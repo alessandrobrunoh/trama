@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideCircleCheck, LucideCopy, LucideDynamicIcon, LucideInfo, LucidePlus, LucideTriangleAlert } from '@lucide/angular';
+import { LucideCircleCheck, LucideCopy, LucideDynamicIcon, LucideEllipsis, LucideInfo, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { Clipboard } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { DEFAULT_TOKEN_LIMITS, MAX_TOKEN_LIMITS, TOKEN_SCOPES, type ApiPermission, type ApiToken, type TokenLimits, type TokenScope } from '../../../core/contracts/domain';
-import { ActorAvatar } from '../../../shared/actor-avatar';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { AppSelect, type Option } from '../../create/form-kit';
 import { ConnectSnippets } from './connect-snippets';
@@ -23,7 +23,7 @@ const EXPIRY: Option[] = [
 ];
 
 /** Columns of the token table from the md breakpoint up (token, acts as, scope, limit, expires, last used, action). */
-const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_72px]';
+const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_104px_104px_32px]';
 
 /**
  * Settings · API tokens (v4 frame): tokens for scripts, CI, agents and MCP clients as a table (scope, cap,
@@ -32,7 +32,7 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
 @Component({
   selector: 'app-api-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon, RouterLink, ActorAvatar, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, PermissionMatrix, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmDropdownMenuImports, LucideDynamicIcon, RouterLink, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, PermissionMatrix, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
@@ -40,8 +40,8 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
       title="API tokens"
       description="Tokens for scripts, CI and MCP clients. They act as you or as an agent, capped by the scope you pick."
     >
-      @if (canCreate() && !creating() && !secret()) {
-        <button actions hlmBtn size="sm" (click)="creating.set(true)">
+      @if (canCreate() && !creating()) {
+        <button actions hlmBtn size="sm" (click)="startCreate()">
           <svg [lucideIcon]="plusIcon" [size]="13"></svg>
           New token
         </button>
@@ -55,25 +55,16 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
       <div class="border-green/40 bg-green/10 flex flex-col gap-2.5 border px-4 py-3.5">
         <div class="flex items-center gap-2.5">
           <svg [lucideIcon]="created" [size]="15" class="text-green shrink-0"></svg>
-          <span class="text-foreground text-[13px]">Token created</span>
+          <span class="text-foreground text-[13px]">Token “{{ createdName() }}” created</span>
           <span class="flex-1"></span>
           <span class="text-muted-foreground font-mono text-[10.5px]">shown once</span>
         </div>
-        <p class="text-status-needs-input flex items-center gap-1.5 text-[13px]">
-          <svg [lucideIcon]="warn" [size]="14"></svg>
-          Copy this token now. You will not be able to see it again.
-        </p>
         <div class="flex items-center gap-2">
           <code class="bg-bg-deep border-border text-foreground min-w-0 flex-1 border px-2.5 py-2 font-mono text-[12px] break-all select-all">{{ s }}</code>
           <button hlmBtn size="sm" class="shrink-0" (click)="copySecret(s)">
             <svg [lucideIcon]="copyIcon" [size]="13"></svg>
             Copy
           </button>
-        </div>
-        <p class="text-muted-foreground text-xs">Use it like this. The commands below already contain your token.</p>
-        <app-connect-snippets [token]="s" [scope]="createdScope()" />
-        <div class="flex justify-end">
-          <button hlmBtn size="sm" variant="outline" (click)="secret.set(null)">Done</button>
         </div>
       </div>
     } @else if (creating()) {
@@ -146,10 +137,8 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
 
     <div class="bg-card border-border border">
       <div class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px]" [class]="cols">
-        <span>{{ canAdmin() ? 'TOKEN' : 'YOUR TOKENS' }}</span>
-        <span>ACTS AS</span>
+        <span>TOKEN</span>
         <span>SCOPE</span>
-        <span>LIMIT</span>
         <span>EXPIRES</span>
         <span>LAST USED</span>
         <span></span>
@@ -160,14 +149,9 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
             <span class="text-foreground truncate text-[13px]">{{ t.name }}</span>
             <span class="text-faint font-mono text-[10.5px]">{{ t.prefix }}</span>
           </div>
-          <span class="text-foreground flex min-w-0 items-center gap-1.5 text-[12.5px]" title="Acts as">
-            <app-actor-avatar [actor]="t.actor" [size]="18" />
-            <span class="truncate">{{ actorName(t) }}</span>
-          </span>
           <span>
             <span class="border-border bg-secondary text-text-2 inline-block border px-[7px] py-0.5 font-mono text-[11px]" [title]="scopeTitle(t)">{{ scopeInfo(t.scope).label }}@if (t.permissions) { · {{ t.permissions.length }} }</span>
           </span>
-          <span class="text-muted-foreground font-mono text-[10.5px]" [title]="limitTitle(t)">{{ limitText(t) }}</span>
           <span class="font-mono text-[10.5px]">
             @if (isExpired(t)) {
               <span class="text-red">Expired</span>
@@ -181,16 +165,21 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
           <span class="flex justify-end">
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground text-[12.5px]"
-              [attr.aria-label]="'Revoke ' + t.name"
-              (click)="revoke(t)"
+              class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -m-1 p-1 outline-none focus-visible:ring-2"
+              [hlmDropdownMenuTrigger]="tokenMenu"
+              [attr.aria-label]="'Actions for ' + t.name"
             >
-              Revoke
+              <svg [lucideIcon]="moreIcon" [size]="14"></svg>
             </button>
+            <ng-template #tokenMenu>
+              <hlm-dropdown-menu class="w-40">
+                <button hlmDropdownMenuItem variant="destructive" (triggered)="revoke(t)">Revoke</button>
+              </hlm-dropdown-menu>
+            </ng-template>
           </span>
         </div>
       } @empty {
-        <div class="text-faint px-4 py-8 text-center font-mono text-[11.5px]">No tokens yet. Create one to let a script or agent call the API.</div>
+        <div class="text-faint px-4 py-8 text-center font-mono text-[11.5px]">No tokens yet.</div>
       }
     </div>
 
@@ -202,7 +191,7 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
       </p>
     </div>
 
-    <app-settings-block title="Use it" description="With a token, call the REST API, install the CLI and skill, or add the MCP server to a client.">
+    <app-settings-block title="Use it">
       <app-connect-snippets [scope]="'write'" />
     </app-settings-block>
 
@@ -210,7 +199,6 @@ const COLS = 'md:grid md:grid-cols-[minmax(0,1fr)_120px_96px_104px_104px_104px_7
       <app-settings-card>
         @for (l of limitFields; track l.key) {
           <app-card-row [label]="l.label">
-            <span class="text-faint font-mono text-[10.5px]">up to {{ l.max }}</span>
             <span class="text-foreground font-mono text-[12px]">{{ l.default }}</span>
           </app-card-row>
         }
@@ -228,7 +216,7 @@ export class ApiSection {
   protected readonly field = SETTINGS_FIELD;
   protected readonly cols = COLS;
   protected readonly plusIcon = LucidePlus;
-  protected readonly warn = LucideTriangleAlert;
+  protected readonly moreIcon = LucideEllipsis;
   protected readonly created = LucideCircleCheck;
   protected readonly copyIcon = LucideCopy;
   private readonly clipboard = inject(Clipboard);
@@ -253,7 +241,7 @@ export class ApiSection {
     { key: 'writesPerMinute', label: 'Writes / minute', default: DEFAULT_TOKEN_LIMITS.writesPerMinute, max: MAX_TOKEN_LIMITS.writesPerMinute },
     { key: 'writesPerDay', label: 'Writes / day', default: DEFAULT_TOKEN_LIMITS.writesPerDay, max: MAX_TOKEN_LIMITS.writesPerDay },
   ];
-  protected readonly createdScope = signal<TokenScope>('write');
+  protected readonly createdName = signal('');
   protected readonly actorOptions = computed<Option[]>(() => [
     { value: ME, label: `Me (${this.store.me()?.name ?? 'you'})` },
     ...(this.canAgents() ? this.store.agents().map((a) => ({ value: a.id, label: a.name, hint: 'agent' })) : []),
@@ -299,20 +287,13 @@ export class ApiSection {
   protected scopeInfo(s: TokenScope | undefined) {
     return TOKEN_SCOPES[s ?? 'write'];
   }
-  /** The request cap of a token, or the workspace default when it has none of its own. */
-  protected limitText(t: ApiToken): string {
-    return `${t.limits?.requestsPerMinute ?? DEFAULT_TOKEN_LIMITS.requestsPerMinute} / min`;
-  }
-  protected limitTitle(t: ApiToken): string {
-    const l = t.limits ?? DEFAULT_TOKEN_LIMITS;
-    return `Caps: ${l.requestsPerMinute} requests/min, ${l.writesPerMinute} writes/min, ${l.writesPerDay} writes/day`;
-  }
   protected isExpired(t: ApiToken): boolean {
     return !!t.expiresAt && new Date(t.expiresAt).getTime() <= this.now;
   }
-  protected actorName(t: ApiToken): string {
-    if (t.actor.type === 'user' && t.actor.id === this.store.me()?.id) return 'You';
-    return this.store.resolveActor(t.actor).name;
+
+  protected startCreate(): void {
+    this.secret.set(null);
+    this.creating.set(true);
   }
 
   protected cancel(): void {
@@ -347,7 +328,7 @@ export class ApiSection {
     this.busy.set(false);
     if (created) {
       this.cancel();
-      this.createdScope.set(created.token.scope);
+      this.createdName.set(created.token.name);
       this.secret.set(created.secret);
     }
   }

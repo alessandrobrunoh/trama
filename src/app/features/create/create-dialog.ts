@@ -16,13 +16,8 @@ import {
   LucideCircleUser,
   LucideDynamicIcon,
   LucideBox,
-  LucideGauge,
   LucideLayers,
   LucideListTree,
-  LucideMessageSquare,
-  LucideShapes,
-  LucideTag,
-  LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -46,7 +41,6 @@ import {
   type ViewLayout,
 } from '../../core/contracts/domain';
 import {
-  ISSUE_KIND_META,
   ISSUE_KINDS,
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
@@ -59,13 +53,9 @@ import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { Kbd } from '../../shared/kbd';
 import { LabelCatalog } from '../../shared/label-catalog';
-import { V3_FIELD, V3_TEXTAREA, V3DialogFoot, V3DialogHead, V3Field, V3Toggle } from '../../shared/v3';
-import { issueEstimateOptions } from '../issues/issue-model';
-import { isValidThreadUrl, toThreadUrl } from '../issues/issue-thread-link';
+import { V3_FIELD, V3_TEXTAREA, V3DialogFoot, V3DialogHead, V3Field } from '../../shared/v3';
 import { Picker, type PickOption } from '../../shared/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
-import { DraftSuggestions } from '../ai/draft-suggestions';
-import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 import { EntityChip } from '../../shared/entity-chip';
 
 type ComposerKind = 'issue';
@@ -134,14 +124,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     Picker,
     AppSelect,
     FormRow,
-    DraftSuggestions,
     EntityChip,
     Kbd,
     HlmKbd,
     V3DialogHead,
     V3DialogFoot,
     V3Field,
-    V3Toggle,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -152,8 +140,8 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
         [showCloseButton]="false"
         (keydown.meta.enter)="submit($event)"
         (keydown.control.enter)="submit($event)"
-        (keydown.meta.shift.enter)="submit($event, false, true)"
-        (keydown.control.shift.enter)="submit($event, false, true)"
+        (keydown.meta.shift.enter)="submit($event, true)"
+        (keydown.control.shift.enter)="submit($event, true)"
       >
         <!-- v3 · 15: kicker + Newsreader title + esc, then Body (padding 18, gap 14) and Foot -->
         <v3-dialog-head [kicker]="'NEW ' + kindLabel().toUpperCase()" (dismiss)="ui.closeModal()">
@@ -164,12 +152,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
         </p>
 
         <form (submit)="submit($event)" novalidate class="flex flex-col" [class]="composer() ? '' : 'sm:min-w-md'">
-          @if (restored()) {
-            <div class="bg-secondary text-muted-foreground mx-[18px] mt-3.5 flex items-center gap-2 px-2.5 py-1.5 font-mono text-[10.5px]" data-testid="draft-restored">
-              Restored your unsent {{ kindLabel().toLowerCase() }}.
-              <button type="button" class="text-foreground ml-auto underline-offset-2 hover:underline" (click)="discardDraft()">Discard</button>
-            </div>
-          }
           @if (composer()) {
             <div class="flex flex-col gap-3.5 p-[18px]">
               <!-- title + description -->
@@ -203,21 +185,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 ></textarea>
               </v3-field>
 
-              <!-- quick suggestions -->
-              <app-draft-suggestions
-                [kind]="composer()!.kind"
-                [title]="title()"
-                [description]="text()"
-                [disabled]="busy()"
-                [current]="suggestionCurrent()"
-                (titleAccepted)="title.set($event)"
-                (descriptionAccepted)="text.set($event)"
-                (questionPicked)="addQuestion($event)"
-                (triageAccepted)="applyIssueSuggestion($event)"
-                (settingsRequested)="ui.closeModal()"
-              />
-
-              <!-- property pills -->
+              <!-- property pills: Status, Priority, Assignee, Project -->
               <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Task properties">
               @switch (kind()) {
                 @case ('issue') {
@@ -259,39 +227,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       (valueChange)="projectId.set($event[0] ?? '')"
                     />
                   }
-                  @if (showEstimate()) {
-                    <app-picker
-                      variant="pill"
-                      label="Estimate"
-                      [icon]="estimateIcon"
-                      [searchable]="false"
-                      [options]="issueEstimateChoices()"
-                      [value]="opt(issueEstimate())"
-                      [clearable]="true"
-                      clearLabel="No estimate"
-                      (valueChange)="issueEstimate.set($event[0] ?? '')"
-                    />
-                  }
-                  @if (labelOptions().length) {
-                    <app-picker
-                      variant="pill"
-                      label="Labels"
-                      [icon]="labelIcon"
-                      [multiple]="true"
-                      [options]="labelOptions()"
-                      [value]="labelIds()"
-                      (valueChange)="setLabels($event)"
-                    />
-                  }
-                  <app-picker
-                    variant="pill"
-                    label="Type"
-                    [icon]="typeIcon"
-                    [searchable]="false"
-                    [options]="issueKindOptions"
-                    [value]="[issueKind()]"
-                    (valueChange)="setOne(issueKind, $event)"
-                  />
                 }
               }
               </div>
@@ -313,35 +248,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
               }
 
               @if (kind() === 'issue') {
-                <!-- Optional Delta thread -->
-                <div>
-                  <div class="bg-background border-border focus-within:border-primary flex h-[34px] items-center gap-2 border px-2.5 transition-colors">
-                    <svg
-                      [lucideIcon]="threadIcon"
-                      [size]="14"
-                      class="text-delta shrink-0"
-                      aria-hidden="true"
-                    ></svg>
-                    <input
-                      class="placeholder:text-faint min-w-0 flex-1 bg-transparent font-mono text-[11.5px] outline-none"
-                      placeholder="Thread link (optional), e.g. https://delta.dev/…"
-                      [(ngModel)]="threadUrl"
-                      name="threadUrl"
-                      autocomplete="off"
-                      spellcheck="false"
-                      aria-label="Thread link"
-                      [attr.aria-invalid]="!!err('thread')"
-                    />
-                  </div>
-                  @if (err('thread'); as e) {
-                    <p class="text-red mt-1.5 font-mono text-[10.5px]" role="alert">{{ e }}</p>
-                  }
-                </div>
-
-                <label class="flex items-center gap-2.5 text-[13px]">
-                  <span class="min-w-0 flex-1">Create more</span>
-                  <v3-toggle [(checked)]="createMore" aria-label="Create more" />
-                </label>
                 <p class="text-faint font-mono text-[10.5px] leading-[15px]">
                   Start it from Delta with /trama once it exists — one thread per task or subtask.
                 </p>
@@ -378,9 +284,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Project tag"
                     />
                   </app-form-row>
-                  <p class="text-muted-foreground -mt-1 text-xs">
-                    Prefixes task keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
-                  </p>
                   <app-form-row label="Summary" [optional]="true">
                     <input
                       hlmInput
@@ -389,17 +292,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       name="projectSummary"
                       autocomplete="off"
                       aria-label="Project summary"
-                    />
-                  </app-form-row>
-                  <app-form-row label="Repository" [optional]="true">
-                    <input
-                      hlmInput
-                      class="font-mono"
-                      placeholder="owner/name or https://github.com/owner/name"
-                      [(ngModel)]="repositoryText"
-                      name="repository"
-                      autocomplete="off"
-                      aria-label="Repository"
                     />
                   </app-form-row>
                 }
@@ -443,27 +335,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       </label>
                     </app-form-row>
                   </div>
-                  @if (viewSummary(); as s) {
-                    <p class="text-muted-foreground text-xs">Saves the current setup: {{ s }}.</p>
-                  }
                 }
               }
             </div>
           }
 
           <v3-dialog-foot [hint]="composer() ? anotherHint : ''">
-            @if (composer()) {
-              <button
-                hlmBtn
-                type="button"
-                variant="ghost"
-                class="max-sm:h-10"
-                [disabled]="busy()"
-                (click)="saveDraft($event)"
-              >
-                Save as draft
-              </button>
-            }
             <button hlmBtn type="button" variant="outline" class="max-sm:h-10" hlmDialogClose>
               Cancel <kbd hlmKbd class="h-4 max-sm:hidden">esc</kbd>
             </button>
@@ -501,11 +378,7 @@ export class CreateDialog {
   private readonly labelCatalog = inject(LabelCatalog);
 
   protected readonly userIcon = LucideCircleUser;
-  protected readonly typeIcon = LucideShapes;
   protected readonly projectIcon = LucideBox;
-  protected readonly estimateIcon = LucideGauge;
-  protected readonly labelIcon = LucideTag;
-  protected readonly threadIcon = LucideMessageSquare;
   protected readonly subtaskIcon = LucideListTree;
   protected readonly fieldClass = V3_FIELD;
   protected readonly textareaClass = V3_TEXTAREA;
@@ -530,34 +403,16 @@ export class CreateDialog {
   // issue
   protected readonly issueStatus = signal<string>('backlog');
   protected readonly issueKind = signal<string>('bug');
-  /** Story points as a string ('' = none). */
+  /** Story points as a string ('' = none); carried from the opening context, not edited here. */
   protected readonly issueEstimate = signal('');
-  /** The workspace turned estimates off: do not offer the chip. */
-  protected readonly showEstimate = computed(() => this.store.estimateScale() !== 'none');
-  protected readonly issueEstimateChoices = computed<PickOption[]>(() =>
-    issueEstimateOptions(undefined, this.store.estimateScale()),
-  );
   protected readonly assigneeId = signal('');
-  /** Workspace label ids. */
+  /** Workspace label ids; carried from the opening context, not edited here. */
   protected readonly labelIds = signal<string[]>([]);
-  protected readonly labelOptions = computed<PickOption[]>(() => {
-    const { suggested, rest } = this.labelCatalog.arrange(new Set(this.labelIds()), false, 'issue');
-    return [...suggested, ...rest].map((l) => ({
-      value: l.id,
-      label: l.name,
-      kind: 'label' as const,
-      color: l.color,
-    }));
-  });
-  /** Optional git repository: a URL or `owner/name`, not a registry id. */
-  protected readonly repositoryText = signal('');
   protected readonly projectId = signal('');
   protected readonly projectKey = signal('');
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
   /** Parent issue supplied by the opening context; not persisted in the generic issue draft. */
   protected readonly parentId = signal('');
-  /** Optional link to the Delta thread working on the task. */
-  protected readonly threadUrl = signal('');
   private projectKeyTouched = false;
   protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
@@ -569,12 +424,9 @@ export class CreateDialog {
     layout?: ViewLayout;
   } = {};
   protected readonly viewPreset = signal(false);
-  protected readonly viewSummary = signal('');
 
-  protected readonly createMore = signal(false);
   protected readonly busy = signal(false);
   private readonly submitted = signal(false);
-  private readonly draftAttempt = signal(false);
 
   // ── options ──
   protected readonly priorityOptions: PickOption[] = PRIORITIES.map((p) => ({
@@ -590,11 +442,6 @@ export class CreateDialog {
       statusEntity: 'issue' as const,
     }));
   }
-  protected readonly issueKindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({
-    value: k,
-    label: ISSUE_KIND_META[k].label,
-    kind: 'kind' as const,
-  }));
   protected readonly viewEntityOptions: Option[] = [
     { value: 'issue', label: 'Tasks' },
     { value: 'project', label: 'Projects' },
@@ -632,9 +479,6 @@ export class CreateDialog {
     () => 'Add a description, steps to reproduce, links… Markdown supported.',
   );
 
-  /** True while the form shows text restored from an unsent draft. */
-  protected readonly restored = signal(false);
-
   constructor() {
     // Reset the form from the context defaults each time the dialog opens.
     effect(() => {
@@ -660,7 +504,6 @@ export class CreateDialog {
         assigneeId: this.assigneeId(),
         projectId: this.projectId(),
         tags: this.tags(),
-        threadUrl: this.threadUrl(),
       };
       const kind = this.kind();
       untracked(() => {
@@ -677,7 +520,6 @@ export class CreateDialog {
 
   /** Bring back the unsent text of this kind, unless the dialog was opened with its own prefill. */
   private restoreDraft(kind: CreateKind, d: Record<string, unknown>): void {
-    this.restored.set(false);
     if (!SWITCHER.some((k) => k.kind === kind)) return;
     if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement'])) return;
     const draft = this.drafts.get<Record<string, unknown>>(this.draftKey(kind));
@@ -690,16 +532,6 @@ export class CreateDialog {
     if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
     if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
     this.tags.set(asStr(draft['tags']));
-    this.threadUrl.set(asStr(draft['threadUrl']));
-    this.restored.set(true);
-  }
-
-  /** Throw the restored text away and start from the context defaults. */
-  protected discardDraft(): void {
-    this.drafts.set(this.draftKey(this.kind()), null);
-    this.reset(this.kind(), this.ui.createDefaults());
-    this.restored.set(false);
-    this.focusTitle();
   }
 
   private reset(kind: CreateKind, d: Record<string, unknown>): void {
@@ -725,7 +557,6 @@ export class CreateDialog {
         .slice(0, this.labelCatalog.maxPerRecord),
     );
     this.parentId.set(asStr(d['parentId']));
-    this.repositoryText.set(asStr(d['repository']));
 
     this.projectKeyTouched = false;
     this.projectKey.set(
@@ -736,7 +567,6 @@ export class CreateDialog {
           )
         : '',
     );
-    this.threadUrl.set(asStr(d['threadUrl']));
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'issue');
     this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
@@ -756,42 +586,13 @@ export class CreateDialog {
       !!entity &&
         (!!this.viewExtras.filters || !!this.viewExtras.sort || !!this.viewExtras.groupBy),
     );
-    this.viewSummary.set(this.describeViewExtras());
 
     this.submitted.set(false);
-    this.draftAttempt.set(false);
     this.busy.set(false);
-  }
-
-  private describeViewExtras(): string {
-    const x = this.viewExtras;
-    const bits: string[] = [];
-    if (x.filters?.length)
-      bits.push(`${x.filters.length} filter${x.filters.length === 1 ? '' : 's'}`);
-    if (x.sort) bits.push(`sorted by ${x.sort.field} ${x.sort.direction}`);
-    if (x.groupBy) bits.push(`grouped by ${x.groupBy}`);
-    if (x.layout) bits.push(`${x.layout} layout`);
-    return bits.join(' · ');
-  }
-
-  /** What the draft already has, so quick suggestions skip no-ops. */
-  protected readonly suggestionCurrent = computed(() => ({
-    priority: this.priority(),
-    kind: this.issueKind(),
-    estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
-    assigneeId: this.assigneeId(),
-  }));
-
-  protected addQuestion(question: string): void {
-    this.text.update((t) => `${t.trimEnd()}${t.trim() ? '\n\n' : ''}${question}\n`);
   }
 
   protected opt(v: string): string[] {
     return v ? [v] : [];
-  }
-
-  protected setLabels(ids: string[]): void {
-    this.labelIds.set(ids.slice(0, this.labelCatalog.maxPerRecord));
   }
 
   protected setOne(sig: { set: (v: string) => void }, values: string[]): void {
@@ -818,16 +619,10 @@ export class CreateDialog {
     this.projectKey.set(v.toUpperCase());
   }
 
-  protected err(field: 'title' | 'key' | 'thread'): string | null {
+  protected err(field: 'title' | 'key'): string | null {
     if (!this.submitted()) return null;
     const k = this.kind();
     switch (field) {
-      case 'thread': {
-        const raw = this.threadUrl().trim();
-        return k !== 'issue' || !raw || isValidThreadUrl(toThreadUrl(raw))
-          ? null
-          : 'Use a full http(s) link, for example https://delta.dev/…';
-      }
       case 'title':
         return this.title().trim() ? null : k === 'issue' ? 'Give it a title.' : 'Required.';
       case 'key':
@@ -846,50 +641,20 @@ export class CreateDialog {
   }
 
   private valid(): boolean {
-    return (['title', 'key', 'thread'] as const).every((f) => !this.err(f));
+    return (['title', 'key'] as const).every((f) => !this.err(f));
   }
 
   private focusTitle(delay = 0): void {
     setTimeout(() => this.titleEl()?.nativeElement.focus(), delay);
   }
 
-  protected applyIssueSuggestion(suggestion: AiIssueDraftSuggestion): void {
-    switch (suggestion.field) {
-      case 'priority':
-        this.priority.set(suggestion.value);
-        break;
-      case 'kind':
-        this.issueKind.set(suggestion.value);
-        break;
-      case 'estimate':
-        this.issueEstimate.set(String(suggestion.value));
-        break;
-      case 'assigneeId':
-        this.assigneeId.set(suggestion.value);
-        break;
-    }
-  }
-
-  protected saveDraft(ev: Event): void {
-    this.draftAttempt.set(true);
-    void this.submit(ev, true);
-  }
-
-  /** `another`: keep the dialog open for the next task (⇧⌘↵), whatever "Create more" says. */
-  protected async submit(ev: Event, asDraft = false, another = false): Promise<void> {
+  /** `another`: keep the dialog open for the next task (⇧⌘↵). */
+  protected async submit(ev: Event, another = false): Promise<void> {
     ev.preventDefault();
     ev.stopPropagation();
     if (this.busy()) return;
-    if (asDraft) {
-      if (!this.title().trim() || this.err('thread')) {
-        this.submitted.set(true);
-        return;
-      }
-    } else {
-      this.draftAttempt.set(false);
-      this.submitted.set(true);
-      if (!this.valid()) return;
-    }
+    this.submitted.set(true);
+    if (!this.valid()) return;
     this.busy.set(true);
     try {
       const slug = this.store.slug();
@@ -898,19 +663,17 @@ export class CreateDialog {
       let done: { label: string; path: string[] } | undefined;
       switch (this.kind()) {
         case 'issue': {
-          const status = asDraft ? 'draft' : (this.issueStatus() as IssueStatus);
           const i = await this.store.createIssue({
             kind: this.issueKind() as IssueKind,
             title,
             body: this.text().trim() || undefined,
             priority: this.priority() as Priority,
-            status,
+            status: this.issueStatus() as IssueStatus,
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
             labels: this.labelIds().length ? this.labelIds() : undefined,
             parentId: this.parentId() || undefined,
-            threadUrl: this.threadUrl().trim() ? toThreadUrl(this.threadUrl()) : undefined,
           });
           if (i) {
             done ={ label: `${i.key} created`, path: ['tasks', i.key] };
@@ -922,7 +685,6 @@ export class CreateDialog {
             name: title,
             key: this.projectKey().trim().toUpperCase(),
             summary: this.text().trim() || undefined,
-            repository: this.repositoryText().trim() || undefined,
           });
           if (p) {
             done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
@@ -944,7 +706,6 @@ export class CreateDialog {
           return;
       }
       if (!done) return; // the store already toasted the failure; keep the form open
-      if (asDraft && this.kind() === 'issue') done.label = `${done.path[1]} saved as draft`;
       const commands = ['/', slug, ...done.path];
       // Linear behaviour: stay where you are, offer "Open" in the toast.
       // Views and projects are destinations of their own, so those still navigate.
@@ -956,13 +717,11 @@ export class CreateDialog {
           : { label: 'Open', run: () => void this.router.navigate(commands) },
       });
       this.drafts.set(this.draftKey(this.kind()), null);
-      if ((this.createMore() || another) && this.composer()) {
+      if (another && this.composer()) {
         this.title.set('');
         this.text.set('');
         this.text2.set('');
-        this.threadUrl.set('');
         this.submitted.set(false);
-        this.draftAttempt.set(false);
         this.focusTitle();
         return;
       }

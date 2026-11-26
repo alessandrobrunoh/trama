@@ -101,15 +101,6 @@ const LEGEND: readonly { type: string; label: string }[] = [
         <span class="text-muted-foreground">Group</span>
         <span class="text-foreground">{{ groupLabel() }}</span>
       </button>
-      <button
-        type="button"
-        class="border-border flex items-center gap-1.5 border px-2 py-[3px] font-mono text-[11px]"
-        [attr.aria-pressed]="showClosed()"
-        (click)="showClosed.set(!showClosed())"
-      >
-        <span class="text-muted-foreground">Closed</span>
-        <span class="text-foreground">{{ showClosed() ? 'Shown' : 'Hidden' }}</span>
-      </button>
       <div class="border-border flex border" role="group" aria-label="Zoom">
         @for (z of zooms; track z.value) {
           <button
@@ -130,7 +121,7 @@ const LEGEND: readonly { type: string; label: string }[] = [
     @if (!store.ready()) {
       <div class="text-muted-foreground m-auto text-sm">Loading…</div>
     } @else {
-      <app-timeline-chart [projects]="projects()" [zoom]="zoom()" [group]="group()" [showClosed]="showClosed()" />
+      <app-timeline-chart [projects]="projects()" [zoom]="zoom()" [group]="group()" />
     }
 
     <app-status-bar>
@@ -167,17 +158,15 @@ export class TimelinePage {
   protected readonly linkIcon = LucideLink;
   protected readonly chart = viewChild(TimelineChart);
 
-  private readonly saved = readJson<{ zoom: string; group: string; showClosed: boolean }>(STORAGE_KEY);
+  private readonly saved = readJson<{ zoom: string; group: string }>(STORAGE_KEY);
   protected readonly zoom = signal<Zoom>(oneOf(this.saved?.zoom, ZOOM_VALUES, 'month'));
   protected readonly group = signal<TimelineGroup>(oneOf(this.saved?.group, GROUP_VALUES, 'milestone'));
-  protected readonly showClosed = signal(this.saved?.showClosed === true);
 
   protected readonly groupLabel = computed(() => GROUPS.find((g) => g.value === this.group())?.label ?? '');
 
   protected readonly projects = computed(() => {
     const statuses = this.store.settings().statuses.project;
     return this.store.projects().filter((p) => {
-      if (this.showClosed()) return true;
       const type = statusTypeOf(statuses, p.status);
       return type !== 'completed' && type !== 'canceled';
     });
@@ -196,7 +185,7 @@ export class TimelinePage {
 
   constructor() {
     effect(() =>
-      writeJson(STORAGE_KEY, { zoom: this.zoom(), group: this.group(), showClosed: this.showClosed() }),
+      writeJson(STORAGE_KEY, { zoom: this.zoom(), group: this.group() }),
     );
   }
 

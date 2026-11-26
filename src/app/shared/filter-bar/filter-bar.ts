@@ -8,7 +8,6 @@
 //     [filters]="filters()" (filtersChange)="filters.set($event)"
 //     [items]="items()" [ctx]="ctx()"                   <!-- what the value counts are taken from -->
 //     [locked]="scope()"                                <!-- a scope the user cannot remove (My tasks) -->
-//     [matchable]="true" [match]="match()" (matchChange)="match.set($event)"   <!-- All / Any -->
 //     [sort]="sort()" (sortChange)="setSort($event)"
 //     [groupBy]="group()" (groupByChange)="setGroup($event)">
 //     <div leading>…</div>                      <!-- optional, before the chips (layout switch) -->
@@ -29,7 +28,6 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { LucideDynamicIcon, LucideLock, LucidePlus } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import {
@@ -127,7 +125,6 @@ interface ViewChip {
   imports: [
     HlmDropdownMenuImports,
     HlmPopoverImports,
-    LucideDynamicIcon,
     FilterChip,
     FilterMenu,
   ],
@@ -177,7 +174,6 @@ interface ViewChip {
     @for (l of lockedChips(); track l.field) {
       <app-filter-chip [label]="l.aria" [active]="false" [removable]="false">
         <span [class]="segment" [attr.title]="'Always applied on this page'">
-          <svg [lucideIcon]="lockIcon" [size]="10" class="text-faint"></svg>
           <span class="text-muted-foreground">{{ l.label }}</span>
         </span>
         <span [class]="segment + ' text-foreground'">{{ l.opText }}</span>
@@ -187,27 +183,6 @@ interface ViewChip {
           </span>
         }
       </app-filter-chip>
-    }
-
-    @if (matchable() && canEdit() && activeCount() > 1) {
-      <span
-        class="border-border flex h-[22px] shrink-0 items-stretch border font-mono text-[11px]"
-        role="group"
-        aria-label="Match filters"
-      >
-        <span class="text-faint flex items-center px-1.5">Match</span>
-        @for (m of matchOptions; track m.id) {
-          <button
-            type="button"
-            class="border-border -ms-px flex items-center border-l px-2 outline-none focus-visible:underline"
-            [class]="match() === m.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="match() === m.id"
-            (click)="matchChange.emit(m.id)"
-          >
-            {{ m.label }}
-          </button>
-        }
-      </span>
     }
 
     @for (c of chips(); track c.field) {
@@ -290,17 +265,8 @@ interface ViewChip {
       </app-filter-chip>
     }
 
-    @if (canEdit() && activeCount()) {
-      <button
-        type="button"
-        class="text-faint hover:text-foreground hover:bg-hover inline-flex h-[22px] shrink-0 items-center px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
-        (click)="clear()"
-      >
-        Clear
-      </button>
-    }
-
     @if (canEdit() && fields().length) {
+      <!-- No visible "+" (the v3 bar has none): Filter · F opens this menu, anchored where the chips end. -->
       <hlm-popover
         class="contents"
         align="start"
@@ -311,12 +277,11 @@ interface ViewChip {
         <button
           hlmPopoverTrigger
           type="button"
-          class="text-faint hover:text-foreground hover:bg-hover aria-expanded:text-foreground inline-flex size-[22px] shrink-0 items-center justify-center font-mono text-[11px] outline-none focus-visible:underline"
+          class="sr-only"
+          tabindex="-1"
           aria-label="Add filter"
           aria-keyshortcuts="f"
-        >
-          <svg [lucideIcon]="plusIcon" [size]="12"></svg>
-        </button>
+        ></button>
         <hlm-popover-content *hlmPopoverPortal class="w-72 gap-0 p-0">
           <app-filter-menu
             [entity]="entity()"
@@ -454,9 +419,6 @@ export class FilterBar {
   readonly locked = input<readonly ViewFilter[]>([]);
   /** Fields shown up front as "Assignee any" chips until a filter is set on them (the v3 chip row). */
   readonly suggested = input<readonly string[]>([]);
-  /** Offer the All / Any switch once there are two filters. */
-  readonly matchable = input(false);
-  readonly match = input<FilterMatch>('all');
   /** Named views as chips of their own, by field. */
   readonly presets = input<Readonly<Record<string, readonly FilterPreset[]>>>({});
   /** The preset in force, by field (an id of `presets[field]`). */
@@ -465,17 +427,10 @@ export class FilterBar {
   readonly filtersChange = output<ViewFilter[]>();
   readonly sortChange = output<FilterBarSort | null>();
   readonly groupByChange = output<string | null>();
-  readonly matchChange = output<FilterMatch>();
   readonly presetPick = output<{ field: string; id: string }>();
 
-  protected readonly plusIcon = LucidePlus;
-  protected readonly lockIcon = LucideLock;
   protected readonly segment = CHIP_SEGMENT;
   protected readonly segmentButton = CHIP_SEGMENT_BUTTON;
-  protected readonly matchOptions: readonly { id: FilterMatch; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'any', label: 'Any' },
-  ];
 
   protected readonly addOpen = signal(false);
   /** The field whose value popover is open. */
@@ -647,10 +602,6 @@ export class FilterBar {
 
   protected removeFilter(field: string): void {
     this.filtersChange.emit(replaceFilter(this.filters(), field, null));
-  }
-
-  protected clear(): void {
-    this.filtersChange.emit([]);
   }
 
   /** The operator segment: keep the values when the new operator reads them the same way, else start over. */

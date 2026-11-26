@@ -76,7 +76,7 @@ export class CodeBlock {
 /** Installer of the trama CLI (see cli/README.md). */
 const INSTALL_URL = 'https://raw.githubusercontent.com/alessandrobrunoh/trama/main/cli/install/install.sh';
 
-type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'write' | 'context';
+type Tab = 'mcp-cli' | 'mcp-json' | 'cli' | 'read' | 'write';
 
 /**
  * Copy-paste examples for connecting an MCP client (the trama-mcp server) or calling the Trama REST
@@ -88,13 +88,7 @@ type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'wri
   imports: [CodeBlock],
   host: { class: 'flex flex-col gap-3' },
   template: `
-    <app-code-block [code]="code()" [label]="current().label" [tabs]="tabs()" [activeTab]="tab()" (tabChange)="setTab($event)" />
-    <p class="text-muted-foreground text-[12px] leading-[18px]">{{ current().hint }}</p>
-    @if (!token()) {
-      <p class="text-muted-foreground text-[12px] leading-[18px]">
-        <code class="font-mono">trm_YOUR_TOKEN</code> is a placeholder: the real secret is only shown once, when the token is created.
-      </p>
-    }
+    <app-code-block [code]="code()" [label]="label()" [tabs]="tabs()" [activeTab]="tab()" (tabChange)="setTab($event)" />
   `,
 })
 export class ConnectSnippets {
@@ -111,7 +105,6 @@ export class ConnectSnippets {
   protected readonly apiUrl = computed(() => (this.base.startsWith('/') && typeof location !== 'undefined' ? location.origin + this.base : this.base));
   protected readonly slug = computed(() => this.store.slug() ?? 'my-workspace');
   private readonly secret = computed(() => this.token() ?? 'trm_YOUR_TOKEN');
-  private readonly exampleKey = computed(() => this.store.issues()[0]?.key ?? 'CORA-142');
 
   protected setTab(id: string): void {
     this.tab.set(id as Tab);
@@ -120,38 +113,21 @@ export class ConnectSnippets {
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [
     { id: 'mcp-cli', label: 'MCP · Claude Code' },
     { id: 'mcp-json', label: 'MCP · JSON config' },
-    { id: 'mcp-docker', label: 'MCP · Docker' },
     { id: 'cli', label: 'CLI' },
-    { id: 'env', label: 'Environment' },
     { id: 'read', label: 'Read (curl)' },
     ...(this.scope() === 'read' ? [] : [{ id: 'write' as Tab, label: 'Write (curl)' }]),
-    { id: 'context', label: 'Agent context' },
   ]);
 
-  protected readonly current = computed<{ label: string; hint: string }>(() => {
+  protected readonly label = computed(() => {
     switch (this.tab()) {
       case 'mcp-cli':
-        return { label: 'Claude Code command', hint: 'Adds the Trama MCP server to Claude Code. The key decides which tools the model sees: tools it may not use are hidden.' };
+        return 'Claude Code command';
       case 'mcp-json':
-        return { label: 'MCP config', hint: 'For clients that take a Streamable HTTP server with headers (Cursor, Windsurf, VS Code…). Same key, same permissions.' };
-      case 'mcp-docker':
-        return { label: 'docker command', hint: 'Run your own MCP server next to the API. Clients then connect to http://localhost:8080/mcp with the same Authorization header.' };
+        return 'MCP config';
       case 'cli':
-        return {
-          label: 'Shell',
-          hint: 'The trama command works anywhere a shell does, with or without MCP. `trama login` asks for the token (so it never lands in your shell history) and saves it; `trama skill install` teaches your coding agent the commands.',
-        };
-      case 'env':
-        return { label: 'Environment', hint: 'Read by the trama CLI and by `trama mcp`. Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
-      case 'read':
-        return { label: 'curl command', hint: 'Lists workspace tasks. Any GET route works with every scope.' };
-      case 'write':
-        return { label: 'curl command', hint: 'Files a task. Needs a write (or admin) token; a read token gets 403.' };
-      case 'context':
-        return {
-          label: 'curl command',
-          hint: 'Returns the task and its plan, if present, so an agent can pick up the context.',
-        };
+        return 'Shell';
+      default:
+        return 'curl command';
     }
   });
 
@@ -163,8 +139,6 @@ export class ConnectSnippets {
         return `claude mcp add --transport http trama ${this.mcpUrl} \\\n  --header "Authorization: Bearer ${this.secret()}"`;
       case 'mcp-json':
         return JSON.stringify({ mcpServers: { trama: { url: this.mcpUrl, headers: { Authorization: `Bearer ${this.secret()}` } } } }, null, 2);
-      case 'mcp-docker':
-        return [`docker run --rm -p 8080:8080 \\`, `  -e TRAMA_API_URL=${url} \\`, `  ghcr.io/alessandrobrunoh/trama-mcp:latest`].join('\n');
       case 'cli':
         return [
           `# install (macOS, Linux); on Windows: irm ${INSTALL_URL.replace('install.sh', 'install.ps1')} | iex`,
@@ -175,8 +149,6 @@ export class ConnectSnippets {
           `trama task list --open --limit 5`,
           `trama skill install            # teach Claude Code / agents the commands`,
         ].join('\n');
-      case 'env':
-        return [`TRAMA_API_URL=${url}`, `TRAMA_WORKSPACE=${slug}`, `TRAMA_API_KEY=${this.secret()}`].join('\n');
       case 'read':
         return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/issues"`;
       case 'write':
@@ -186,8 +158,6 @@ export class ConnectSnippets {
           `  -H "Content-Type: application/json" \\`,
           `  -d '{"kind":"bug","title":"Created from the API"}'`,
         ].join('\n');
-      case 'context':
-        return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/issues/${this.exampleKey()}/context"`;
     }
   });
 }

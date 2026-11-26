@@ -26,18 +26,14 @@ import {
 } from '@lucide/angular';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
-import { ProjectChip } from '../../shared/project-chip';
-import { IssueKindLabel } from '../../shared/issue';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { SwipeRow } from '../../shared/swipe-row';
-import { LabelChips } from '../../shared/label-chip';
 import { V3Source, V3Thread, sourceRef } from '../../shared/v3';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue, quietToggleStatus } from './issue-model';
 import { IssueActions } from './issue-actions';
 import { IssueCell } from './issue-cells';
 import { IssueProp } from './issue-prop';
-import { NeedsYou } from './list-preview';
 import { TaskChildren } from './task-children';
 
 /** Shared bits of row + card. */
@@ -45,10 +41,7 @@ import { TaskChildren } from './task-children';
 abstract class IssueItemBase {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
-  private readonly needs = inject(NeedsYou);
   protected readonly actions = inject(IssueActions);
-  /** An open attention item is waiting on the current user. */
-  protected readonly needsYou = computed(() => this.needs.issueIds().has(this.issue().id));
   readonly issue = input.required<Issue>();
   // Keep focus consumption in the item: a hover must not recheck every binding on the board.
   protected readonly focused = computed(() => this.ui.focusedRowId() === this.issue().id);
@@ -70,15 +63,11 @@ abstract class IssueItemBase {
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
     return {
-      kind: !h.has('kind'),
-      project: !h.has('project'),
-      labels: !h.has('labels'),
       estimate: !h.has('estimate'),
       assignee: !h.has('assignee'),
       date: !h.has('date'),
     };
   });
-  protected readonly projectId = computed(() => this.issue().projectId);
   /** Shown when the issue is estimated and the workspace still uses estimates (or the value is kept anyway). */
   protected readonly hasEstimate = computed(() => this.issue().estimate !== undefined && this.issue().estimate !== null);
   /** The estimate cell: an estimated task keeps it; others get an empty cell people can click while estimates are on. */
@@ -154,9 +143,6 @@ abstract class IssueItemBase {
     LucideDynamicIcon,
     IssueProp,
     IssueCell,
-    IssueKindLabel,
-    ProjectChip,
-    LabelChips,
     SwipeRow,
     PriorityIcon,
     V3Source,
@@ -307,24 +293,7 @@ abstract class IssueItemBase {
         [class.text-muted-foreground]="quiet()"
       >
         {{ i.title }}
-        @if (i.duplicateOfId) {
-          <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
-        }
       </span>
-      @if (s.kind && !subtask()) {
-        <app-issue-kind class="max-lg:hidden" [kind]="i.kind" [size]="13" />
-      }
-      @if (s.labels && i.labels.length) {
-        <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
-      }
-      @if (s.project && projectId(); as pid) {
-        <span class="relative flex min-w-0 shrink-0 items-center gap-1 max-lg:hidden">
-          <app-project-chip [projectId]="pid" />
-        </span>
-      }
-      @if (needsYou()) {
-        <span class="bg-primary size-1.5 shrink-0" role="img" aria-label="Needs you"></span>
-      }
       <span class="min-w-0 flex-1"></span>
 
       @if (!subtask()) {
@@ -382,7 +351,7 @@ abstract class IssueItemBase {
       @if (s.assignee) {
         <app-issue-cell
           class="relative"
-          [class]="i.assigneeId ? '' : 'opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100'"
+          [class]="i.assigneeId ? '' : 'invisible'"
           [issue]="i"
           field="assignee"
         />
@@ -519,15 +488,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    LucideDynamicIcon,
-    IssueKindLabel,
-    IssueCell,
-    ProjectChip,
-    LabelChips,
-    V3Thread,
-  ],
+  imports: [RouterLink, LucideDynamicIcon, IssueCell, V3Thread],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -574,13 +535,7 @@ export class IssueRow extends IssueItemBase {
       }
       <div class="flex min-h-[14px] items-center gap-2">
         <span class="text-faint font-mono text-[10.5px] leading-[14px]">{{ i.key }}</span>
-        @if (s.kind) {
-          <app-issue-kind [kind]="i.kind" [size]="13" />
-        }
         <span class="flex-1"></span>
-        @if (needsYou()) {
-          <span class="bg-primary size-1.5 shrink-0" role="img" aria-label="Needs you"></span>
-        }
         <app-issue-cell class="relative" [issue]="i" field="priority" [showLabel]="false" />
       </div>
       <span
@@ -617,25 +572,8 @@ export class IssueRow extends IssueItemBase {
         @if (showStatus()) {
           <app-issue-cell class="relative" [issue]="i" field="status" />
         }
-        @if (s.project && projectId(); as pid) {
-          <app-project-chip [projectId]="pid" />
-        }
-        @if (s.labels && i.labels.length) {
-          <app-label-chips class="relative" [ids]="i.labels" [max]="2" />
-        }
-        @if (hasEstimate() && s.estimate) {
-          <app-issue-cell class="relative" [issue]="i" field="estimate" />
-        }
-        @if (s.date && date() !== '—') {
-          <span
-            class="font-mono text-[10.5px] tabular-nums"
-            [class]="overdue() ? 'text-red' : 'text-faint'"
-            [attr.aria-label]="dateTitle()"
-            >{{ date() }}</span
-          >
-        }
         <span class="flex-1"></span>
-        @if (s.assignee) {
+        @if (s.assignee && i.assigneeId) {
           <app-issue-cell class="relative" [issue]="i" field="assignee" />
         }
       </div>

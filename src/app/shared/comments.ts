@@ -37,8 +37,7 @@ import { splitQuote, toQuote } from './comment-quote';
 
 /**
  * Comment box. The default is a card (input on top, hint and send row under it). `dock` is the bottom bar of
- * the task page: one expanding line with the projected context (status chip, assignee…) on the left and
- * attach + send on the right.
+ * the task page: one expanding line with the send key on the right.
  */
 @Component({
   selector: 'app-comment-composer',
@@ -54,9 +53,6 @@ import { splitQuote, toQuote } from './comment-quote';
       <div
         class="border-border focus-within:border-border-strong flex min-h-10 items-end gap-2 border py-px pr-2 pl-3"
       >
-        <div class="flex shrink-0 items-center gap-0.5 self-center max-sm:hidden">
-          <ng-content />
-        </div>
         <app-comment-input
           #composer
           class="min-w-0 flex-1 [&_textarea]:max-h-40 [&_textarea]:min-h-9 [&_textarea]:resize-none [&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-0! [&_textarea]:py-2 [&_textarea]:text-[13px] [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0 dark:[&_textarea]:bg-transparent"
@@ -64,14 +60,6 @@ import { splitQuote, toQuote } from './comment-quote';
           [placeholder]="placeholder()"
           [(value)]="draft"
           (keyed)="onKeydown($event)"
-        />
-        <app-upload-file
-          class="self-center"
-          label="Attach"
-          variant="ghost"
-          size="xs"
-          [busy]="uploading()"
-          (file)="attach($event)"
         />
         <button
           type="button"

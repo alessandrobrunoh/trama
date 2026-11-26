@@ -103,9 +103,6 @@ interface MemberTab {
           }
         </p>
         <app-copy-field class="mt-2" [value]="s.link.url" label="Invite link" />
-        <p class="text-faint mt-1.5 font-mono text-[10.5px]">
-          It works for 7 days and only for that email address. Sending again replaces it.
-        </p>
       </div>
     }
 

@@ -121,22 +121,15 @@ const tokenPlaceholder = (provider: ConnProvider): string => {
             (click)="choose(p)"
           >
             <app-provider-icon [provider]="p.provider" [size]="18" />
-            <span class="min-w-0">
-              <span class="text-foreground block text-[13px]">{{ p.label }}</span>
-              <span class="text-faint block truncate font-mono text-[10px]">{{ p.blurb }}</span>
-            </span>
+            <span class="text-foreground min-w-0 truncate text-[13px]">{{ p.label }}</span>
           </button>
         }
       </div>
       <app-settings-group>
-        <app-settings-row
-          label="Name"
-          description="Shown in lists and when you pick a connection. Optional: it defaults to the provider and the account."
-          wide
-        >
+        <app-settings-row label="Name" wide>
           <input hlmInput class="h-8 w-full text-[13px]" maxlength="80" [placeholder]="namePlaceholder()" [value]="name()" (input)="name.set($any($event.target).value)" aria-label="Name" />
         </app-settings-row>
-        <app-settings-row label="Access token" [description]="info[provider()].scopes" wide>
+        <app-settings-row label="Access token" wide>
           <div class="relative">
             <input
               hlmInput
@@ -155,7 +148,7 @@ const tokenPlaceholder = (provider: ConnProvider): string => {
           </div>
         </app-settings-row>
         @if (provider() !== 'bitbucket') {
-          <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" [description]="baseHint()" wide>
+          <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" wide>
             <input hlmInput class="h-8 w-full font-mono text-xs" type="url" [placeholder]="info[provider()].base" [value]="baseUrl()" (input)="baseUrl.set($any($event.target).value)" aria-label="Base URL" />
           </app-settings-row>
         }
@@ -195,9 +188,6 @@ export class ConnectionAddForm {
 
   protected readonly baseRequired = computed(() => this.provider() === 'delta' || !!this.choice().selfHosted);
   protected readonly canSubmit = computed(() => !!this.token().trim() && (!this.baseRequired() || !!this.baseUrl().trim()));
-  protected readonly baseHint = computed(() =>
-    this.baseRequired() ? `Required: the address of your ${this.choice().label.replace(/ Self-Hosted$/, '')} instance.` : PROVIDER_INFO[this.provider()].baseHint,
-  );
   protected readonly placeholder = computed(() => tokenPlaceholder(this.provider()));
   protected readonly namePlaceholder = computed(() => `${PROVIDER_INFO[this.provider()].label} · ${this.scopeWord()}`);
 
@@ -228,7 +218,7 @@ export class ConnectionAddForm {
   template: `
     <form (submit)="submit($event)">
       <app-settings-group>
-        <app-settings-row label="New token" description="Checked against the provider before it replaces the old one." wide>
+        <app-settings-row label="New token" wide>
           <input
             hlmInput
             type="password"
@@ -241,7 +231,7 @@ export class ConnectionAddForm {
           />
         </app-settings-row>
         @if (provider() !== 'bitbucket') {
-          <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" [description]="info[provider()].baseHint" wide>
+          <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" wide>
             <input hlmInput type="url" class="h-8 w-full font-mono text-xs" [placeholder]="info[provider()].base" [value]="baseUrl()" (input)="baseUrl.set($any($event.target).value)" aria-label="Base URL" />
           </app-settings-row>
         }

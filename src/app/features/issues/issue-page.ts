@@ -39,7 +39,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   },
 };
 
-const MY_LAYOUTS: readonly IssueLayout[] = ['list', 'board', 'flow'];
+const MY_LAYOUTS: readonly IssueLayout[] = ['list', 'board'];
 
 @Component({
   selector: 'app-issue-page',
@@ -67,7 +67,7 @@ const MY_LAYOUTS: readonly IssueLayout[] = ['list', 'board', 'flow'];
       }
     </ng-template>
 
-    <app-page-header [title]="title()" [description]="description()" />
+    <app-page-header [title]="title()" />
     @if (awaitingTasks()) {
       <div class="flex min-h-0 flex-1 items-center justify-center">
         <app-trama-loader [size]="40" caption="Loading tasks…" />
@@ -124,10 +124,11 @@ export class IssuePage {
   protected readonly isBoard = computed(() => this.layout() === 'board');
   protected readonly isMine = computed(() => this.mine() === true);
   protected readonly layouts = computed<readonly IssueLayout[]>(() =>
-    this.isMine() ? MY_LAYOUTS : this.isBoard() ? ['board'] : ['list', 'flow'],
+    this.isMine() ? MY_LAYOUTS : this.isBoard() ? ['board'] : ['list'],
   );
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
-  protected readonly tab = computed(() => asViewTab(this.view()));
+  /** The board has no Status chip (v3 · 04): it always shows every status as a column. */
+  protected readonly tab = computed(() => (this.isBoard() ? 'all' : asViewTab(this.view())));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   /** The snapshot is still on its way and there is nothing to show yet: the loader replaces the empty state. */
   protected readonly awaitingTasks = computed(
@@ -150,13 +151,6 @@ export class IssuePage {
   private readonly pool = computed(() => {
     const me = this.store.me()?.id;
     return this.isMine() ? this.store.issues().filter((i) => i.assigneeId === me) : this.store.issues();
-  });
-  protected readonly description = computed(() => {
-    if (!this.isMine()) return undefined;
-    const list = this.pool().filter((i) => i.status !== 'draft');
-    const open = list.filter((i) => !['done', 'canceled'].includes(i.status)).length;
-    const progress = list.filter((i) => i.status === 'in_progress').length;
-    return `${open} open · ${progress} in progress · ${list.length} assigned to you`;
   });
   protected readonly createDefaults = computed<Record<string, unknown>>(() => {
     const me = this.store.me()?.id;

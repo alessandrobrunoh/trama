@@ -148,7 +148,7 @@ const COLUMNS = 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_14px] sm:grid-cols-[120p
           </div>
         } @else {
           <p class="bg-card border-border text-muted-foreground border px-4 py-3.5 text-[12.5px] leading-[19px]">
-            No logins yet. They are added when you connect an account of your own, or you can add one by hand.
+            No logins yet.
           </p>
         }
       } @else if (loadError()) {

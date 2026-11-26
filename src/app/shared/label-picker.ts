@@ -1,12 +1,11 @@
 // Label picker: search, tick several, and create a label from what you typed. Used on the detail
 // pages of tasks and projects, and as the label filter on lists.
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTag } from '@lucide/angular';
+import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideTag } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { LABEL_NAME_MAX, TramaStore, type LabelScope, type WorkspaceLabel } from '../core';
+import { LABEL_NAME_MAX, type LabelScope, type WorkspaceLabel } from '../core';
 import { LabelCatalog } from './label-catalog';
 import { LabelChip, LabelChips } from './label-chip';
 
@@ -18,7 +17,7 @@ import { LabelChip, LabelChips } from './label-chip';
 @Component({
   selector: 'app-label-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmPopoverImports, HlmCommandImports, HlmButtonImports, LucideDynamicIcon, LabelChip, LabelChips, RouterLink],
+  imports: [HlmPopoverImports, HlmCommandImports, HlmButtonImports, LucideDynamicIcon, LabelChip, LabelChips],
   host: { class: 'inline-block min-w-0 max-w-full', '[class.shrink-0]': "variant() === 'chip'" },
   template: `
     <hlm-popover [align]="align()" sideOffset="4" [state]="state()" (stateChanged)="onState($event)">
@@ -132,21 +131,6 @@ import { LabelChip, LabelChips } from './label-chip';
           @if (atMax()) {
             <div class="text-muted-foreground px-3 py-1.5 text-[11px]">At most {{ catalog.maxPerRecord }} labels per item.</div>
           }
-          @if (catalog.canManage() && manageLink()) {
-            <div class="p-1">
-              <a
-                hlmBtn
-                variant="ghost"
-                size="sm"
-                class="text-muted-foreground w-full justify-start font-normal"
-                [routerLink]="['/', slug(), 'settings', 'labels']"
-                (click)="close()"
-              >
-                <svg [lucideIcon]="manage" [size]="14"></svg>
-                Manage labels
-              </a>
-            </div>
-          }
         </hlm-command>
       </hlm-popover-content>
     </hlm-popover>
@@ -154,7 +138,6 @@ import { LabelChip, LabelChips } from './label-chip';
 })
 export class LabelPicker {
   protected readonly catalog = inject(LabelCatalog);
-  private readonly store = inject(TramaStore);
 
   /** Selected label ids. */
   readonly value = input<readonly string[]>([]);
@@ -174,7 +157,7 @@ export class LabelPicker {
    * `null` has no scope: nothing new can be added.
    */
   readonly scope = input<LabelScope | null>(null);
-  /** Show the "Manage labels" link for admins. */
+  /** Kept so existing bindings compile; the list no longer carries a "Manage labels" link. */
   readonly manageLink = input(true);
 
   readonly valueChange = output<string[]>();
@@ -186,8 +169,6 @@ export class LabelPicker {
   protected readonly tag = LucideTag;
   protected readonly check = LucideCheck;
   protected readonly plus = LucidePlus;
-  protected readonly manage = LucideSettings2;
-  protected readonly slug = computed(() => this.store.slug() ?? '');
 
   private readonly picked = computed(() => new Set(this.value()));
   /** Selected ids that still exist in the catalog. */

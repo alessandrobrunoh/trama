@@ -11,46 +11,29 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import {
-  LucideChartLine,
-  LucideChevronRight,
-  LucideChevronsDownUp,
-  LucideChevronsUpDown,
-  LucideCornerDownRight,
-  LucideDynamicIcon,
-  LucidePlus,
-} from '@lucide/angular';
+import { LucideCornerDownRight, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, type Issue } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { V3Check, V3Thread } from '../../shared/v3';
 import { isClosedIssue, quietToggleStatus, subtaskStatus } from './issue-model';
 import { IssueProp } from './issue-prop';
 import { IssueActions } from './issue-actions';
-import { TaskBurnup } from './task-burnup';
+import { TaskBurnup, hasBurnup, taskBurnModel } from './task-burnup';
 import { TaskChildren } from './task-children';
 import { TaskSectionHead } from './task-section-head';
-import {
-  buildRows,
-  buildSubtree,
-  expandableIds,
-  percent,
-  type SubtreeNode,
-  type SubtreeRow,
-} from './task-subtree-model';
+import { buildRows, buildSubtree, percent, type SubtreeRow } from './task-subtree-model';
 
 /**
- * The subtasks of a task as a collapsible tree that goes as deep as the data does (sub-sub-...-tasks), in the v3
- * "Subtasks" section: a header with the count and "Add subtask", a 3px progress bar (or the burn-up of the
- * Progress view) and one 38px row per task: check, key, title, thread link, estimate, status, assignee. The
- * chevron folds a level, "+" adds a subtask under any row, double click opens the task. The tree is built from the
- * store's flat list in one pass, no request per level.
+ * The subtasks of a task as a tree that goes as deep as the data does (sub-sub-...-tasks), in the v3 "Subtasks"
+ * section: a header with the count and "Add subtask", a 3px progress bar (the burn-up once work has started) and one 38px row per task: check, key,
+ * title, thread link, estimate, status, assignee. Double click opens the task. The tree is built from the store's
+ * flat list in one pass, no request per level.
  *
  * `flat` lists only the direct children of `issue` (minus `exclude`): the "Other subtasks of TRM-128" of a subtask.
  *
- * Keyboard (rows are a roving-tabindex tree): ↑ ↓ move, → expands or enters, ← collapses or goes to the parent,
+ * Keyboard (rows are a roving-tabindex tree): ↑ ↓ move, → enters the first child, ← goes to the parent,
  * Enter opens. New subtasks start in the parent's project and status; Enter in the input adds one and keeps the
  * input open for the next, Esc closes it.
  */
@@ -61,7 +44,6 @@ import {
     RouterLink,
     HlmButton,
     HlmInputImports,
-    HlmTooltip,
     ActorAvatar,
     IssueProp,
     LucideDynamicIcon,
@@ -73,50 +55,23 @@ import {
   host: { class: 'flex min-w-0 flex-col' },
   template: `
     <app-task-section-head [title]="flat() ? title() : 'Subtasks'" [caption]="caption()">
-      @if (!flat()) {
-        @if (expandable().length) {
-          <button
-            type="button"
-            class="text-faint hover:text-foreground focus-visible:ring-ring inline-flex size-[25px] shrink-0 items-center justify-center outline-none focus-visible:ring-2"
-            [attr.aria-label]="allCollapsed() ? 'Expand all subtasks' : 'Collapse all subtasks'"
-            [hlmTooltip]="allCollapsed() ? 'Expand all' : 'Collapse all'"
-            (click)="toggleAll()"
-          >
-            <svg [lucideIcon]="allCollapsed() ? expandIcon : collapseIcon" [size]="14" aria-hidden="true"></svg>
-          </button>
-        }
-        @if (tree().total > 0) {
-          <button
-            hlmBtn
-            type="button"
-            variant="ghost"
-            class="h-[25px]"
-            [attr.aria-pressed]="progressView()"
-            hlmTooltip="Burn-up of the subtasks"
-            (click)="progressView.set(!progressView())"
-          >
-            <svg [lucideIcon]="chartIcon" [size]="13" aria-hidden="true"></svg>
-            Progress
-          </button>
-        }
-        @if (canCreate()) {
-          <button
-            hlmBtn
-            type="button"
-            variant="ghost"
-            class="h-[25px]"
-            [attr.aria-label]="'Add subtask to ' + issue().key"
-            (click)="startAdd(issue().id)"
-          >
-            <svg [lucideIcon]="plusIcon" [size]="13" aria-hidden="true"></svg>
-            Add subtask
-          </button>
-        }
+      @if (!flat() && canCreate()) {
+        <button
+          hlmBtn
+          type="button"
+          variant="ghost"
+          class="h-[25px]"
+          [attr.aria-label]="'Add subtask to ' + issue().key"
+          (click)="startAdd(issue().id)"
+        >
+          <svg [lucideIcon]="plusIcon" [size]="13" aria-hidden="true"></svg>
+          Add subtask
+        </button>
       }
     </app-task-section-head>
 
     @if (!flat() && tree().total > 0) {
-      @if (progressView()) {
+      @if (burnup()) {
         <app-task-burnup class="my-2.5" [issue]="issue()" [tasks]="allTasks()" />
       } @else {
         <div
@@ -149,30 +104,11 @@ import {
             [style.padding-left.px]="14 + n.depth * 18"
             [attr.data-id]="c.id"
             [attr.aria-level]="n.depth + 1"
-            [attr.aria-expanded]="n.children.length && !flat() ? !isCollapsed(c.id) : null"
             [attr.tabindex]="tabbable(c.id) ? 0 : -1"
             (focus)="active.set(c.id)"
             (dblclick)="openChild(c, $event)"
           >
-            @if (n.children.length && !flat()) {
-              <button
-                type="button"
-                tabindex="-1"
-                class="text-faint hover:text-foreground inline-flex size-[13px] shrink-0 items-center justify-center"
-                [attr.aria-label]="(isCollapsed(c.id) ? 'Expand ' : 'Collapse ') + c.key"
-                (click)="toggle(c.id)"
-              >
-                <svg
-                  [lucideIcon]="chevron"
-                  [size]="13"
-                  class="transition-transform motion-reduce:transition-none"
-                  [class.rotate-90]="!isCollapsed(c.id)"
-                  aria-hidden="true"
-                ></svg>
-              </button>
-            } @else {
-              <svg [lucideIcon]="indentIcon" [size]="13" class="text-faint shrink-0" aria-hidden="true"></svg>
-            }
+            <svg [lucideIcon]="indentIcon" [size]="13" class="text-faint shrink-0" aria-hidden="true"></svg>
             <button
               type="button"
               tabindex="-1"
@@ -191,26 +127,6 @@ import {
               [class.text-muted-foreground]="closed(c)"
               >{{ c.title }}</a
             >
-            @if (n.children.length && !flat()) {
-              <span
-                class="text-faint shrink-0 font-mono text-[11px] leading-[14px] tabular-nums"
-                [hlmTooltip]="rollupTip(n)"
-              >
-                {{ n.descendantsDone }}/{{ n.descendants }}
-              </span>
-            }
-            @if (canCreate() && !flat()) {
-              <button
-                type="button"
-                tabindex="-1"
-                class="text-faint hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-                [attr.aria-label]="'Add subtask to ' + c.key"
-                hlmTooltip="Add subtask"
-                (click)="startAdd(c.id)"
-              >
-                <svg [lucideIcon]="plusIcon" [size]="13" aria-hidden="true"></svg>
-              </button>
-            }
             <v3-thread class="max-sm:hidden" [issue]="c" />
             @if (showEstimate(c)) {
               <app-issue-prop class="max-sm:hidden" [issue]="c" field="estimate" chip />
@@ -219,7 +135,7 @@ import {
             @if (c.assigneeId) {
               <app-actor-avatar [actor]="{ type: 'user', id: c.assigneeId }" [size]="22" />
             } @else {
-              <span class="border-border size-[22px] shrink-0 border border-dashed" aria-label="Unassigned"></span>
+              <span class="size-[22px] shrink-0" aria-hidden="true"></span>
             }
           </div>
         } @else {
@@ -265,12 +181,8 @@ export class IssueSubtasks {
   /** Heading of a `flat` list. */
   readonly title = input('Subtasks');
 
-  protected readonly chevron = LucideChevronRight;
   protected readonly plusIcon = LucidePlus;
   protected readonly indentIcon = LucideCornerDownRight;
-  protected readonly chartIcon = LucideChartLine;
-  protected readonly collapseIcon = LucideChevronsDownUp;
-  protected readonly expandIcon = LucideChevronsUpDown;
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canCreate = computed(() => this.store.allowed('createIssues'));
@@ -281,9 +193,12 @@ export class IssueSubtasks {
     buildSubtree(this.issue().id, this.children.byParent(), (t) => isClosedIssue(t, this.entries())),
   );
   protected readonly progress = computed(() => percent(this.tree().done, this.tree().total));
-  protected readonly expandable = computed(() => expandableIds(this.tree()));
   /** Every task below, for the burn-up. */
   protected readonly allTasks = computed(() => Array.from(this.tree().byId.values(), (n) => n.task));
+  /** Once some subtask has been started the burn-up replaces the thin bar (v3 "Task detail · Progress"). */
+  protected readonly burnup = computed(() =>
+    hasBurnup(taskBurnModel(this.issue(), this.allTasks(), this.store.estimateScale())),
+  );
 
   protected readonly caption = computed(() => {
     if (this.flat()) return 'each with 0 or 1 thread';
@@ -291,15 +206,7 @@ export class IssueSubtasks {
     return `${t.total ? `${t.done} of ${t.total} done` : 'none yet'} · each subtask can link its own Delta thread`;
   });
 
-  /** The Progress view: the burn-up of the subtasks instead of the thin bar. */
-  protected readonly progressView = signal(false);
-
-  /** Tasks the reader folded. Everything starts open. */
-  private readonly collapsed = signal<ReadonlySet<string>>(new Set());
-  protected readonly allCollapsed = computed(() => {
-    const ids = this.expandable();
-    return ids.length > 0 && ids.every((id) => this.collapsed().has(id));
-  });
+  private readonly noneCollapsed: ReadonlySet<string> = new Set();
 
   /** The task a new subtask is being typed under (the page's own task for the top level). */
   protected readonly addingTo = signal<string | null>(null);
@@ -314,7 +221,7 @@ export class IssueSubtasks {
         .roots.filter((n) => n.task.id !== skip)
         .map((node) => ({ kind: 'node' as const, node }));
     }
-    return buildRows(this.issue().id, this.tree().roots, this.collapsed(), this.addingTo());
+    return buildRows(this.issue().id, this.tree().roots, this.noneCollapsed, this.addingTo());
   });
   private readonly nodeIds = computed(() =>
     this.rows().flatMap((r) => (r.kind === 'node' ? [r.node.task.id] : [])),
@@ -332,17 +239,10 @@ export class IssueSubtasks {
       if (last !== undefined && last !== id) {
         this.addingTo.set(null);
         this.draft.set('');
-        this.collapsed.set(new Set());
         this.active.set(null);
-        this.progressView.set(false);
       }
       last = id;
     });
-  }
-
-  /** Opens the "new subtask" input under the task (the "New subtask" of an empty thread record). */
-  addSubtask(): void {
-    this.startAdd(this.issue().id);
   }
 
   protected rowKey(row: SubtreeRow<Issue>): string {
@@ -368,30 +268,6 @@ export class IssueSubtasks {
   protected toggleDone(issue: Issue): void {
     if (!this.canEdit()) return;
     this.actions.setStatus([issue.id], quietToggleStatus(this.entries(), this.closed(issue)));
-  }
-
-  protected rollupTip(n: SubtreeNode<Issue>): string {
-    const direct = n.children.length;
-    const open = n.descendants - n.descendantsDone;
-    return `${direct} direct ${direct === 1 ? 'subtask' : 'subtasks'}, ${n.descendants} in all · ${n.descendantsDone} finished, ${open} open`;
-  }
-
-  protected isCollapsed(id: string): boolean {
-    return this.collapsed().has(id);
-  }
-
-  protected toggle(id: string, open?: boolean): void {
-    this.collapsed.update((set) => {
-      const next = new Set(set);
-      const shouldOpen = open ?? next.has(id);
-      if (shouldOpen) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  protected toggleAll(): void {
-    this.collapsed.set(this.allCollapsed() ? new Set() : new Set(this.expandable()));
   }
 
   // ───────────────────────── opening ─────────────────────────
@@ -427,13 +303,11 @@ export class IssueSubtasks {
         break;
       case 'ArrowRight':
         if (!node.children.length || this.flat()) return;
-        if (this.isCollapsed(id)) this.toggle(id, true);
-        else this.focusRow(node.children[0].task.id);
+        this.focusRow(node.children[0].task.id);
         break;
       case 'ArrowLeft':
         if (this.flat()) return;
-        if (node.children.length && !this.isCollapsed(id)) this.toggle(id, false);
-        else if (node.task.parentId && node.task.parentId !== this.issue().id) this.focusRow(node.task.parentId);
+        if (node.task.parentId && node.task.parentId !== this.issue().id) this.focusRow(node.task.parentId);
         break;
       case 'Home':
         this.focusRow(ids[0]);
@@ -460,7 +334,6 @@ export class IssueSubtasks {
 
   protected startAdd(parentId: string): void {
     if (this.flat()) return;
-    if (parentId !== this.issue().id) this.toggle(parentId, true);
     this.addingTo.set(parentId);
   }
 

@@ -41,7 +41,6 @@ const ENV_LINES: readonly string[] = [
         <app-settings-card class="min-w-0 flex-1">
           <app-card-row label="Open Ask" description="From the status bar on every page.">
             <app-kbd keys="mod+j" />
-            <button hlmBtn size="sm" variant="outline" [disabled]="!ai.ready()" (click)="ai.open.set(true)">Open</button>
           </app-card-row>
           <app-card-row label="Answer with" [description]="answerHint()">
             <span class="text-foreground font-mono text-[12px]">{{ answerWith() }}</span>
@@ -87,7 +86,6 @@ const ENV_LINES: readonly string[] = [
                 }
               </span>
             </div>
-            <button hlmBtn size="sm" variant="ghost" [disabled]="ai.loadingStatus()" (click)="ai.refreshStatus()">Refresh status</button>
             @if (!ai.ready()) {
               <button hlmBtn size="sm" variant="outline" (click)="copyEnv()">
                 <svg [lucideIcon]="copy" [size]="13"></svg>
@@ -117,7 +115,7 @@ const ENV_LINES: readonly string[] = [
                 <span class="text-foreground text-[13.5px]">SuperGrok</span>
                 <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ text: grokBadge().text, tone: grokBadge().tone }" />
               </div>
-              <span class="text-muted-foreground text-[12px]">Use your own subscription, with the official Grok Build device authorization flow.</span>
+              <span class="text-muted-foreground text-[12px]">Use your own subscription.</span>
             </div>
             @if (ai.status()?.supergrok?.connected) {
               <button hlmBtn size="sm" variant="outline" (click)="disconnectSuperGrok()">Disconnect</button>
@@ -140,12 +138,6 @@ const ENV_LINES: readonly string[] = [
               }
             </div>
           }
-          @if (!ai.status()?.supergrok?.available) {
-            <p class="text-muted-foreground pl-[42px] text-[12.5px] leading-snug">
-              Install the official <code class="font-mono">@xai-official/grok</code> CLI in the API container and set
-              <code class="font-mono">GROK_HOME_DIR</code> to a persistent private volume.
-            </p>
-          }
         </div>
 
         <!-- ChatGPT -->
@@ -161,28 +153,8 @@ const ENV_LINES: readonly string[] = [
               </div>
               <span class="text-muted-foreground text-[12px]">Sign in with your OpenAI account.</span>
             </div>
-            <button hlmBtn size="sm" variant="outline" disabled aria-describedby="chatgpt-availability">Connect</button>
+            <button hlmBtn size="sm" variant="outline" disabled>Connect</button>
           </div>
-          <p id="chatgpt-availability" class="text-muted-foreground pl-[42px] text-[12.5px] leading-snug">
-            Connecting a ChatGPT subscription to a remotely hosted app requires OpenAI approval. The public local-app login cannot be used on this server. No ChatGPT account is connected.
-            <a
-              href="https://developers.openai.com/siwc/token-sharing-open-source"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-foreground underline underline-offset-4"
-              >OpenAI eligibility and access information</a
-            >
-          </p>
-        </div>
-      </app-settings-card>
-    </app-settings-block>
-
-    <app-settings-block title="What AI can see">
-      <app-settings-card>
-        <div class="text-muted-foreground px-4 py-3.5 text-[12.5px] leading-[19px]">
-          Suggestions send your draft to your connected SuperGrok account, if available, or the server provider. Chat sends your messages and,
-          when selected, details of the item you have open. Conversations are kept only in this browser tab and cleared when you leave the
-          workspace or sign out. The assistant cannot change workspace data.
         </div>
       </app-settings-card>
     </app-settings-block>

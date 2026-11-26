@@ -15,41 +15,22 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import {
-  LucideChevronDown,
-  LucideChevronUp,
-  LucideCopy,
-  LucideCornerUpLeft,
-  LucideDynamicIcon,
-  LucideEllipsis,
-  LucideGitBranch,
-  LucideLink,
-  LucidePanelRight,
-  LucidePlus,
-  LucideSparkles,
-  LucideTrash2,
-  LucideX,
-} from '@lucide/angular';
+import { LucideCornerUpLeft, LucideDynamicIcon, LucidePanelRight } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Clipboard,
   TramaStore,
   Viewport,
   isTypingTarget,
   usePageShortcuts,
-  type ActorRef,
   type Issue,
 } from '../../core';
 import { PageChrome, TopBarActions, usePageCrumbs, type Crumb, type PageTitle } from '../../layout/page-chrome';
 import { AgoPipe } from '../../shared/ago';
 import { CommentComposer } from '../../shared/comments';
 import { EmptyState } from '../../shared/empty-state';
-import { EntityChip } from '../../shared/entity-chip';
 import { Kbd } from '../../shared/kbd';
 import { V3Source } from '../../shared/v3';
-import { AiActions } from '../ai-actions/ai-actions.service';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueDescription, IssueTitle } from './issue-detail-parts';
 import { IssueStream } from './issue-stream';
@@ -63,14 +44,11 @@ import { TaskTimerPill } from './task-timer-pill';
   imports: [
     RouterLink,
     HlmButtonImports,
-    HlmDropdownMenuImports,
-    HlmTooltip,
     LucideDynamicIcon,
     TopBarActions,
     AgoPipe,
     CommentComposer,
     EmptyState,
-    EntityChip,
     Kbd,
     V3Source,
     IssueTitle,
@@ -93,105 +71,6 @@ import { TaskTimerPill } from './task-timer-pill';
             Set status <app-kbd keys="s" />
           </button>
         }
-        <button
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground"
-          [hlmDropdownMenuTrigger]="more"
-          aria-label="Task actions"
-          hlmTooltip="More actions"
-        >
-          <svg [lucideIcon]="moreIcon" [size]="16"></svg>
-        </button>
-        <ng-template #more>
-          <hlm-dropdown-menu class="w-60">
-            @if (nav().total > 1) {
-              <hlm-dropdown-menu-group>
-                <button hlmDropdownMenuItem [disabled]="!nav().prev" (triggered)="go(nav().prev)">
-                  <svg [lucideIcon]="upIcon" [size]="14"></svg> Previous task
-                  <hlm-dropdown-menu-shortcut><app-kbd keys="k" /></hlm-dropdown-menu-shortcut>
-                </button>
-                <button hlmDropdownMenuItem [disabled]="!nav().next" (triggered)="go(nav().next)">
-                  <svg [lucideIcon]="downIcon" [size]="14"></svg> Next task
-                  <hlm-dropdown-menu-shortcut><app-kbd keys="j" /></hlm-dropdown-menu-shortcut>
-                </button>
-              </hlm-dropdown-menu-group>
-              <hlm-dropdown-menu-separator />
-            }
-            <hlm-dropdown-menu-group>
-              @if (store.allowed('createIssues')) {
-                <button hlmDropdownMenuItem (triggered)="stream()?.addSubtask()">
-                  <svg [lucideIcon]="plusIcon" [size]="14"></svg> Add subtask
-                </button>
-              }
-              <button hlmDropdownMenuItem (triggered)="actions.copyKeys([i.id])">
-                <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy key
-                <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+k" /></hlm-dropdown-menu-shortcut>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="actions.copyLinks([i.id])">
-                <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy link
-                <hlm-dropdown-menu-shortcut
-                  ><app-kbd keys="mod+shift+l"
-                /></hlm-dropdown-menu-shortcut>
-              </button>
-              <button hlmDropdownMenuItem (triggered)="actions.copyTitle(i.id)">
-                <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy key and title
-              </button>
-              <button hlmDropdownMenuItem (triggered)="actions.copyBranch(i.id)">
-                <svg [lucideIcon]="branchIcon" [size]="14"></svg> Copy git branch name
-                <hlm-dropdown-menu-shortcut
-                  ><app-kbd keys="mod+shift+g"
-                /></hlm-dropdown-menu-shortcut>
-              </button>
-            </hlm-dropdown-menu-group>
-            @if (ai.available()) {
-              <hlm-dropdown-menu-separator />
-              <hlm-dropdown-menu-group>
-                <button hlmDropdownMenuItem (triggered)="ai.request('summarize', i.id)">
-                  <svg [lucideIcon]="sparkles" [size]="14" class="text-primary"></svg>
-                  Summarize with AI
-                </button>
-                @if (canEdit()) {
-                  <button hlmDropdownMenuItem (triggered)="ai.request('triage', i.id)">
-                    <svg [lucideIcon]="sparkles" [size]="14" class="text-primary"></svg>
-                    Suggest properties with AI
-                  </button>
-                  <button hlmDropdownMenuItem (triggered)="ai.request('improve', i.id)">
-                    <svg [lucideIcon]="sparkles" [size]="14" class="text-primary"></svg>
-                    Improve description with AI
-                  </button>
-                }
-              </hlm-dropdown-menu-group>
-            }
-            @if (canEdit()) {
-              <hlm-dropdown-menu-separator />
-              <hlm-dropdown-menu-group>
-                @if (i.duplicateOfId) {
-                  <button hlmDropdownMenuItem (triggered)="actions.clearDuplicate(i.id)">
-                    <svg [lucideIcon]="xIcon" [size]="14"></svg> Not a duplicate
-                  </button>
-                } @else {
-                  <button hlmDropdownMenuItem (triggered)="actions.openPrompt('duplicate', [i.id])">
-                    <svg [lucideIcon]="copyIcon" [size]="14"></svg> Mark as duplicate…
-                    <hlm-dropdown-menu-shortcut
-                      ><app-kbd keys="shift+d"
-                    /></hlm-dropdown-menu-shortcut>
-                  </button>
-                }
-              </hlm-dropdown-menu-group>
-              @if (store.allowed('deleteIssues')) {
-                <hlm-dropdown-menu-separator />
-                <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
-                  <svg [lucideIcon]="trash" [size]="14"></svg> Delete task…
-                  <hlm-dropdown-menu-shortcut
-                    ><app-kbd keys="mod+backspace"
-                  /></hlm-dropdown-menu-shortcut>
-                </button>
-              }
-            }
-          </hlm-dropdown-menu>
-        </ng-template>
       </ng-template>
 
       <div class="flex min-h-0 flex-1 max-md:flex-col">
@@ -217,23 +96,6 @@ import { TaskTimerPill } from './task-timer-pill';
                   <span class="size-1.5 shrink-0" [class]="p.threadUrl ? 'bg-delta-line' : 'bg-faint'" aria-hidden="true"></span>
                   {{ p.threadUrl ? 'parent has its own thread' : 'parent has no thread' }}
                 </span>
-              </div>
-            }
-            @if (duplicate(); as dup) {
-              <div class="bg-card border-border flex flex-wrap items-center gap-2 border px-3.5 py-2.5 text-[13px]">
-                <span class="text-muted-foreground">Duplicate of</span>
-                <app-entity-chip type="issue" [ref]="dup.id" />
-                @if (canEdit()) {
-                  <button
-                    hlmBtn
-                    variant="ghost"
-                    class="ml-auto"
-                    type="button"
-                    (click)="actions.clearDuplicate(i.id)"
-                  >
-                    Not a duplicate
-                  </button>
-                }
               </div>
             }
 
@@ -322,7 +184,6 @@ export class IssueDetailPage {
   protected readonly details = signal(false);
   protected readonly store = inject(TramaStore);
   protected readonly actions = inject(IssueActions);
-  protected readonly ai = inject(AiActions);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
@@ -354,29 +215,6 @@ export class IssueDetailPage {
   /** The direct parent: a task with one is a subtask. */
   protected readonly parent = computed(() => this.ancestors().at(-1));
   protected readonly project = computed(() => this.store.getProject(this.issue()?.projectId));
-  protected readonly duplicate = computed(() => {
-    const id = this.issue()?.duplicateOfId;
-    return id ? this.store.issueById().get(id) : undefined;
-  });
-
-  /** Assignee, reporter and everyone who commented: the avatar group of the top bar. */
-  private readonly people = computed<ActorRef[]>(() => {
-    const i = this.issue();
-    if (!i) return [];
-    const out: ActorRef[] = [];
-    const seen = new Set<string>();
-    const add = (actor: ActorRef | undefined): void => {
-      if (!actor) return;
-      const id = `${actor.type}:${actor.id ?? ''}`;
-      if (seen.has(id)) return;
-      seen.add(id);
-      out.push(actor);
-    };
-    if (i.assigneeId) add({ type: 'user', id: i.assigneeId });
-    if (i.reporterId) add({ type: 'user', id: i.reporterId });
-    for (const author of this.store.commentAuthorsFor({ type: 'issue', id: i.id })) add(author);
-    return out;
-  });
 
   /** Prev / next in the order the issue list last showed (falls back to most recently updated). */
   protected readonly nav = computed(() => {
@@ -395,16 +233,6 @@ export class IssueDetailPage {
 
   protected readonly parentIcon = LucideCornerUpLeft;
   protected readonly panelIcon = LucidePanelRight;
-  protected readonly moreIcon = LucideEllipsis;
-  protected readonly trash = LucideTrash2;
-  protected readonly copyIcon = LucideCopy;
-  protected readonly linkIcon = LucideLink;
-  protected readonly plusIcon = LucidePlus;
-  protected readonly sparkles = LucideSparkles;
-  protected readonly xIcon = LucideX;
-  protected readonly branchIcon = LucideGitBranch;
-  protected readonly upIcon = LucideChevronUp;
-  protected readonly downIcon = LucideChevronDown;
 
   /** The key in the URL may be an old key (alias), an id or a different case: show the current key. */
   private readonly _canonicalUrl = effect(() => {
@@ -425,12 +253,12 @@ export class IssueDetailPage {
     return [...out, { label: i.key }, { label: i.title }];
   });
 
-  /** The people behind the task go to the top bar's avatar group (and the title to the phone header). */
+  /** The title goes to the phone header. */
   private readonly _page = (() => {
     let mine: PageTitle | null = null;
     effect(() => {
       const i = this.issue();
-      this.chrome.page.set(i ? (mine = { title: i.title, actors: this.people() }) : null);
+      this.chrome.page.set(i ? (mine = { title: i.title }) : null);
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.chrome.page() === mine) this.chrome.page.set(null);

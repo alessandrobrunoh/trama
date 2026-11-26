@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import type { ActivityStep } from '../../core/ai/ai-api';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Markdown } from '../../shared/markdown';
@@ -34,15 +34,6 @@ export interface AskTurnData {
             · {{ when() }}
           }
         </span>
-        @if (canDelete()) {
-          <button
-            type="button"
-            class="hover:text-red shrink-0 uppercase outline-none focus-visible:underline"
-            (click)="remove.emit()"
-          >
-            Delete
-          </button>
-        }
       </div>
       <h2
         class="font-title text-foreground text-[24px] leading-[30px] [overflow-wrap:anywhere] whitespace-pre-wrap md:text-[30px] md:leading-9"
@@ -108,8 +99,6 @@ export class AskTurn {
   readonly asker = input('you');
   /** "2m ago": when the answer was saved. */
   readonly when = input<string | null>(null);
-  readonly canDelete = input(false);
-  readonly remove = output<void>();
   protected readonly seconds = computed(() => {
     const s = this.turn().seconds;
     return s === null ? 'a while' : `${s} ${s === 1 ? 'second' : 'seconds'}`;

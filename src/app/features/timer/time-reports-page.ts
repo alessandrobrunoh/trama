@@ -28,7 +28,6 @@ import {
   type Series,
   type ValueRow,
 } from './time-model';
-import { TimeTabs } from './time-nav';
 
 type Group = 'project' | 'task';
 
@@ -64,7 +63,7 @@ interface PointsRow {
  * `/:workspace/timer/reports` (v3 "24 · Time · Reports"): your tracked time over the last weeks.
  *
  *   filters   the range, and what the bars are split by (project or task)
- *   tiles     tracked, average per week, days with time, tasks worked on
+ *   tiles     tracked, average per week
  *   chart     hours per day, stacked by the split; hover a day for the numbers
  *   list      the same split as a ranked list
  *   rail      points vs actual: tasks with an estimate and their time against the hours that estimate usually takes
@@ -75,13 +74,12 @@ interface PointsRow {
 @Component({
   selector: 'app-time-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmButtonImports, Kbd, PageHeader, TopBarActions, TimeTabs],
+  imports: [RouterLink, LucideDynamicIcon, HlmButtonImports, Kbd, PageHeader, TopBarActions],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <app-page-header title="Reports" />
 
     <ng-template appTopBarActions>
-      <app-time-tabs />
       <button hlmBtn variant="outline" type="button" (click)="exportCsv()">Export CSV <app-kbd keys="shift+e" /></button>
     </ng-template>
 
@@ -122,14 +120,11 @@ interface PointsRow {
         </div>
 
         <!-- tiles -->
-        <div class="border-border grid grid-cols-2 border sm:grid-cols-4">
+        <div class="grid grid-cols-2 sm:grid-cols-4">
           @for (k of tiles(); track k.label) {
-            <div class="border-border flex min-w-0 flex-col gap-1 px-[18px] py-3.5 not-first:border-l">
+            <div class="border-border flex min-w-0 flex-col gap-1 border px-[18px] py-3.5 not-first:border-l-0">
               <div class="flex items-end gap-2">
                 <span class="font-title text-foreground text-[28px] leading-[normal]">{{ k.value }}</span>
-                @if (k.note) {
-                  <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ k.note }}</span>
-                }
               </div>
               <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ k.label }}</span>
             </div>
@@ -408,14 +403,9 @@ export class TimeReportsPage {
 
   protected readonly tiles = computed(() => {
     const total = this.total();
-    const worked = new Set(this.segs().filter((s) => s.issueId && this.inRange(s)).map((s) => s.issueId));
-    const active = this.days().filter((d) => d.total > 0).length;
-    const past = this.days().filter((d) => !d.day.future).length;
     return [
-      { value: hoursMinutes(total), note: '', label: `tracked · ${this.weeks()} ${this.weeks() === 1 ? 'week' : 'weeks'}` },
-      { value: hoursMinutes(total / this.weeks()), note: '', label: 'average per week' },
-      { value: String(active), note: `of ${past}`, label: 'days with time' },
-      { value: String(worked.size), note: '', label: 'tasks worked on' },
+      { value: hoursMinutes(total), label: `tracked · ${this.weeks()} ${this.weeks() === 1 ? 'week' : 'weeks'}` },
+      { value: hoursMinutes(total / this.weeks()), label: 'average per week' },
     ];
   });
 

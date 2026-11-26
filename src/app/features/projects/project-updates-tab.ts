@@ -2,27 +2,10 @@
 // scope and risk chart, the key events of the current milestone (what happened, where scope changed, the pull
 // requests), the closed milestones folded to a line each, and a rail with where things stand, who is active,
 // the next milestone and the Post update / Export as changelog actions.
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  LucideBookOpen,
-  LucideChevronRight,
-  LucideDynamicIcon,
-  LucideEllipsis,
-  LucidePencil,
-  LucideTrash2,
-} from '@lucide/angular';
+import { LucideBookOpen, LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
   resolveStatusEntry,
   statusTypeOf,
@@ -31,7 +14,6 @@ import {
   type ProjectUpdate,
 } from '../../core/contracts/domain';
 import { TramaStore } from '../../core/stores/trama.store';
-import { UiStore } from '../../core/stores/ui.store';
 import { ago } from '../../shared/ago';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { dayOf, totalsOf, usesPoints } from '../milestones/milestone-model';
@@ -66,11 +48,11 @@ const STATE_LABEL: Record<MilestoneState, string> = {
 const EVENT_CAP = 8;
 const CAST_CAP = 6;
 
-/** The key events of one milestone: date, who, what, and the task on the right. Posted updates carry a "…" menu. */
+/** The key events of one milestone: date, who, what, and the task on the right. */
 @Component({
   selector: 'app-project-key-events',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ActorAvatar, HlmButtonImports, HlmDropdownMenuImports, LucideDynamicIcon],
+  imports: [RouterLink, ActorAvatar, HlmButtonImports],
   host: { class: 'flex w-full flex-col' },
   template: `
     @for (e of shown(); track e.id) {
@@ -98,33 +80,6 @@ const CAST_CAP = 6;
             [routerLink]="['/', slug(), 'tasks', e.ref]"
             >{{ e.ref }}</a
           >
-        } @else if (e.update; as u) {
-          @if (canEdit(u) || canDelete(u)) {
-            <button
-              hlmBtn
-              variant="ghost"
-              size="icon-sm"
-              class="text-muted-foreground -my-1 -mr-1.5 size-6"
-              aria-label="Update actions"
-              [hlmDropdownMenuTrigger]="menu"
-            >
-              <svg [lucideIcon]="moreIcon" [size]="14"></svg>
-            </button>
-            <ng-template #menu>
-              <hlm-dropdown-menu class="w-40">
-                @if (canEdit(u)) {
-                  <button hlmDropdownMenuItem (triggered)="edit.emit(u)">
-                    <svg [lucideIcon]="editIcon" [size]="14" class="text-muted-foreground"></svg> Edit
-                  </button>
-                }
-                @if (canDelete(u)) {
-                  <button hlmDropdownMenuItem variant="destructive" (triggered)="remove.emit(u)">
-                    <svg [lucideIcon]="trashIcon" [size]="14"></svg> Delete
-                  </button>
-                }
-              </hlm-dropdown-menu>
-            </ng-template>
-          }
         }
       </div>
     } @empty {
@@ -146,28 +101,13 @@ const CAST_CAP = 6;
 export class ProjectKeyEvents {
   readonly events = input.required<readonly KeyEvent[]>();
   readonly slug = input.required<string>();
-  readonly meId = input<string | undefined>();
-  /** People who manage projects: they may edit their own updates and delete anyone's. */
-  readonly canManage = input(false);
-  readonly edit = output<ProjectUpdate>();
-  readonly remove = output<ProjectUpdate>();
 
   protected readonly cap = EVENT_CAP;
   protected readonly all = signal(false);
-  protected readonly moreIcon = LucideEllipsis;
-  protected readonly editIcon = LucidePencil;
-  protected readonly trashIcon = LucideTrash2;
   protected readonly shown = computed(() => (this.all() ? this.events() : this.events().slice(0, EVENT_CAP)));
 
   protected date(e: KeyEvent): string {
     return shortDate(e.at);
-  }
-  protected canEdit(u: ProjectUpdate): boolean {
-    // the server wants authorship and the right to manage projects
-    return this.canManage() && u.author.type === 'user' && u.author.id === this.meId();
-  }
-  protected canDelete(u: ProjectUpdate): boolean {
-    return this.canManage() || (u.author.type === 'user' && u.author.id === this.meId());
   }
 }
 
@@ -216,9 +156,7 @@ interface PastSection {
           <h2 class="font-title text-muted-foreground m-0 text-[24px] leading-[31px] font-normal tracking-[-0.3px]">
             No update has been posted for {{ p.name }} yet.
           </h2>
-          @if (canPost()) {
-            <button hlmBtn size="sm" class="mt-1 self-start" (click)="post()">Post the first update</button>
-          } @else if (store.failed()) {
+          @if (store.failed()) {
             <p class="text-faint m-0 font-mono text-[11px]">Updates could not be loaded.</p>
           }
         }
@@ -238,14 +176,7 @@ interface PastSection {
               </span>
             }
           </div>
-          <app-project-key-events
-            [events]="s.events"
-            [slug]="slug()"
-            [meId]="meId()"
-            [canManage]="canPost()"
-            (edit)="edit($event)"
-            (remove)="remove($event)"
-          />
+          <app-project-key-events [events]="s.events" [slug]="slug()" />
         </section>
       }
 
@@ -280,14 +211,7 @@ interface PastSection {
           <p class="font-title text-muted-foreground m-0 pl-[26px] text-[15px] leading-[22px] italic">{{ m.recap }}</p>
           @if (isOpen(m.id)) {
             <div class="pt-1 pl-[26px]">
-              <app-project-key-events
-                [events]="m.events"
-                [slug]="slug()"
-                [meId]="meId()"
-                [canManage]="canPost()"
-                (edit)="edit($event)"
-                (remove)="remove($event)"
-              />
+              <app-project-key-events [events]="m.events" [slug]="slug()" />
             </div>
           }
         </section>
@@ -348,7 +272,7 @@ interface PastSection {
     </aside>
 
     @if (canPost()) {
-      <app-project-update-dialog [project]="p" [editing]="editing()" [(open)]="dialogOpen" />
+      <app-project-update-dialog [project]="p" [(open)]="dialogOpen" />
     }
   `,
 })
@@ -357,17 +281,14 @@ export class ProjectUpdatesTab {
 
   protected readonly store = inject(ProjectUpdatesStore);
   private readonly trama = inject(TramaStore);
-  private readonly ui = inject(UiStore);
   private readonly info = inject(MilestoneInfo);
 
   protected readonly chevron = LucideChevronRight;
   protected readonly bookIcon = LucideBookOpen;
   protected readonly dialogOpen = signal(false);
-  protected readonly editing = signal<ProjectUpdate | null>(null);
   private readonly opened = signal<ReadonlySet<string>>(new Set());
 
   protected readonly slug = computed(() => this.trama.slug() ?? '');
-  protected readonly meId = computed(() => this.trama.me()?.id);
   protected readonly canPost = computed(() => this.trama.allowed('manageProjects') && !this.trama.isGuest());
 
   private readonly milestones = computed(() => this.trama.milestonesByProject().get(this.project().id) ?? []);
@@ -547,24 +468,7 @@ export class ProjectUpdatesTab {
   }
 
   protected post(): void {
-    this.editing.set(null);
     this.dialogOpen.set(true);
-  }
-
-  protected edit(u: ProjectUpdate): void {
-    this.editing.set(u);
-    this.dialogOpen.set(true);
-  }
-
-  protected remove(u: ProjectUpdate): void {
-    const projectId = this.project().id;
-    this.ui.setConfirmDelete({
-      title: 'Delete this update?',
-      description: 'It is removed from the project. The project health stays as it is.',
-      onConfirm: async () => {
-        await this.store.remove(projectId, u.id);
-      },
-    });
   }
 
   protected exportChangelog(): void {

@@ -25,7 +25,6 @@ import {
   valueRows,
   type ValueRow,
 } from './time-model';
-import { TimeTabs } from './time-nav';
 
 const DAY_MS = 86_400_000;
 
@@ -68,13 +67,12 @@ const OPEN = new Set(['in_progress', 'in_review']);
 @Component({
   selector: 'app-time-estimates-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmButtonImports, Kbd, PageHeader, TopBarActions, TimeTabs],
+  imports: [RouterLink, LucideDynamicIcon, HlmButtonImports, Kbd, PageHeader, TopBarActions],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <app-page-header title="Estimates" />
 
     <ng-template appTopBarActions>
-      <app-time-tabs />
       <a hlmBtn variant="outline" [routerLink]="['/', slug(), 'settings', 'workspace']">Scale settings <app-kbd keys="mod+," /></a>
     </ng-template>
 
