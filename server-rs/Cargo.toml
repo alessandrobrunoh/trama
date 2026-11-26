@@ -53,6 +53,7 @@ utoipa-scalar = { version = "0.4", features = ["axum"] }
 
 trama-ai = { path = "crates/ai" }
 trama-artifacts = { path = "crates/artifacts" }
+trama-attention = { path = "crates/attention" }
 trama-auth = { path = "crates/auth" }
 trama-comments = { path = "crates/comments" }
 trama-common = { path = "crates/common" }
@@ -60,9 +61,11 @@ trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-events = { path = "crates/events" }
+trama-insights = { path = "crates/insights" }
 trama-migration = { path = "crates/migration" }
 trama-milestones = { path = "crates/milestones" }
 trama-notifications = { path = "crates/notifications" }
+trama-search = { path = "crates/search" }
 trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
 trama-uploads = { path = "crates/uploads" }
@@ -112,14 +115,17 @@ utoipa.workspace = true
 utoipa-scalar.workspace = true
 trama-ai.workspace = true
 trama-artifacts.workspace = true
+trama-attention.workspace = true
 trama-auth.workspace = true
 trama-comments.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true
+trama-insights.workspace = true
 trama-migration.workspace = true
 trama-milestones.workspace = true
 trama-notifications.workspace = true
+trama-search.workspace = true
 trama-sharing.workspace = true
 trama-system.workspace = true
 trama-uploads.workspace = true
