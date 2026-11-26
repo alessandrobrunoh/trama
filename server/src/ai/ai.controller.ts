@@ -1,6 +1,7 @@
 import {
   Auth,
   Ctx,
+  NoGuests,
   RequireUser,
   Roles,
   type AuthInfo,
@@ -28,6 +29,7 @@ import { GrokBuildService } from './grok-build.service.js';
 @Controller('w/:slug/ai')
 @RequireUser()
 @Roles('viewer')
+@NoGuests()
 export class AiController {
   constructor(
     private readonly config: AiConfig,

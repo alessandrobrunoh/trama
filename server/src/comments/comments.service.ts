@@ -22,6 +22,7 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
 import { currentAccess, projectHidden } from '../auth/member-access.js';
 import {
+  ArtifactEntity,
   CommentEntity,
   IssueEntity,
   MilestoneEntity,
@@ -254,6 +255,20 @@ export class CommentsService {
     if (!currentAccess()) return;
     if (type === 'project') {
       if (projectHidden(currentAccess(), id)) throw notFound('Project', id);
+      return;
+    }
+    if (type === 'artifact') {
+      // An artifact belongs to the project of the task it is attached to.
+      const artifact = await this.repo.manager
+        .getRepository(ArtifactEntity)
+        .findOne({ where: { workspaceId, id }, select: { id: true, issueId: true } });
+      const issue = artifact?.issueId
+        ? await this.repo.manager
+            .getRepository(IssueEntity)
+            .findOne({ where: { workspaceId, id: artifact.issueId }, select: { id: true, projectId: true } })
+        : null;
+      if (!artifact || projectHidden(currentAccess(), issue ? issue.projectId : null))
+        throw notFound(type, id);
       return;
     }
     const entity =

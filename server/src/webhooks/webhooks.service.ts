@@ -13,6 +13,7 @@ import { IntegrationConnectionEntity } from '../database/entities/index.js';
 import { ArtifactLinkerService } from '../integrations/artifact-linker.service.js';
 import { WebhookDeliveryEntity } from '../integrations/entities.js';
 import { SecretsService } from '../integrations/secrets.service.js';
+import { InboundRoutingService } from '../routing/inbound-routing.service.js';
 import {
   PayloadError,
   parseBitbucketEvent,
@@ -64,6 +65,7 @@ export class WebhooksService {
     private readonly ds: DataSource,
     private readonly secrets: SecretsService,
     private readonly linker: ArtifactLinkerService,
+    private readonly routing: InboundRoutingService,
     @InjectRepository(IntegrationConnectionEntity)
     private readonly connections: Repository<IntegrationConnectionEntity>,
   ) {}
@@ -178,7 +180,35 @@ export class WebhooksService {
         body: { status: 'ignored', reason: parsed.reason },
       };
 
+    // A revoked connection no longer feeds anything.
+    if (conn.status === 'revoked')
+      return {
+        httpStatus: 202,
+        body: { status: 'ignored', reason: 'connection revoked' },
+      };
+
     const repo = { id: parsed.repo.fullName };
+
+    // Issues have no task key to match by: only routing rules place them.
+    if (parsed.kind === 'issue') {
+      const routed = await this.routing.routeIssue(conn, parsed.repo, parsed.issue);
+      return routed.status === 'ignored' || routed.status === 'unchanged'
+        ? {
+            httpStatus: 202,
+            body: { status: 'ignored', reason: routed.reason ?? 'nothing to change' },
+          }
+        : { httpStatus: 200, body: { status: 'processed', routed: routed.status, issues: routed.key ? [routed.key] : [] } };
+    }
+
+    // A personal connection has no workspace to match keys in: its events are for routing rules.
+    if (!conn.workspaceId) {
+      if (parsed.kind === 'ci')
+        return { httpStatus: 202, body: { status: 'ignored', reason: 'personal connection without a workspace' } };
+      const placed = await this.routing.routePullRequest(conn, parsed.repo, parsed.candidate, parsed.meta);
+      return placed.key
+        ? { httpStatus: 200, body: { status: 'processed', routed: placed.placed ? 'created' : 'updated', issues: [placed.key] } }
+        : { httpStatus: 202, body: { status: 'ignored', reason: 'no routing rule takes this pull request' } };
+    }
 
     if (parsed.kind === 'ci') {
       const updated = await this.linker.applyCi(
@@ -203,12 +233,18 @@ export class WebhooksService {
       conn.workspaceId,
       repo,
       parsed.candidate,
+      { host: conn.baseUrl },
     );
-    if (!res.created && !res.updated && !res.issueKeys.length)
+    if (!res.created && !res.updated && !res.issueKeys.length) {
+      // Nothing names a task: a rule may still know where this pull request belongs.
+      const placed = await this.routing.routePullRequest(conn, parsed.repo, parsed.candidate, parsed.meta);
+      if (placed.key)
+        return { httpStatus: 200, body: { status: 'processed', routed: placed.placed ? 'created' : 'updated', issues: [placed.key] } };
       return {
         httpStatus: 202,
         body: { status: 'ignored', reason: 'no issue key found' },
       };
+    }
     return {
       httpStatus: 200,
       body: {

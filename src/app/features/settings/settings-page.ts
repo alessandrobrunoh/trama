@@ -8,13 +8,13 @@ import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
 import { AiSection } from './sections/ai-section';
 import { ApiSection } from './sections/api-section';
-import { AppearanceSection } from './sections/appearance-section';
 import { EstimatesSection } from './sections/estimates-section';
 import { ImportSection } from './sections/import-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { LabelsSection } from './sections/labels-section';
 import { MembersSection } from './sections/members-section';
 import { NotificationsSection } from './sections/notifications-section';
+import { PersonalIntegrationsSection } from './sections/personal-integrations-section';
 import { PreferencesSection } from './sections/preferences-section';
 import { ProfileSection } from './sections/profile-section';
 import { RolesSection } from './sections/roles-section';
@@ -22,10 +22,24 @@ import { ShortcutsSection } from './sections/shortcuts-section';
 import { TimeSection } from './sections/time-section';
 import { WorkflowSection } from './sections/workflow-section';
 import { WorkspaceSection } from './sections/workspace-section';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS, resolveSettingsSection } from './settings-nav';
+import { SETTINGS_SECTIONS, resolveSettingsSection, settingsGroupsFor } from './settings-nav';
 
-/** Sections laid out on the full content width (two columns, lists); the others read better narrow. */
-const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
+/**
+ * Sections laid out on the wide column of the v4 frames (1072px with its 56px gutters: tables, lists, two
+ * columns); the others use the narrow 872px one.
+ */
+const WIDE = new Set([
+  'members',
+  'roles',
+  'workflow',
+  'labels',
+  'estimates',
+  'agents',
+  'import',
+  'shortcuts',
+  'api',
+  'my-integrations',
+]);
 
 /**
  * Settings: the section nav lives in the settings sidebar (`SettingsSidebar`, shown by the main sidebar
@@ -42,9 +56,9 @@ const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
     PageHeader,
     EmptyState,
     ProfileSection,
+    PersonalIntegrationsSection,
     PreferencesSection,
     NotificationsSection,
-    AppearanceSection,
     ShortcutsSection,
     WorkspaceSection,
     MembersSection,
@@ -66,7 +80,7 @@ const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
       class="border-border scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 md:hidden"
       aria-label="Settings sections"
     >
-      @for (g of groups; track g.title) {
+      @for (g of groups(); track g.title) {
         @for (s of g.sections; track s.id) {
           <a
             class="flex h-8 shrink-0 items-center gap-2 px-3 text-[13px] whitespace-nowrap"
@@ -86,20 +100,20 @@ const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
       <app-integrations-section class="min-h-0 flex-1" />
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <div class="w-full px-5 py-6 sm:px-10 sm:py-8 lg:px-14" [class]="fullWidth() ? 'max-w-[1240px]' : 'max-w-[920px]'">
+        <div class="w-full px-5 pt-6 pb-12 sm:px-10 sm:pt-8 sm:pb-14 lg:px-14" [class]="wide() ? 'max-w-[1072px]' : 'max-w-[872px]'">
           @switch (sectionId()) {
             @case ('ai') { <app-ai-section /> }
             @case ('profile') {
               <app-profile-section />
+            }
+            @case ('my-integrations') {
+              <app-personal-integrations-section />
             }
             @case ('notifications') {
               <app-notifications-section />
             }
             @case ('preferences') {
               <app-preferences-section />
-            }
-            @case ('appearance') {
-              <app-appearance-section />
             }
             @case ('shortcuts') {
               <app-shortcuts-section />
@@ -152,12 +166,12 @@ export class SettingsPage {
 
   private readonly store = inject(TramaStore);
 
-  protected readonly groups = SETTINGS_GROUPS;
+  protected readonly groups = computed(() => settingsGroupsFor(this.store.isGuest()));
   protected readonly warn = LucideTriangleAlert;
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly sectionId = computed(() => resolveSettingsSection(this.section()));
   protected readonly current = computed(() => SETTINGS_SECTIONS.find((s) => s.id === this.sectionId()));
-  protected readonly fullWidth = computed(() => FULL_WIDTH.has(this.sectionId()));
+  protected readonly wide = computed(() => WIDE.has(this.sectionId()));
 
   constructor() {
     // "Settings / Workflow": the parent crumb is plain text, the page is the last one.

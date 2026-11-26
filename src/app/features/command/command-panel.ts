@@ -69,7 +69,8 @@ import { FavoritesStore } from '../../core/stores/favorites.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { ThemeService } from '../../core/theme';
-import { ALL_NAV } from '../../layout/nav';
+import { ALL_NAV, guestMayOpen, navForRole } from '../../layout/nav';
+import { guestMayOpenSettings } from '../settings/settings-nav';
 import { OnboardingStore } from '../../core/stores/onboarding.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { Kbd } from '../../shared/kbd';
@@ -176,6 +177,12 @@ const SETTINGS_SECTIONS: { id: string; label: string; icon: LucideIcon; keywords
     label: 'Integrations',
     icon: LucidePlug,
     keywords: 'github gitlab delta webhook',
+  },
+  {
+    id: 'my-integrations',
+    label: 'My integrations',
+    icon: LucidePlug,
+    keywords: 'personal accounts connections github gitlab',
   },
   { id: 'shortcuts', label: 'Keyboard shortcuts', icon: LucideKeyboard },
 ];
@@ -833,7 +840,8 @@ export class CommandPanel {
       (...path: string[]) =>
       () =>
         void this.router.navigate(['/', slug, ...path]);
-    const nav = ALL_NAV;
+    const guest = this.store.isGuest();
+    const nav = navForRole(ALL_NAV, guest);
     const out: Cmd[] = nav.map((n) => ({
       id: 'nav:' + n.segment,
       label: n.label,
@@ -863,19 +871,22 @@ export class CommandPanel {
       ['activity', 'Activity', LucideActivity, 'g e'],
     ];
     for (const [segment, label, icon, keys] of extra) {
+      if (guest && !guestMayOpen(segment)) continue;
       if (!nav.some((n) => n.segment === segment))
         out.push({ id: 'nav:' + segment, label, keywords: 'go to', icon, keys, run: go(segment) });
     }
-    for (const v of this.store.views()) {
-      out.push({
-        id: 'view:' + v.id,
-        label: `View ${v.name}`,
-        keywords: 'go to',
-        icon: LucideLayers,
-        run: go('views', v.id),
-      });
-    }
+    if (!guest)
+      for (const v of this.store.views()) {
+        out.push({
+          id: 'view:' + v.id,
+          label: `View ${v.name}`,
+          keywords: 'go to',
+          icon: LucideLayers,
+          run: go('views', v.id),
+        });
+      }
     for (const s of SETTINGS_SECTIONS) {
+      if (guest && !guestMayOpenSettings(s.id)) continue;
       out.push({
         id: 'settings:' + s.id,
         label: `Settings › ${s.label}`,
@@ -899,7 +910,7 @@ export class CommandPanel {
         icon: LucidePlus,
         run: create('issue'),
       });
-    if (this.store.can('member'))
+    if (this.store.can('member') && !this.store.isGuest())
       out.push({
         id: 'new:project',
         label: 'Create project',
@@ -1021,7 +1032,8 @@ export class CommandPanel {
         run: () => void this.session.logout(),
       },
     );
-    return out;
+    // A guest has no assistant and no setup checklist (both are about the whole workspace).
+    return this.store.isGuest() ? out.filter((c) => c.id !== 'ask-trama' && c.id !== 'onboarding:show') : out;
   });
 
   constructor() {

@@ -40,6 +40,11 @@ export interface SinkDeps {
   counters: CountersService;
   projects: ProjectsService;
   milestones: MilestonesService;
+  /**
+   * Maps a tracker login to a member of this workspace through their external identities. Used for
+   * assignees the mapping does not mention at all (an explicit `null` still means "unassigned").
+   */
+  resolveAssignee?: (login: string) => Promise<string | null>;
 }
 
 /**
@@ -204,8 +209,15 @@ export class TypeormImportSink implements ImportSink {
     }
 
     Object.assign(plan.labels, await this.resolveLabels(discovery, mapping));
-    for (const u of discovery.users)
-      plan.users[u.id] = mapping.users[u.id] ?? null;
+    for (const u of discovery.users) {
+      const mapped = mapping.users[u.id];
+      plan.users[u.id] =
+        mapped !== undefined
+          ? mapped
+          : u.login && this.deps.resolveAssignee
+            ? await this.deps.resolveAssignee(u.login)
+            : null;
+    }
     return plan;
   }
 

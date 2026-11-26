@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, In, type EntityManager, type EntityTarget } from 'typeorm';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
 import { uid } from '../common/util.js';
 import {
   FAVORITE_TYPES,
@@ -165,8 +166,20 @@ export class FavoritesService {
     if (!table) return new Set();
     const rows = await m.find(table, {
       where: { workspaceId, id: In(ids) },
-      select: { id: true },
+      select: (type === 'issue' ? { id: true, projectId: true } : { id: true }) as { id: true },
     });
-    return new Set(rows.map((r) => r.id));
+    // Work in a project the person cannot open is not theirs to pin, and stops being listed once access ends.
+    const access = currentAccess();
+    return new Set(
+      rows
+        .filter(
+          (r) =>
+            !projectHidden(
+              access,
+              type === 'issue' ? (r as unknown as { projectId?: string | null }).projectId : r.id,
+            ),
+        )
+        .map((r) => r.id),
+    );
   }
 }

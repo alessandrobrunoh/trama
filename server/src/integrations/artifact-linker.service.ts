@@ -1,11 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
-import type { ActorRef } from '../contracts/domain.js';
+import type { ActorRef, MemberAccess } from '../contracts/domain.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
+import { projectHidden } from '../auth/member-access.js';
 import {
   ArtifactEntity,
   IssueEntity,
+  MembershipEntity,
 } from '../database/entities/index.js';
+import { ExternalIdentitiesService } from '../external-identities/external-identities.service.js';
 import type { ArtifactCandidate, CiPatch } from './candidates.js';
 import { ArtifactSourceEntity } from './entities.js';
 import { extractKeys } from './keys.js';
@@ -33,6 +36,9 @@ export class ArtifactLinkerService {
   constructor(
     private readonly ds: DataSource,
     private readonly artifacts: ArtifactsService,
+    @Optional()
+    @Inject(ExternalIdentitiesService)
+    private readonly identities?: ExternalIdentitiesService,
   ) {}
 
   private async serial<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -54,21 +60,93 @@ export class ArtifactLinkerService {
     return new Map(rows.map((issue) => [issue.key, issue.id]));
   }
 
+  /** `source.host` is the git host the event came from (its connection's), for login lookups. */
   upsert(
     workspaceId: string,
     repo: { id: string },
     c: ArtifactCandidate,
+    source: { host?: string | null } = {},
   ): Promise<LinkResult> {
     return this.serial(
       `${workspaceId}|${repo.id}|${c.kind}|${c.externalId}`,
-      () => this.doUpsert(workspaceId, repo, c),
+      () => this.doUpsert(workspaceId, repo, c, source),
     );
+  }
+
+  /**
+   * Who the event concerns, from the provider's logins through external identities: the people a
+   * review was asked from (workspace members only, so only they hear about it), and, when the sender
+   * has a verified identity, the person to credit the activity to instead of "system".
+   */
+  private async people(
+    workspaceId: string,
+    c: ArtifactCandidate,
+    host: string | null | undefined,
+  ): Promise<{
+    actor: ActorRef;
+    reviewers: { userId: string; access: MemberAccess | null }[];
+  }> {
+    const reviewers: { userId: string; access: MemberAccess | null }[] = [];
+    if (!this.identities) return { actor: SYSTEM_ACTOR, reviewers };
+    let actor = SYSTEM_ACTOR;
+    try {
+      if (c.reviewerLogins?.length) {
+        const found = await this.identities.resolveMembersByLogins(
+          workspaceId,
+          c.provider,
+          host,
+          c.reviewerLogins,
+        );
+        const ids = [...new Set(found.values())];
+        const memberships = ids.length
+          ? await this.ds
+              .getRepository(MembershipEntity)
+              .findBy({ workspaceId, userId: In(ids) })
+          : [];
+        for (const m of memberships)
+          reviewers.push({ userId: m.userId, access: m.access });
+      }
+      if (c.actorLogin) {
+        const userId = await this.identities.resolveMemberByLogin(
+          workspaceId,
+          c.provider,
+          host,
+          c.actorLogin,
+          { verifiedOnly: true },
+        );
+        if (userId) actor = { type: 'user', id: userId };
+      }
+    } catch (e) {
+      // A lookup problem must not drop the webhook: fall back to the system actor.
+      this.logger.warn(`Login lookup failed: ${(e as Error).message}`);
+    }
+    return { actor, reviewers };
+  }
+
+  /** Reviewers who may see the task: someone limited to other projects is not told about it. */
+  private async reviewersWhoCanSee(
+    issueId: string,
+    reviewers: { userId: string; access: MemberAccess | null }[],
+  ): Promise<string[] | undefined> {
+    if (!reviewers.length) return undefined;
+    let projectId: string | null | undefined;
+    if (reviewers.some((r) => r.access && !r.access.projects.all))
+      projectId = (
+        await this.ds
+          .getRepository(IssueEntity)
+          .findOne({ where: { id: issueId }, select: { id: true, projectId: true } })
+      )?.projectId;
+    const visible = reviewers
+      .filter((r) => !projectHidden(r.access, projectId))
+      .map((r) => r.userId);
+    return visible.length ? visible : undefined;
   }
 
   private async doUpsert(
     workspaceId: string,
     repo: { id: string },
     c: ArtifactCandidate,
+    source: { host?: string | null },
   ): Promise<LinkResult> {
     const keyMap = await this.keyMap(workspaceId);
     const keys = [
@@ -92,9 +170,13 @@ export class ArtifactLinkerService {
       ...byIssue.keys(),
     ]);
     const result: LinkResult = { created: 0, updated: 0, issueKeys: keys };
+    const { actor, reviewers } = targets.size
+      ? await this.people(workspaceId, c, source.host)
+      : { actor: SYSTEM_ACTOR, reviewers: [] };
 
     for (const issueId of targets) {
       const current = byIssue.get(issueId);
+      const reviewerUserIds = await this.reviewersWhoCanSee(issueId, reviewers);
       const applyReview =
         c.review !== undefined &&
         (!c.reviewOnlyFrom ||
@@ -102,24 +184,21 @@ export class ArtifactLinkerService {
           c.reviewOnlyFrom.includes(current.review ?? 'none'));
       let row: ArtifactEntity;
       if (current) {
-        row = await this.artifacts.update(
-          workspaceId,
-          SYSTEM_ACTOR,
-          current.id,
-          {
-            title: c.title,
-            url: c.url,
-            state: c.state,
-            ci: c.ci,
-            review: applyReview ? c.review : undefined,
-            hasConflicts: c.hasConflicts,
-          },
-        );
+        row = await this.artifacts.update(workspaceId, actor, current.id, {
+          title: c.title,
+          url: c.url,
+          state: c.state,
+          ci: c.ci,
+          review: applyReview ? c.review : undefined,
+          hasConflicts: c.hasConflicts,
+          reviewerUserIds,
+        });
         if (row.updatedAt.getTime() > current.updatedAt.getTime())
           result.updated++;
       } else {
-        row = await this.artifacts.create(workspaceId, SYSTEM_ACTOR, {
+        row = await this.artifacts.create(workspaceId, actor, {
           issueId,
+          reviewerUserIds,
           kind: c.kind,
           provider: c.provider,
           title: c.title,

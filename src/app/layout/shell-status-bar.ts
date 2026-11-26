@@ -47,18 +47,20 @@ const PROVIDER_LABEL: Record<string, string> = {
       <span class="min-w-0 shrink truncate">{{ t }}</span>
     }
     <span class="flex-1"></span>
-    <button
-      type="button"
-      id="ask-trama-chip"
-      class="bg-primary/10 border-primary/40 hover:bg-primary/20 flex shrink-0 items-center gap-1.5 border py-0.5 ps-2 pe-1.5 outline-none focus-visible:border-primary"
-      aria-controls="trama-assistant"
-      [attr.aria-expanded]="ui.askOpen()"
-      (click)="ui.toggleAsk()"
-    >
-      <svg [lucideIcon]="sparklesIcon" [size]="11" class="text-primary shrink-0" aria-hidden="true"></svg>
-      <span class="text-foreground">Ask Trama</span>
-      <kbd class="bg-secondary text-muted-foreground px-1 font-mono text-[10px]">{{ askKeys }}</kbd>
-    </button>
+    @if (!store.isGuest()) {
+      <button
+        type="button"
+        id="ask-trama-chip"
+        class="bg-primary/10 border-primary/40 hover:bg-primary/20 flex shrink-0 items-center gap-1.5 border py-0.5 ps-2 pe-1.5 outline-none focus-visible:border-primary"
+        aria-controls="trama-assistant"
+        [attr.aria-expanded]="ui.askOpen()"
+        (click)="ui.toggleAsk()"
+      >
+        <svg [lucideIcon]="sparklesIcon" [size]="11" class="text-primary shrink-0" aria-hidden="true"></svg>
+        <span class="text-foreground">Ask Trama</span>
+        <kbd class="bg-secondary text-muted-foreground px-1 font-mono text-[10px]">{{ askKeys }}</kbd>
+      </button>
+    }
     <button type="button" class="hover:text-muted-foreground shrink-0 whitespace-pre max-lg:hidden" (click)="ui.openModal('shortcuts')">? shortcuts</button>
     <button type="button" class="hover:text-muted-foreground -ms-1 shrink-0 max-lg:hidden" (click)="ui.openCommandPalette()">⌘K command</button>
     @if (timers.running(); as run) {
@@ -93,7 +95,7 @@ export class ShellStatusBar {
       : 'Ctrl J';
   protected readonly timers = inject(TimeEntriesStore);
   private readonly sync = inject(SyncStatus);
-  private readonly store = inject(TramaStore);
+  protected readonly store = inject(TramaStore);
 
   /** One tick per second (drives the elapsed clock and the "ago" labels). */
   private readonly now = signal(Date.now());

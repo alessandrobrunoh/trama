@@ -1,17 +1,23 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource, In, IsNull, LessThan, MoreThan } from 'typeorm';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
 import { appUrl } from '../common/app-url.js';
 import { uid } from '../common/util.js';
 import {
   NOTIFICATION_KINDS,
+  effectiveMemberAccess,
+  findWorkspaceRole,
+  isProjectLimited,
   resolveNotificationSettings,
   type ActorRef,
+  type MemberAccess,
   type NotificationChannels,
   type NotificationKind,
   type NotificationSettings,
 } from '../contracts/domain.js';
 import {
   AgentEntity,
+  ArtifactEntity,
   DomainEventEntity,
   IssueEntity,
   MembershipEntity,
@@ -61,6 +67,36 @@ export class NotificationsService implements OnModuleInit {
     opts: { limit?: number; unreadOnly?: boolean } = {},
   ) {
     const repo = this.ds.getRepository(NotificationEntity);
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+    const access = currentAccess();
+    // Someone limited to some projects only keeps the notifications of those projects (access can shrink later).
+    if (isProjectLimited(access)) {
+      const recent = await repo.find({
+        where: {
+          workspaceId,
+          userId,
+          ...(opts.unreadOnly ? { readAt: IsNull() } : {}),
+        },
+        order: { createdAt: 'DESC', id: 'DESC' },
+        take: 500,
+      });
+      const visible = await this.openable(workspaceId, recent, access!);
+      const unread = opts.unreadOnly
+        ? visible
+        : await this.openable(
+            workspaceId,
+            await repo.find({
+              where: { workspaceId, userId, readAt: IsNull() },
+              order: { createdAt: 'DESC', id: 'DESC' },
+              take: 500,
+            }),
+            access!,
+          );
+      const items = visible.slice(0, limit);
+      for (const item of items)
+        if (item.kind === 'workstream_update') item.link = 'tasks';
+      return { items, unread: unread.length };
+    }
     const items = await repo.find({
       where: {
         workspaceId,
@@ -68,7 +104,7 @@ export class NotificationsService implements OnModuleInit {
         ...(opts.unreadOnly ? { readAt: IsNull() } : {}),
       },
       order: { createdAt: 'DESC', id: 'DESC' },
-      take: Math.min(Math.max(opts.limit ?? 50, 1), 200),
+      take: limit,
     });
     const unread = await repo.countBy({
       workspaceId,
@@ -78,6 +114,45 @@ export class NotificationsService implements OnModuleInit {
     for (const item of items)
       if (item.kind === 'workstream_update') item.link = 'tasks';
     return { items, unread };
+  }
+
+  /** The notifications about a project, task or artifact the access can open. Anything else is dropped. */
+  private async openable(
+    workspaceId: string,
+    rows: NotificationEntity[],
+    access: MemberAccess,
+  ): Promise<NotificationEntity[]> {
+    const idsOf = (type: string) => [
+      ...new Set(rows.filter((row) => row.subject.type === type).map((row) => row.subject.id)),
+    ];
+    const artifactIds = idsOf('artifact');
+    const artifacts = artifactIds.length
+      ? await this.ds.getRepository(ArtifactEntity).find({
+          where: { workspaceId, id: In(artifactIds) },
+          select: { id: true, issueId: true },
+        })
+      : [];
+    const issueIds = [
+      ...new Set([
+        ...idsOf('issue'),
+        ...artifacts.map((artifact) => artifact.issueId).filter((id): id is string => !!id),
+      ]),
+    ];
+    const issues = issueIds.length
+      ? await this.ds.getRepository(IssueEntity).find({
+          where: { workspaceId, id: In(issueIds) },
+          select: { id: true, projectId: true },
+        })
+      : [];
+    const projectOfIssue = new Map(issues.map((issue) => [issue.id, issue.projectId]));
+    const issueOfArtifact = new Map(artifacts.map((artifact) => [artifact.id, artifact.issueId]));
+    return rows.filter((row) => {
+      const { type, id } = row.subject;
+      if (type === 'project') return !projectHidden(access, id);
+      const issueId = type === 'issue' ? id : type === 'artifact' ? issueOfArtifact.get(id) : undefined;
+      if (!issueId || !projectOfIssue.has(issueId)) return false;
+      return !projectHidden(access, projectOfIssue.get(issueId));
+    });
   }
 
   /** Mark some (or, without ids, all) of the caller's notifications in this workspace as read. */
@@ -156,9 +231,31 @@ export class NotificationsService implements OnModuleInit {
     const memberIds = new Set(
       memberships.map((membership) => membership.userId),
     );
-    for (let i = 0; i < drafts.length; i += DELIVERY_CONCURRENCY) {
+    // Someone limited to some projects is not told about work in the others (the title would leak in the email).
+    const roles = workspace.resolved().roles;
+    const accessOf = new Map(
+      memberships.map((membership) => [
+        membership.userId,
+        effectiveMemberAccess(
+          findWorkspaceRole(roles, membership.role),
+          membership.access,
+        ),
+      ]),
+    );
+    const projectId = ctx.issue
+      ? (ctx.issue.projectId ?? null)
+      : ctx.event.subject.type === 'project'
+        ? ctx.event.subject.id
+        : undefined;
+    const deliverable =
+      projectId === undefined
+        ? drafts
+        : drafts.filter(
+            (draft) => !projectHidden(accessOf.get(draft.userId), projectId),
+          );
+    for (let i = 0; i < deliverable.length; i += DELIVERY_CONCURRENCY) {
       await Promise.all(
-        drafts.slice(i, i + DELIVERY_CONCURRENCY).map((draft) =>
+        deliverable.slice(i, i + DELIVERY_CONCURRENCY).map((draft) =>
           this.deliver(workspace, event.actor, draft, {
             user: usersById.get(draft.userId),
             isMember: memberIds.has(draft.userId),

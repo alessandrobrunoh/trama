@@ -20,7 +20,7 @@ Trama reduces the work required to manage development. Tasks stay granular; comm
 12. **Require migration.** Trama must stay usable beside an existing tracker; it never forces replacing one.
 13. **Grow enterprise administration ahead of need.** SSO, SCIM and audit exports wait for a real customer, after the core workflow is proven.
 14. **Host the marketing site.** Landing, blog and brand pages are not product (see the freeze table).
-15. **Model organization structure or a repository registry.** No teams (tasks are not assigned to a team) and no registry of repositories. A project has one optional `repository` string.
+15. **Model organization structure or a workspace-wide repository registry.** No teams (tasks are not assigned to a team) and no catalogue of repositories for the workspace. A project may have routing rules: each names one external source (a repository or group), the connection it is read through and whether it is inbound or two-way, and decides which project the source's unmatched issues and pull requests land in. Rules belong to the project, a source goes to one project, and nothing lists repositories on their own. The old `repository` string stays readable and was migrated into a rule.
 16. **Run a decision or approval workflow.** No ADRs, decision records, or agent "input requests" waiting on a person. Context goes in comments; what needs a person shows up in Attention.
 
 ## Scope freeze

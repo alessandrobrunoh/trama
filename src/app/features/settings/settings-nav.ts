@@ -6,11 +6,11 @@ import {
   LucideKeyRound,
   LucideKeyboard,
   LucidePlug,
+  LucidePlugZap,
   LucideSettings,
   LucideShieldCheck,
   LucideSlidersHorizontal,
   LucideSparkles,
-  LucideSunMoon,
   LucideTag,
   LucideTimer,
   LucideUserRound,
@@ -33,20 +33,20 @@ export interface SettingsGroupDef {
   sections: readonly SettingsSectionDef[];
 }
 
-/** The settings sidebar (v3 "Settings sidebar"): WORKSPACE first, then ACCOUNT. */
+/** The settings sidebar (v4 "Settings sidebar"): WORKSPACE first, then ACCOUNT, in the order of the frames. */
 export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
   {
     title: 'WORKSPACE',
     sections: [
       { id: 'workspace', label: 'General', icon: LucideSettings },
-      { id: 'workflow', label: 'Workflow', icon: LucideWorkflow },
-      { id: 'estimates', label: 'Estimates', icon: LucideGauge },
       { id: 'members', label: 'Members', icon: LucideUsers },
       { id: 'roles', label: 'Roles & permissions', icon: LucideShieldCheck },
+      { id: 'workflow', label: 'Workflow', icon: LucideWorkflow },
       { id: 'labels', label: 'Labels', icon: LucideTag },
-      { id: 'agents', label: 'Agents', icon: LucideBot },
-      { id: 'integrations', label: 'Integrations', icon: LucidePlug },
+      { id: 'estimates', label: 'Estimates', icon: LucideGauge },
       { id: 'time', label: 'Time tracking', icon: LucideTimer },
+      { id: 'integrations', label: 'Integrations', icon: LucidePlug },
+      { id: 'agents', label: 'Agents', icon: LucideBot },
       { id: 'import', label: 'Import', icon: LucideDownload },
     ],
   },
@@ -54,24 +54,50 @@ export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
     title: 'ACCOUNT',
     sections: [
       { id: 'profile', label: 'Profile', icon: LucideUserRound },
+      { id: 'my-integrations', label: 'Integrations', icon: LucidePlugZap },
       { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal },
       { id: 'notifications', label: 'Notifications', icon: LucideBell },
       { id: 'ai', label: 'AI & assistant', icon: LucideSparkles },
-      { id: 'appearance', label: 'Appearance', icon: LucideSunMoon },
       { id: 'shortcuts', label: 'Shortcuts', icon: LucideKeyboard },
-      { id: 'api', label: 'API & MCP', icon: LucideKeyRound },
+      { id: 'api', label: 'API tokens', icon: LucideKeyRound },
     ],
   },
 ];
 
 export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = SETTINGS_GROUPS.flatMap((g) => g.sections);
 
+/** A guest only has the personal sections: nothing about the workspace, AI or API keys. */
+const GUEST_SECTIONS: ReadonlySet<string> = new Set([
+  'profile',
+  'my-integrations',
+  'preferences',
+  'notifications',
+  'shortcuts',
+]);
+
+/** Whether a guest may open this settings section. */
+export function guestMayOpenSettings(sectionId: string): boolean {
+  return GUEST_SECTIONS.has(sectionId);
+}
+
+/** The settings sidebar for a guest (only the sections they have) or for everyone else (all of them). */
+export function settingsGroupsFor(guest: boolean): readonly SettingsGroupDef[] {
+  if (!guest) return SETTINGS_GROUPS;
+  return SETTINGS_GROUPS.map((group) => ({
+    ...group,
+    sections: group.sections.filter((section) => GUEST_SECTIONS.has(section.id)),
+  })).filter((group) => group.sections.length);
+}
+
 /** Old / alternative section ids, still linked from elsewhere in the app. */
 const ALIASES: Readonly<Record<string, string>> = {
   danger: 'workspace',
   general: 'workspace',
   account: 'profile',
-  theme: 'appearance',
+  theme: 'preferences',
+  appearance: 'preferences',
+  personal: 'my-integrations',
+  'personal-integrations': 'my-integrations',
   statuses: 'workflow',
   tokens: 'api',
 };

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IntegrationConnectionEntity } from '../database/entities/index.js';
+import { ExternalIdentitiesModule } from '../external-identities/external-identities.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { IssuesModule } from '../issues/issues.module.js';
 import { MilestonesModule } from '../milestones/milestones.module.js';
 import { ProjectsModule } from '../projects/projects.module.js';
+import { RoutingModule } from '../routing/routing.module.js';
 import { CredentialsService } from './credentials.service.js';
 import { ImportJobEntity, ImportLinkEntity, TrackerCredentialEntity } from './entities.js';
 import { ExternalLinksService } from './external-links.service.js';
@@ -16,9 +18,11 @@ import { ImportsService } from './imports.service.js';
   imports: [
     TypeOrmModule.forFeature([ImportJobEntity, ImportLinkEntity, TrackerCredentialEntity, IntegrationConnectionEntity]),
     IntegrationsModule,
+    ExternalIdentitiesModule,
     IssuesModule,
     ProjectsModule,
     MilestonesModule,
+    RoutingModule,
   ],
   controllers: [ImportsController, IssueExternalRefController],
   providers: [CredentialsService, ImportRunnerService, ImportsService, ExternalLinksService],

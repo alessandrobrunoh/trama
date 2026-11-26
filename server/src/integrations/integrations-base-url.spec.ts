@@ -2,13 +2,18 @@ import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { IntegrationConnectionEntity } from '../database/entities/index.js';
-import { IntegrationsService } from './integrations.service.js';
+import { IntegrationsService, type ConnectionScope } from './integrations.service.js';
 import { SecretsService } from './secrets.service.js';
+
+const W1: ConnectionScope = { type: 'workspace', workspaceId: 'w1' };
 
 function setup() {
   const secrets = new SecretsService();
   const row = Object.assign(new IntegrationConnectionEntity(), {
     id: 'ic_1',
+    ownerType: 'workspace',
+    label: 'GitHub · octo',
+    host: 'ghe.example.com',
     workspaceId: 'w1',
     provider: 'github',
     baseUrl: 'https://ghe.example.com',
@@ -27,23 +32,25 @@ function setup() {
   };
   const repo = { findOneBy: async () => row, save: async (x: unknown) => x };
   const events = { publish: vi.fn() };
-  const service = new IntegrationsService(http as never, secrets, events as never, repo as never);
+  const users = { find: async () => [] };
+  const service = new IntegrationsService(http as never, secrets, events as never, repo as never, users as never);
   return { service, row, http, seen };
 }
 
 describe('IntegrationsService.update base URL change', () => {
   it('does not send the stored token to a new host unless the token is supplied again', async () => {
     const { service, row, http } = setup();
-    await expect(service.update('w1', 'ic_1', { baseUrl: 'https://attacker.example.net' }, 'http://x')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.update(W1, 'ic_1', { baseUrl: 'https://attacker.example.net' }, 'http://x')).rejects.toBeInstanceOf(BadRequestException);
     expect(http.request).not.toHaveBeenCalled();
     expect(row.baseUrl).toBe('https://ghe.example.com');
   });
 
   it('accepts a new host together with a fresh token, and an unchanged host without one', async () => {
     const { service, row } = setup();
-    await service.update('w1', 'ic_1', { baseUrl: 'https://ghe.example.org', token: 'fresh' }, 'http://x');
+    await service.update(W1, 'ic_1', { baseUrl: 'https://ghe.example.org', token: 'fresh' }, 'http://x');
     expect(row.baseUrl).toBe('https://ghe.example.org');
-    await service.update('w1', 'ic_1', { baseUrl: 'https://ghe.example.org' }, 'http://x');
+    expect(row.host).toBe('ghe.example.org');
+    await service.update(W1, 'ic_1', { baseUrl: 'https://ghe.example.org' }, 'http://x');
     expect(row.baseUrl).toBe('https://ghe.example.org');
   });
 });
@@ -53,8 +60,8 @@ describe('IntegrationsService base URL SSRF guard', () => {
     'rejects %s with a 400 before contacting it',
     async (baseUrl) => {
       const { service, http } = setup();
-      await expect(service.update('w1', 'ic_1', { baseUrl, token: 'fresh' }, 'http://x')).rejects.toThrow(/Invalid baseUrl: .*not allowed/);
-      await expect(service.create('w1', { type: 'user', id: 'u' } as never, { provider: 'gitlab', token: 't', baseUrl }, 'http://x')).rejects.toBeInstanceOf(
+      await expect(service.update(W1, 'ic_1', { baseUrl, token: 'fresh' }, 'http://x')).rejects.toThrow(/Invalid baseUrl: .*not allowed/);
+      await expect(service.create(W1, { type: 'user', id: 'u' } as never, { provider: 'gitlab', token: 't', baseUrl }, 'http://x')).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(http.request).not.toHaveBeenCalled();

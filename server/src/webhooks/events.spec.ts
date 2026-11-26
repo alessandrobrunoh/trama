@@ -1,5 +1,5 @@
 import { PayloadError, bitbucketCi, githubCi, gitlabCi, parseBitbucketEvent, parseGithubEvent, parseGitlabEvent } from './events.js';
-import { bbCommitStatus, bbPullRequest, ghCheckRun, ghCheckSuite, ghPullRequest, ghStatus, glMergeRequest, glPipeline } from './fixtures.js';
+import { bbCommitStatus, bbPullRequest, ghCheckRun, ghCheckSuite, ghIssue, ghPullRequest, ghStatus, glIssue, glMergeRequest, glPipeline } from './fixtures.js';
 
 describe('GitHub payload mapping', () => {
   it('maps an opened PR', () => {
@@ -34,6 +34,25 @@ describe('GitHub payload mapping', () => {
     expect(get({ requested_reviewers: [{ login: 'x' }] }, 'opened')).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
     expect(get({}, 'review_request_removed')).toMatchObject({ review: 'none', reviewOnlyFrom: ['requested'] });
   });
+  it('reports who was asked to review and who sent the event', () => {
+    const get = (payload: unknown) => {
+      const r = parseGithubEvent('pull_request', payload);
+      if (r.kind !== 'pr') throw new Error('expected pr');
+      return r.candidate;
+    };
+    const asked = get({
+      ...ghPullRequest({ requested_reviewers: [{ login: 'Bob-GH' }, { login: 'Eve' }] }, 'review_requested'),
+      requested_reviewer: { login: 'Bob-GH' },
+      sender: { login: 'Ada-GH' },
+    });
+    expect(asked.reviewerLogins).toEqual(['Bob-GH']); // only the one this event asked
+    expect(asked.actorLogin).toBe('Ada-GH');
+    const opened = get(ghPullRequest({ requested_reviewers: [{ login: 'Bob-GH' }, { login: 'Eve' }, { login: 'Bob-GH' }] }));
+    expect(opened.reviewerLogins).toEqual(['Bob-GH', 'Eve']);
+    const none = get(ghPullRequest());
+    expect(none.reviewerLogins).toBeUndefined();
+    expect(none.actorLogin).toBeUndefined();
+  });
   it('maps CI from check_suite, check_run and status', () => {
     const ci = (e: string, p: unknown) => {
       const r = parseGithubEvent(e, p);
@@ -51,9 +70,28 @@ describe('GitHub payload mapping', () => {
     expect(suite.kind === 'ci' && suite.patch).toMatchObject({ sha: 'a'.repeat(40), prExternalIds: ['#182'] });
     expect(githubCi('completed', 'cancelled')).toBe('pending');
   });
+  it('maps issues with their labels, milestone, author and close reason', () => {
+    const open = parseGithubEvent('issues', ghIssue({ milestone: { title: 'v1.2' } }));
+    if (open.kind !== 'issue') throw new Error('expected issue');
+    expect(open.repo.fullName).toBe('acme/auth-service');
+    expect(open.issue).toMatchObject({
+      provider: 'github', externalId: '#31', number: 31, state: 'open', labels: ['bug'], milestone: 'v1.2', author: 'octo',
+    });
+    const closed = parseGithubEvent('issues', ghIssue({ state: 'closed', state_reason: 'not_planned' }, 'closed'));
+    expect(closed.kind === 'issue' && closed.issue).toMatchObject({ state: 'closed', stateReason: 'not_planned' });
+    const done = parseGithubEvent('issues', ghIssue({ state: 'closed' }, 'closed'));
+    expect(done.kind === 'issue' && done.issue.stateReason).toBe('completed');
+    expect(parseGithubEvent('issues', ghIssue({ pull_request: {} })).kind).toBe('ignored');
+    expect(parseGithubEvent('issues', ghIssue({}, 'assigned')).kind).toBe('ignored');
+    expect(() => parseGithubEvent('issues', { action: 'opened' })).toThrow(PayloadError);
+  });
+  it('carries labels and milestone of a pull request for routing', () => {
+    const r = parseGithubEvent('pull_request', ghPullRequest({ labels: [{ name: 'frontend' }], milestone: { title: 'v2' } }));
+    expect(r.kind === 'pr' && r.meta).toEqual({ labels: ['frontend'], milestone: 'v2' });
+  });
   it('ignores unhandled events/actions, answers ping, rejects malformed payloads', () => {
     expect(parseGithubEvent('ping', {}).kind).toBe('ping');
-    expect(parseGithubEvent('issues', {}).kind).toBe('ignored');
+    expect(parseGithubEvent('push', {}).kind).toBe('ignored');
     expect(parseGithubEvent('pull_request', ghPullRequest({}, 'labeled')).kind).toBe('ignored');
     expect(() => parseGithubEvent('pull_request', { action: 'opened' })).toThrow(PayloadError);
     expect(() => parseGithubEvent('check_suite', { check_suite: { head_sha: 1 }, repository: {} })).toThrow(PayloadError);
@@ -82,6 +120,11 @@ describe('GitLab payload mapping', () => {
     expect(mr({ action: 'open' }, { reviewers: [{ id: 1 }] })).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
     expect(mr({ action: 'update', oldrev: 'abc' }).ci).toBe('pending');
   });
+  it('reports reviewers and the user behind the event', () => {
+    const c = mr({ action: 'open' }, { reviewers: [{ username: 'bob' }, { id: 3 }], user: { username: 'ada' } });
+    expect(c.reviewerLogins).toEqual(['bob']);
+    expect(c.actorLogin).toBe('ada');
+  });
   it('maps pipelines', () => {
     const ci = (status: string, iid?: number) => {
       const r = parseGitlabEvent(glPipeline(status, iid));
@@ -91,6 +134,17 @@ describe('GitLab payload mapping', () => {
     expect(ci('failed')).toMatchObject({ ci: 'failing', prExternalIds: [] });
     expect(ci('running')).toMatchObject({ ci: 'pending' });
     expect(gitlabCi('canceled')).toBe('pending');
+  });
+  it('maps issues', () => {
+    const open = parseGitlabEvent(glIssue());
+    expect(open.kind === 'issue' && open.issue).toMatchObject({
+      provider: 'gitlab', externalId: '#5', state: 'open', labels: ['bug'], author: 'tanuki',
+    });
+    expect(open.kind === 'issue' && open.repo.fullName).toBe('acme-internal/mobile-app');
+    const closed = parseGitlabEvent(glIssue({ state: 'closed', action: 'close' }));
+    expect(closed.kind === 'issue' && closed.issue.state).toBe('closed');
+    expect(parseGitlabEvent(glIssue({ action: 'move' })).kind).toBe('ignored');
+    expect(() => parseGitlabEvent(glIssue({ iid: 'x' }))).toThrow(PayloadError);
   });
   it('ignores unhandled kinds and rejects malformed payloads', () => {
     expect(parseGitlabEvent({ object_kind: 'push', project: {} }).kind).toBe('ignored');
@@ -122,6 +176,11 @@ describe('Bitbucket payload mapping', () => {
     expect(pr('pullrequest:unapproved', { reviewers: [{ uuid: 'x' }] }).candidate.review).toBe('requested');
     expect(pr('pullrequest:changes_request_created').candidate.review).toBe('changes_requested');
     expect(pr('pullrequest:created', { reviewers: [{ uuid: 'x' }] }).candidate).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
+  });
+  it('reports reviewers and the actor by nickname', () => {
+    const c = pr('pullrequest:created', { reviewers: [{ nickname: 'bob' }, { uuid: 'x' }] }, { actor: { nickname: 'ada' } }).candidate;
+    expect(c.reviewerLogins).toEqual(['bob']);
+    expect(c.actorLogin).toBe('ada');
   });
   it('maps build statuses', () => {
     const ci = (state: string) => {

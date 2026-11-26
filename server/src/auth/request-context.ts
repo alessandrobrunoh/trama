@@ -107,6 +107,7 @@ export const CAPABILITY_KEY = 'trama:capability';
 export const ALLOW_CUSTOM_TOKEN_KEY = 'trama:allow-custom-token';
 export const SESSION_ONLY_KEY = 'trama:session-only';
 export const MULTIPART_KEY = 'trama:multipart';
+export const NO_GUESTS_KEY = 'trama:no-guests';
 
 /** Skip authentication (login, signup, health, webhooks…). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -141,6 +142,12 @@ export const RequireUser = () => SetMetadata(REQUIRE_USER_KEY, true);
  * only the JSON content-type check is relaxed, and only for this handler.
  */
 export const Multipart = () => SetMetadata(MULTIPART_KEY, true);
+
+/**
+ * A workspace-wide route a guest never uses (tokens, the AI assistant, creating shared labels): 403 for the
+ * guest role, whatever else the route allows. Routes that return people or projects scope their answer instead.
+ */
+export const NoGuests = () => SetMetadata(NO_GUESTS_KEY, true);
 
 function req(ctx: ExecutionContext): AppRequest {
   return ctx.switchToHttp().getRequest<AppRequest>();

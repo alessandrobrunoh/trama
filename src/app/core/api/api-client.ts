@@ -20,6 +20,8 @@ import type {
   CommentPage,
   SnapshotCommentsMode,
   DomainEvent,
+  ExternalIdentity,
+  ExternalIdentityInput,
   Favorite,
   ImportCredential,
   ImportJob,
@@ -39,7 +41,18 @@ import type {
   Project,
   ProjectAiKind,
   ProjectAiResult,
+  ProjectPlacement,
+  ProjectTransferPreview,
+  ProjectTransferResult,
+  GitProvider,
+  RoutingConnectionOption,
+  RoutingRule,
+  RoutingRulesOverview,
+  RoutingSuggestions,
+  ProjectInviteResult,
+  ProjectShare,
   Role,
+  SharedProject,
   PublicView,
   SavedView,
   User,
@@ -98,6 +111,9 @@ import type {
   ManualTimeEntryInput,
   TimeEntry,
   TimeEntryTarget,
+  CreateRoutingRuleInput,
+  RoutingSuggestionsQuery,
+  UpdateRoutingRuleInput,
 } from './api.types';
 
 export interface RequestOptions {
@@ -280,6 +296,22 @@ export class ApiClient {
     revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
   };
 
+  /** Sharing one project with guests: who can open it, invite by email, take the project away from someone. */
+  readonly projectShare = {
+    get: (slug: string, projectId: ID) =>
+      this.get<ProjectShare>(`${this.w(slug)}/projects/${projectId}/share`),
+    invite: (slug: string, projectId: ID, email: string) =>
+      this.post<ProjectInviteResult>(`${this.w(slug)}/projects/${projectId}/invites`, { email }),
+    resend: (slug: string, projectId: ID, inviteId: ID) =>
+      this.post<InviteLink>(`${this.w(slug)}/projects/${projectId}/invites/${inviteId}/resend`),
+    revokeInvite: (slug: string, projectId: ID, inviteId: ID) =>
+      this.del(`${this.w(slug)}/projects/${projectId}/invites/${inviteId}`),
+    removeAccess: (slug: string, projectId: ID, membershipId: ID) =>
+      this.del<{ membershipEnded: boolean }>(
+        `${this.w(slug)}/projects/${projectId}/share/${membershipId}`,
+      ),
+  };
+
   /** The signed-in user's notifications in a workspace, and their settings (the same in every workspace). */
   readonly notifications = {
     list: (slug: string, opts: { limit?: number; unread?: boolean } = {}) =>
@@ -324,6 +356,17 @@ export class ApiClient {
       this.post<Favorite>(`${this.w(slug)}/favorites`, { type, subjectId }),
     remove: (slug: string, type: FavoriteType, subjectId: ID) =>
       this.del(`${this.w(slug)}/favorites/${type}/${encodeURIComponent(subjectId)}`),
+  };
+
+  /**
+   * The signed-in user's logins in other tools (GitHub, GitLab, Jira…), shared by all their workspaces.
+   * `add` answers 409 when someone else already has the login.
+   */
+  readonly externalIdentities = {
+    list: () => this.get<ExternalIdentity[]>('/me/external-identities', undefined, { quiet: true }),
+    add: (input: ExternalIdentityInput) =>
+      this.post<ExternalIdentity>('/me/external-identities', input, { quiet: true }),
+    remove: (id: ID) => this.del(`/me/external-identities/${encodeURIComponent(id)}`),
   };
 
   /** The page behind an invitation link: `preview` is public, `accept` needs a signed-in user. */
@@ -373,6 +416,31 @@ export class ApiClient {
     /** AI suggestion; the `kind` of the result matches the requested one. */
     ai: (slug: string, projectId: ID, kind: ProjectAiKind) =>
       this.post<ProjectAiResult>(`${this.w(slug)}/projects/${projectId}/ai/${kind}`),
+    /** What moving the project to `target` (a workspace slug) would do. Changes nothing. */
+    transferPreview: (slug: string, id: ID, target: string) =>
+      this.get<ProjectTransferPreview>(
+        `${this.w(slug)}/projects/${id}/transfer-preview`,
+        { target },
+        { quiet: true },
+      ),
+    /** Owner or admin of both workspaces. The project leaves `slug` for `target`. */
+    transfer: (slug: string, id: ID, target: string) =>
+      this.post<ProjectTransferResult>(`${this.w(slug)}/projects/${id}/transfer`, { target }),
+  };
+
+  /** Projects shared with the signed-in person (they are a guest there), and where they show them. */
+  readonly shared = {
+    list: () => this.get<SharedProject[]>('/shared/projects', undefined, { quiet: true }),
+    /** Show the project in one of my workspaces. */
+    place: (projectId: ID, workspaceId: ID) =>
+      this.put<ProjectPlacement>(`/shared/projects/${projectId}/placement`, { workspaceId }),
+    /** Hide it from Shared with me. */
+    hide: (projectId: ID) =>
+      this.put<ProjectPlacement>(`/shared/projects/${projectId}/placement`, { workspaceId: null }),
+    /** Back to Shared with me. */
+    clear: (projectId: ID) => this.del(`/shared/projects/${projectId}/placement`),
+    /** Give up my access to the project. */
+    leave: (projectId: ID) => this.post<void>(`/shared/projects/${projectId}/leave`),
   };
 
   readonly issues = {
@@ -522,9 +590,43 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateIntegrationInput) =>
       this.patch<IntegrationDetail>(`${this.w(slug)}/integrations/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/integrations/${id}`),
+    /** Withdraws the credential: status `revoked`, token wiped. A new token via `update` reconnects it. */
+    revoke: (slug: string, id: ID) =>
+      this.post<IntegrationDetail>(`${this.w(slug)}/integrations/${id}/revoke`),
     rotateWebhookSecret: (slug: string, id: ID) =>
       this.post<IntegrationWithWebhook>(`${this.w(slug)}/integrations/${id}/rotate-webhook-secret`),
   };
+
+  /** The signed-in person's own connections (same in every workspace); only they can see them. */
+  readonly connections = {
+    list: (o?: RequestOptions) => this.get<IntegrationDetail[]>('/me/connections', undefined, o),
+    create: (input: CreateIntegrationInput) =>
+      this.post<IntegrationWithWebhook>('/me/connections', input),
+    update: (id: ID, input: UpdateIntegrationInput) =>
+      this.patch<IntegrationDetail>(`/me/connections/${id}`, input),
+    revoke: (id: ID) => this.post<IntegrationDetail>(`/me/connections/${id}/revoke`),
+    remove: (id: ID) => this.del(`/me/connections/${id}`),
+    rotateWebhookSecret: (id: ID) =>
+      this.post<IntegrationWithWebhook>(`/me/connections/${id}/rotate-webhook-secret`),
+  };
+
+  /** Where a project's tasks come from: its sources (routing rules). Anyone who sees the project reads them. */
+  readonly routing = {
+    overview: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.get<RoutingRulesOverview>(this.rules(slug, projectId), undefined, o),
+    /** Connections this person may read through, the workspace one suggested. */
+    connections: (slug: string, projectId: ID, provider?: GitProvider, o?: RequestOptions) =>
+      this.get<RoutingConnectionOption[]>(`${this.rules(slug, projectId)}/connections`, { provider }, o),
+    suggestions: (slug: string, projectId: ID, query: RoutingSuggestionsQuery, o?: RequestOptions) =>
+      this.get<RoutingSuggestions>(`${this.rules(slug, projectId)}/suggestions`, { ...query }, o),
+    create: (slug: string, projectId: ID, input: CreateRoutingRuleInput) =>
+      this.post<RoutingRule>(this.rules(slug, projectId), input),
+    update: (slug: string, projectId: ID, ruleId: ID, input: UpdateRoutingRuleInput) =>
+      this.patch<RoutingRule>(`${this.rules(slug, projectId)}/${ruleId}`, input),
+    remove: (slug: string, projectId: ID, ruleId: ID) =>
+      this.del(`${this.rules(slug, projectId)}/${ruleId}`),
+  };
+  private rules = (slug: string, projectId: ID) => `${this.w(slug)}/projects/${projectId}/routing-rules`;
 
   /** Custom integrations: signed JSON POSTs to your URL for domain events. Needs the manageIntegrations capability. */
   readonly outgoingWebhooks = {

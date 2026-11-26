@@ -1,5 +1,5 @@
 import type { Role, ShareLevel, SharingSettings } from '../contracts/domain.js';
-import { legacyRoleAtLeast } from '../contracts/domain.js';
+import { GUEST_ROLE_ID, legacyRoleAtLeast } from '../contracts/domain.js';
 
 /** The caller as far as view permissions are concerned. */
 export interface ViewActor {
@@ -36,9 +36,13 @@ export function grantLevel(view: ViewAccessSubject, actor: ViewActor): ShareLeve
   return view.sharing.grants.find((g) => g.userId === actor.userId)?.level ?? null;
 }
 
-/** Owner, invited people, or (for workspace/link views) any workspace member. */
+/**
+ * Owner, invited people, or (for workspace/link views) any workspace member. A guest is not "the workspace":
+ * views shared with it by name still open, the ones shared with everybody do not.
+ */
 export function canReadView(view: ViewAccessSubject, actor: ViewActor): boolean {
-  return isOwner(view, actor) || view.sharing.visibility !== 'private' || grantLevel(view, actor) !== null;
+  if (isOwner(view, actor) || grantLevel(view, actor) !== null) return true;
+  return view.sharing.visibility !== 'private' && actor.role !== GUEST_ROLE_ID;
 }
 
 /**

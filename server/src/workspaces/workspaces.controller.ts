@@ -32,6 +32,7 @@ import {
   Auth,
   Can,
   Ctx,
+  NoGuests,
   RequireUser,
   SessionOnly,
   Roles,
@@ -221,7 +222,7 @@ export class MembersController {
 
   @Get()
   list(@Ctx() ctx: WorkspaceContext) {
-    return this.service.listMembers(ctx.workspace.id);
+    return this.service.listMembers(ctx.workspace.id, ctx);
   }
 
   @Post()
@@ -268,6 +269,7 @@ export class AgentsController {
   }
 
   @Get(':id')
+  @NoGuests()
   get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
     return this.service.getAgent(ctx.workspace.id, id);
   }
@@ -287,6 +289,7 @@ export class AgentsController {
 }
 
 @Controller('w/:slug/tokens')
+@NoGuests()
 export class TokensController {
   constructor(
     private readonly service: WorkspacesService,

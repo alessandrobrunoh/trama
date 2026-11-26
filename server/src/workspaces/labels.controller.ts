@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
 import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
+import { Ctx, NoGuests, Roles, type WorkspaceContext } from '../auth/request-context.js';
 import { LABEL_NAME_MAX, LABEL_SCOPES, type LabelScope } from '../contracts/domain.js';
 import { OptionalNotNull } from '../common/validation.js';
 import { LabelsService } from './labels.service.js';
@@ -29,6 +29,7 @@ export class LabelsController {
   /** Members can create a label while tagging (the picker offers it inline); everything else about the catalog is admin-only. */
   @Post()
   @Roles('member')
+  @NoGuests()
   async create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateLabelDto) {
     return Object.assign(await this.labels.create(ctx, dto), { role: ctx.role });
   }

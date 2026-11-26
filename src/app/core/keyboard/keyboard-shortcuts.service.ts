@@ -222,7 +222,8 @@ export class KeyboardShortcuts {
       }
       if (lower === 'j') {
         event.preventDefault();
-        this.ui.toggleAsk();
+        // A guest has no assistant: it reads the whole workspace.
+        if (!this.trama.isGuest()) this.ui.toggleAsk();
         return;
       }
     }

@@ -11,9 +11,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 import type { Response } from 'express';
-import type { Repository } from 'typeorm';
+import { DataSource, type Repository } from 'typeorm';
 import { API_PERMISSIONS } from '../contracts/domain.js';
 import { WorkspaceEntity } from '../database/entities/index.js';
+import { ensurePersonalWorkspace } from '../workspaces/personal-workspace.js';
 import { AuthService, LEGACY_SESSION_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth.service.js';
 import {
   AllowCustomToken,
@@ -60,15 +61,17 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     @InjectRepository(WorkspaceEntity) private readonly workspaces: Repository<WorkspaceEntity>,
+    private readonly ds: DataSource,
   ) {}
 
   @Public()
   @Post('signup')
   async signup(@Body() dto: SignupDto, @Req() req: AppRequest, @Res({ passthrough: true }) res: Response) {
     const user = await this.auth.createUser(dto);
+    const personal = await ensurePersonalWorkspace(this.ds, user);
     const session = await this.auth.createSession(user.id, req.headers['user-agent']);
     setSessionCookie(res, session.raw);
-    return { user, workspaces: [] };
+    return { user, workspaces: [personal] };
   }
 
   @Public()
@@ -76,6 +79,8 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Req() req: AppRequest, @Res({ passthrough: true }) res: Response) {
     const user = await this.auth.verifyCredentials(dto.email, dto.password);
+    // accounts created before personal workspaces existed (or by seeding) get theirs on the next login
+    await ensurePersonalWorkspace(this.ds, user);
     const session = await this.auth.createSession(user.id, req.headers['user-agent']);
     setSessionCookie(res, session.raw);
     return { user, workspaces: await this.auth.workspacesOf(user.id) };

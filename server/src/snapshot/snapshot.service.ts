@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { AttentionService } from '../attention/attention.service.js';
 import { canDo, type WorkspaceContext } from '../auth/request-context.js';
-import { scopeSnapshot } from '../auth/member-access.js';
-import type { Role, SnapshotCommentsMode } from '../contracts/domain.js';
+import { projectHidden, scopeSnapshot } from '../auth/member-access.js';
+import { isProjectLimited, type Role, type SnapshotCommentsMode } from '../contracts/domain.js';
+import { visibleMemberships } from '../workspaces/people-scope.js';
 import { CommentsService } from '../comments/comments.service.js';
 import {
   AgentEntity,
@@ -97,13 +98,29 @@ export class SnapshotService {
       events,
       ctx.access,
     );
+    // A guest, or a member limited to some projects, only meets the people and agents of those projects.
+    const limited = isProjectLimited(ctx.access);
+    const visibleMembers = visibleMemberships(
+      memberships,
+      ctx.workspace.resolved().roles,
+      ctx.access,
+      ctx.userId,
+    );
+    const visibleUserIds = new Set(visibleMembers.map((m) => m.userId));
+    const assignedIds = limited
+      ? new Set(
+          issues
+            .filter((issue) => !projectHidden(ctx.access, issue.projectId))
+            .map((issue) => issue.assigneeId),
+        )
+      : null;
     const built = {
       workspace: ctx.workspace,
       me,
       myRole,
-      users,
-      memberships,
-      agents,
+      users: limited ? users.filter((user) => visibleUserIds.has(user.id)) : users,
+      memberships: visibleMembers,
+      agents: assignedIds ? agents.filter((agent) => assignedIds.has(agent.id)) : agents,
       projects,
       milestones,
       issues,

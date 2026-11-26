@@ -18,6 +18,7 @@ export * from './stores/draft.store';
 export * from './stores/list-state.store';
 export * from './stores/invites.store';
 export * from './stores/favorites.store';
+export * from './stores/shared-projects.store';
 export * from './stores/notifications.store';
 export * from './sync';
 export * from './query';

@@ -26,6 +26,14 @@ export type Role = string;
 export type LegacyRole = 'owner' | 'admin' | 'member' | 'viewer';
 export const LEGACY_ROLES: readonly LegacyRole[] = ['owner', 'admin', 'member', 'viewer'];
 
+/**
+ * Default role of a person invited to one or a few projects. It only works on the projects in the
+ * membership's `access.projects`; a guest without any project sees nothing.
+ */
+export const GUEST_ROLE_ID = 'guest';
+/** Default role that manages projects, milestones and tasks without administering the workspace. */
+export const ORGANIZER_ROLE_ID = 'organizer';
+
 export interface User {
   id: ID;
   name: string;
@@ -45,6 +53,11 @@ export interface Workspace {
    * or demote them, and only they can remove or demote other owners. Absent on legacy rows.
    */
   primaryOwnerId?: ID;
+  /**
+   * The person's own workspace, created on sign-up. One per user. It can be renamed, but it cannot be left,
+   * deleted or handed over. Absent (or false) on every other workspace.
+   */
+  personal?: boolean;
   createdAt: ISODate;
 }
 
@@ -270,9 +283,10 @@ export function normalizeMemberAccess(
 /**
  * Role grants plus this person's extras. Null for the owner role (always full), and when the result
  * is every action on every project. Unknown role: nothing.
+ * The guest role never means "every project": without a project list it sees no project at all.
  */
 export function effectiveMemberAccess(
-  role: { owner: boolean; grants: readonly MemberGrant[] } | null | undefined,
+  role: { id?: string; owner: boolean; grants: readonly MemberGrant[] } | null | undefined,
   stored: MemberAccess | null | undefined,
 ): MemberAccess | null {
   if (!role) return { projects: { all: false, projectIds: [] }, includeUnassigned: false, grants: [] };
@@ -280,8 +294,9 @@ export function effectiveMemberAccess(
   const base = new Set(role.grants);
   for (const grant of stored?.grants ?? []) base.add(grant);
   const grants = MEMBER_GRANTS.filter((grant) => base.has(grant));
-  const projects = stored?.projects ?? { all: true, projectIds: [] };
-  const includeUnassigned = projects.all || (stored?.includeUnassigned ?? true);
+  const guestWithoutProjects = role.id === GUEST_ROLE_ID && (!stored || stored.projects.all);
+  const projects = guestWithoutProjects ? { all: false, projectIds: [] as ID[] } : (stored?.projects ?? { all: true, projectIds: [] });
+  const includeUnassigned = role.id === GUEST_ROLE_ID ? false : projects.all || (stored?.includeUnassigned ?? true);
   if (projects.all && includeUnassigned && grants.length === MEMBER_GRANTS.length) return null;
   return {
     projects: projects.all
@@ -312,6 +327,22 @@ export function accessWithin(
     if (projects.projectIds.some((id) => !caller.projects.projectIds.includes(id))) return false;
   }
   return true;
+}
+
+/** The person works only on some projects (a guest, or a member limited to a list). */
+export function isProjectLimited(access: MemberAccess | null | undefined): boolean {
+  return !!access && !access.projects.all;
+}
+
+/** Does this access reach the project? `null` access reaches every project. */
+export function accessIncludesProject(access: MemberAccess | null | undefined, projectId: string): boolean {
+  return !access || access.projects.all || access.projects.projectIds.includes(projectId);
+}
+
+/** Do the two people have at least one project in common? Someone with every project shares with everybody. */
+export function accessesShareProject(a: MemberAccess | null | undefined, b: MemberAccess | null | undefined): boolean {
+  if (!a || !b || a.projects.all || b.projects.all) return true;
+  return a.projects.projectIds.some((id) => b.projects.projectIds.includes(id));
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────
@@ -456,6 +487,27 @@ export interface InvitePreview {
   expiresAt: ISODate;
 }
 
+/** One person with access to a project, as listed by its Share dialog. */
+export interface ProjectShareMember extends Membership {
+  user?: User;
+  /** Sees every project of the workspace, so this project cannot be taken away from them on its own. */
+  allProjects: boolean;
+}
+
+/** GET /projects/:id/share — who can open the project, and who was invited to it and has not joined yet. */
+export interface ProjectShare {
+  members: ProjectShareMember[];
+  invites: WorkspaceInvite[];
+}
+
+/**
+ * POST /projects/:id/invites. `invited`: a person without access got an invitation (share `link.url`
+ * if the email did not arrive). `added`: an existing guest or limited member now also sees this project.
+ */
+export type ProjectInviteResult =
+  | { status: 'invited'; link: InviteLink }
+  | { status: 'added'; member: ProjectShareMember };
+
 /** Runtimes that can act in a workspace. `human` = a person. */
 export type ExecutionProvider = 'human' | 'delta' | 'claude_code' | 'codex' | 'cursor' | 'other';
 
@@ -510,6 +562,78 @@ export const GIT_PROVIDER_META: Record<
 
 /** Longest `Project.repository` / artifact repository string, in characters. */
 export const PROJECT_REPOSITORY_MAX = 2048;
+
+// ───────────────────────────── External identities ─────────────────────────────
+
+/** Tools where a person has a login that is not their Trama account. */
+export type ExternalIdentityProvider = GitProvider | 'linear' | 'jira';
+export const EXTERNAL_IDENTITY_PROVIDERS: ExternalIdentityProvider[] = [
+  'github',
+  'gitlab',
+  'bitbucket',
+  'linear',
+  'jira',
+];
+/** `host` is used when none is given; Jira sites differ per company, so it has no default. */
+export const EXTERNAL_IDENTITY_PROVIDER_META: Record<
+  ExternalIdentityProvider,
+  { label: string; defaultHost?: string }
+> = {
+  github: { label: 'GitHub', defaultHost: 'github.com' },
+  gitlab: { label: 'GitLab', defaultHost: 'gitlab.com' },
+  bitbucket: { label: 'Bitbucket', defaultHost: 'bitbucket.org' },
+  linear: { label: 'Linear', defaultHost: 'linear.app' },
+  jira: { label: 'Jira' },
+};
+
+/** `connection`: filled in from a personal connection. `manual`: typed in by the person. */
+export type ExternalIdentitySource = 'connection' | 'manual';
+export const EXTERNAL_IDENTITY_SOURCES: ExternalIdentitySource[] = ['connection', 'manual'];
+
+/** How many external identities one account can hold. */
+export const EXTERNAL_IDENTITIES_MAX = 20;
+export const EXTERNAL_IDENTITY_LOGIN_MAX = 100;
+
+/**
+ * A login a person has in another tool (`github.com` / `alessandro-b`). With several accounts per
+ * provider, every one of them counts as the same person for assignees, review requests and mentions.
+ * A (provider, host, login) triple belongs to at most one account (compared case-insensitively).
+ */
+export interface ExternalIdentity {
+  id: ID;
+  userId: ID;
+  provider: ExternalIdentityProvider;
+  /** Lower-case host without scheme or path, e.g. `github.com` or `git.acme.dev`. */
+  host: string;
+  /** The login as the tool spells it. Compared case-insensitively. */
+  login: string;
+  source: ExternalIdentitySource;
+  createdAt: ISODate;
+}
+
+export interface ExternalIdentityInput {
+  provider: ExternalIdentityProvider;
+  /** Defaults to the provider's public host. Required for Jira. */
+  host?: string;
+  login: string;
+}
+
+/** `https://GitHub.com/` → `github.com`; `null` when it is not a plain host (optionally with a port). */
+export function normalizeIdentityHost(raw: string): string | null {
+  let host = raw.trim().toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
+  host = host.split(/[/?#]/)[0]?.replace(/\.$/, '') ?? '';
+  return /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:\d{1,5})?$/.test(host) ? host : null;
+}
+
+/** Drops a leading `@` and surrounding spaces; `null` when nothing usable is left. */
+export function normalizeIdentityLogin(raw: string): string | null {
+  const login = raw.trim().replace(/^@/, '');
+  return login.length > 0 &&
+    login.length <= EXTERNAL_IDENTITY_LOGIN_MAX &&
+    /^[^\s/\\]+$/.test(login)
+    ? login
+    : null;
+}
 
 // ───────────────────────────── Projects ─────────────────────────────
 
@@ -570,6 +694,77 @@ export interface Project {
 /** Linear-style project health: set by hand on a project, and also what the AI risk assessment reports. */
 export type ProjectHealth = 'on_track' | 'at_risk' | 'off_track';
 export const PROJECT_HEALTHS: ProjectHealth[] = ['on_track', 'at_risk', 'off_track'];
+
+// ───────────────────────────── Shared projects, placements and transfer ─────────────────────────────
+
+/**
+ * Where one person chose to show a project that was shared with them. Per user, nothing is stored on the
+ * project, and it gives nobody any access: opening the project still goes through its own workspace.
+ * `workspaceId` null means "hidden from Shared with me".
+ */
+export interface ProjectPlacement {
+  projectId: ID;
+  workspaceId: ID | null;
+  position: number;
+}
+
+/** A project the caller reaches through a limited (guest) membership in a workspace that is not theirs. */
+export interface SharedProject {
+  id: ID;
+  name: string;
+  key: string;
+  color: string;
+  icon?: string;
+  /** The workspace that owns the project. Open it at `/<workspace.slug>/projects/<id>`. */
+  workspace: { id: ID; slug: string; name: string };
+  /** The caller's role in that workspace. */
+  role: Role;
+  /** Absent: shown under Shared with me. */
+  placement?: ProjectPlacement;
+}
+
+/** What a project transfer will do to one status or label. */
+export interface ProjectTransferMapping {
+  /** `issue`, `project` or `project_health` for statuses; `label` for labels. */
+  kind: StatusSubject | 'label';
+  from: string;
+  /** Name in the target workspace. */
+  to: string;
+  /** `create` only for labels the target does not have yet. */
+  action: 'map' | 'create';
+  /** Records that carry it. */
+  count: number;
+}
+
+export interface ProjectTransferGuest {
+  userId: ID;
+  name: string;
+  email: string;
+  /** `add`: new guest in the target. `extend`: already a limited member there. `keep`: already has full access. */
+  action: 'add' | 'extend' | 'keep';
+  /** Role they get in the target. */
+  role: Role;
+}
+
+export interface ProjectTransferPreview {
+  project: { id: ID; name: string; key: string };
+  source: { id: ID; slug: string; name: string };
+  target: { id: ID; slug: string; name: string };
+  counts: { issues: number; milestones: number; timeEntries: number };
+  mappings: ProjectTransferMapping[];
+  guests: ProjectTransferGuest[];
+  /** Records whose assignee, lead or reporter is not a member of the target: they lose that person. */
+  unassigned: number;
+  /** Anything in here blocks the transfer (for example a project tag that is already used). */
+  blockers: string[];
+}
+
+export interface ProjectTransferResult {
+  project: Project;
+  target: { id: ID; slug: string; name: string };
+  counts: { issues: number; milestones: number; timeEntries: number };
+  unassigned: number;
+}
 
 // ── AI suggestions for a project (POST /w/:slug/projects/:id/ai/:kind) ──
 
@@ -1331,21 +1526,56 @@ export interface ApiToken {
 
 // ───────────────────────────── Integrations ─────────────────────────────
 
+/** Who owns a connection: a whole workspace (admins manage it) or one person. */
+export type ConnectionOwnerType = 'workspace' | 'user';
+
+/**
+ * `connected` (ok): usable. `error`: the provider rejected it; `lastError` says why. `revoked`: the
+ * credential was withdrawn on purpose (the token is wiped); rules that read through it show an error
+ * until someone reconnects or switches to another connection.
+ */
+export type ConnectionStatus = 'connected' | 'error' | 'revoked';
+
+/** Host a connection talks to: the host of its base URL, else the provider's public host. */
+export function connectionHost(provider: GitProvider | 'delta', baseUrl?: string | null): string {
+  if (baseUrl) {
+    try {
+      return new URL(baseUrl).host.toLowerCase();
+    } catch {
+      return baseUrl.toLowerCase();
+    }
+  }
+  return provider === 'delta' ? 'delta' : GIT_PROVIDER_META[provider].host;
+}
+
 export interface IntegrationConnection {
   id: ID;
-  workspaceId: ID;
+  ownerType: ConnectionOwnerType;
+  /** Set for workspace connections, absent for personal ones. */
+  workspaceId?: ID;
+  /** Set for personal connections: the only person who sees and manages it. */
+  ownerUserId?: ID;
+  /** Display name of the owner of a personal connection. */
+  ownerName?: string;
+  /** Display name, e.g. "GitHub · personal". Several connections per provider are allowed. */
+  label: string;
   provider: GitProvider | 'delta';
   /** Display account, e.g. GitHub org/user. */
   account: string;
   /** Base URL for self-hosted GitLab / GitHub Enterprise (not used by Bitbucket Cloud). */
   baseUrl?: string;
+  /** Host this connection talks to (`github.com`, `gitlab.example.com`). */
+  host: string;
   /** Whether a webhook secret is configured (secret itself never returned). */
   webhookConfigured: boolean;
-  status: 'connected' | 'error' | 'disconnected';
+  status: ConnectionStatus;
   lastSyncAt?: ISODate;
   lastError?: string;
   createdAt: ISODate;
 }
+
+/** A connection a person may pick for a project rule. `suggested` marks the one the UI preselects. */
+export type UsableConnection = IntegrationConnection & { suggested: boolean };
 
 // ───────────────────────────── Permissions & workspace settings ─────────────────────────────
 
@@ -1496,6 +1726,7 @@ export type Capability =
   | 'deleteIssues'
   | 'manageSharedViews'
   | 'inviteMembers'
+  | 'inviteToProject'
   | 'manageAgents'
   | 'manageTokens'
   | 'manageIntegrations';
@@ -1515,6 +1746,7 @@ export const CAPABILITIES: Capability[] = [
   'deleteIssues',
   'manageSharedViews',
   'inviteMembers',
+  'inviteToProject',
   'manageAgents',
   'manageTokens',
   'manageIntegrations',
@@ -1526,6 +1758,7 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
   manageSharedViews: { group: 'Work', label: 'Share views', description: 'Create or publish saved views for the whole workspace.' },
   inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. You can only invite someone into a role whose permissions you already have.' },
+  inviteToProject: { group: 'Access & automation', label: 'Share projects', description: 'Invite people to a single project as guests, and change or remove their access to it. They never see the rest of the workspace.' },
   manageAgents: { group: 'Access & automation', label: 'Manage agents', description: 'Register agents, edit them, and mint tokens that act as an agent.' },
   manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). A write-scoped token cannot create an admin-scoped one.' },
   manageIntegrations: { group: 'Access & automation', label: 'Manage integrations', description: 'Connect GitHub, GitLab and Delta, and manage outgoing webhooks.' },
@@ -1538,6 +1771,7 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   deleteIssues: 'member',
   manageSharedViews: 'member',
   inviteMembers: 'admin',
+  inviteToProject: 'admin',
   manageAgents: 'admin',
   manageTokens: 'member',
   manageIntegrations: 'admin',
@@ -1764,10 +1998,13 @@ export interface WorkspaceRole {
 }
 
 /** The owner role always keeps these, so someone can still manage members. Managing roles is the owner role itself. */
-export const OWNER_REQUIRED_CAPABILITIES: readonly Capability[] = ['inviteMembers'];
+export const OWNER_REQUIRED_CAPABILITIES: readonly Capability[] = ['inviteMembers', 'inviteToProject'];
 
-/** Capabilities that used to require an admin. A write-scoped token cannot use them. Holding any of them administers the workspace. */
+/** Capabilities that used to require an admin. A write-scoped token cannot use them. Holding any of them administers the workspace, except the ones listed in `ADMIN_POWER_EXEMPT`. */
 export const ADMIN_CAPABILITIES: readonly Capability[] = CAPABILITIES.filter((cap) => DEFAULT_PERMISSIONS[cap] === 'admin');
+
+/** Capabilities a write-scoped token lacks but that do not make their holder a workspace administrator (an organizer shares projects, nothing more). */
+const ADMIN_POWER_EXEMPT: readonly Capability[] = ['inviteToProject'];
 
 const LEGACY_RANK: Record<LegacyRole, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 
@@ -1820,13 +2057,49 @@ export function migrateLegacyRoles(
   }
   const byRole = resolveRoleGrants(grants);
   const names: Record<LegacyRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
-  return LEGACY_ROLES.map((id) => ({
+  const legacy = LEGACY_ROLES.map((id) => ({
     id,
     name: names[id],
     owner: id === OWNER_ROLE_ID,
     capabilities: capabilitiesForLegacyRole(id, perms),
     grants: id === OWNER_ROLE_ID ? [...MEMBER_GRANTS] : byRole[id],
   }));
+  return [...legacy, ...defaultProjectRoles()];
+}
+
+/**
+ * The Organizer and Guest roles every workspace gets next to the four old ranks.
+ * Organizer runs projects, milestones and tasks but administers nothing. Guest works only on the
+ * projects of their membership: tasks and comments there, read-only statuses and labels.
+ */
+export function defaultProjectRoles(): WorkspaceRole[] {
+  const guestGrants: MemberGrant[] = [
+    'projects:view',
+    'milestones:view',
+    'issues:view',
+    'issues:create',
+    'issues:update',
+    'artifacts:view',
+    'comments:view',
+    'comments:create',
+    'comments:update',
+  ];
+  return [
+    {
+      id: ORGANIZER_ROLE_ID,
+      name: 'Organizer',
+      owner: false,
+      capabilities: ['manageProjects', 'createIssues', 'deleteIssues', 'manageSharedViews', 'inviteToProject'],
+      grants: [...MEMBER_GRANTS],
+    },
+    {
+      id: GUEST_ROLE_ID,
+      name: 'Guest',
+      owner: false,
+      capabilities: ['createIssues'],
+      grants: guestGrants,
+    },
+  ];
 }
 
 /** Drops unknown ids, keeps a single owner role, and puts the required capabilities back on it. */
@@ -1873,7 +2146,11 @@ export function roleHasCapability(roles: readonly WorkspaceRole[], roleId: strin
 
 /** Owner, or a role that holds a capability which used to require an admin. */
 export function roleHasAdminPower(role: Pick<WorkspaceRole, 'owner' | 'capabilities'> | null | undefined): boolean {
-  return !!role && (role.owner || ADMIN_CAPABILITIES.some((cap) => role.capabilities.includes(cap)));
+  return (
+    !!role &&
+    (role.owner ||
+      ADMIN_CAPABILITIES.some((cap) => !ADMIN_POWER_EXEMPT.includes(cap) && role.capabilities.includes(cap)))
+  );
 }
 
 /**
@@ -2534,4 +2811,136 @@ export interface ImportJob {
   createdAt: ISODate;
   startedAt?: ISODate;
   finishedAt?: ISODate;
+}
+
+// ───────────────────────────── Routing rules ─────────────────────────────
+
+/**
+ * A routing rule belongs to one project and says that work from one external source arrives there,
+ * read through one connection. Per project, not a workspace-wide catalogue of repositories (NON-GOALS #15).
+ * A source is provider + host + path, and a workspace routes it to one project: a second rule for the
+ * same source with overlapping filters is rejected, otherwise tasks would arrive twice.
+ */
+export type RoutingDirection = 'inbound' | 'two_way';
+export const ROUTING_DIRECTIONS: RoutingDirection[] = ['inbound', 'two_way'];
+
+/** What a source can do today. Providers missing here are not offered. */
+export const ROUTING_PROVIDER_SUPPORT: Record<
+  GitProvider,
+  { issues: boolean; pullRequests: boolean; twoWay: boolean }
+> = {
+  github: { issues: true, pullRequests: true, twoWay: true },
+  gitlab: { issues: true, pullRequests: true, twoWay: true },
+  bitbucket: { issues: false, pullRequests: true, twoWay: false },
+};
+
+/** Narrows which items of the source a rule takes. Every set filter must match. */
+export interface RoutingFilters {
+  /** The item must carry all of these labels (case-insensitive). */
+  labels?: string[];
+  /** The item's milestone title (case-insensitive). */
+  milestone?: string;
+}
+
+export const ROUTING_SOURCE_PATH_MAX = 300;
+export const ROUTING_FILTER_LABELS_MAX = 10;
+export const ROUTING_FILTER_VALUE_MAX = 100;
+
+/** `repo` is one repository; `group` ends with `/*` and means everything under that owner or group. */
+export type RoutingSourceKind = 'repo' | 'group';
+export function routingSourceKind(sourcePath: string): RoutingSourceKind {
+  return sourcePath.endsWith('/*') ? 'group' : 'repo';
+}
+
+/** Chips for a rule's filters: `label = bug`, `milestone = v1.2`. */
+export function routingFilterChips(filters: RoutingFilters | undefined | null): string[] {
+  const out: string[] = [];
+  for (const label of filters?.labels ?? []) out.push(`label = ${label}`);
+  if (filters?.milestone) out.push(`milestone = ${filters.milestone}`);
+  return out;
+}
+
+/** The connection a rule reads through, as people see it. Never carries credentials. */
+export interface RoutingRuleConnection {
+  id: ID;
+  provider: GitProvider;
+  /** Display name, e.g. "GitHub · Acme". */
+  label: string;
+  ownerType: 'workspace' | 'user';
+  /** Name of the person for a personal connection. */
+  ownerName?: string;
+  /** True when the caller owns it. */
+  mine?: boolean;
+}
+
+export type RoutingRuleHealth = 'ok' | 'error';
+
+export interface RoutingRule {
+  /** `rr_…` */
+  id: ID;
+  workspaceId: ID;
+  projectId: ID;
+  /** Absent when the connection was removed. */
+  connectionId?: ID;
+  provider: GitProvider;
+  /** Lower-case host, e.g. `github.com`. */
+  host: string;
+  /** `owner/name`, or a group path ending with `/*`. */
+  sourcePath: string;
+  filters: RoutingFilters;
+  direction: RoutingDirection;
+  connection?: RoutingRuleConnection;
+  health: RoutingRuleHealth;
+  /** Why the rule is failing (revoked or removed connection, last sync error). */
+  healthReason?: string;
+  lastSyncAt?: ISODate;
+  lastError?: string;
+  /** Tasks and placed pull requests this rule created. */
+  taskCount: number;
+  /** The `Project.repository` value this rule was created from. */
+  migratedFrom?: string;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface RoutingRuleStats {
+  /** Tasks created by this project's rules in the last 7 days. */
+  tasksArrived: number;
+  /** Pull requests without a task key that a rule placed here in the last 7 days. */
+  unmatchedPlaced: number;
+  rulesFailing: number;
+}
+
+export interface RoutingRulesOverview {
+  rules: RoutingRule[];
+  stats: RoutingRuleStats;
+  /** Whether the caller may add, change and remove rules here. */
+  canManage: boolean;
+}
+
+/** A connection the caller may read through for a rule. */
+export interface RoutingConnectionOption extends RoutingRuleConnection {
+  account: string;
+  /** The workspace connection is suggested: it keeps working when people leave. */
+  suggested: boolean;
+  healthy: boolean;
+}
+
+export type RoutingSuggestionStatus = 'available' | 'this_project' | 'other_project';
+
+export interface RoutingSourceSuggestion {
+  sourcePath: string;
+  url?: string;
+  private?: boolean;
+  status: RoutingSuggestionStatus;
+  /** The project that already receives it. */
+  projectId?: ID;
+  projectName?: string;
+}
+
+export interface RoutingSuggestions {
+  items: RoutingSourceSuggestion[];
+  /** Set when the provider could not be read (revoked token, unreachable). */
+  error?: string;
 }

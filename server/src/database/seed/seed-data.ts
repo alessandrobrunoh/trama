@@ -47,9 +47,9 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.repo('gitlab', 'acme-internal/mobile-app', [WEB, API]);
 
   b.data.integrations.push(
-    { id: 'ic_github_acme', workspaceId: ws, provider: 'github', account: 'acme', baseUrl: null, secret: null, webhookSecret: null, status: 'connected', lastSyncAt: b.at(0, 1), lastError: null, config: {}, createdAt: b.at(55) },
-    { id: 'ic_delta_dev', workspaceId: ws, provider: 'delta', account: 'delta.dev', baseUrl: 'https://delta.dev', secret: null, webhookSecret: null, status: 'connected', lastSyncAt: b.at(0, 3), lastError: null, config: {}, createdAt: b.at(54) },
-    { id: 'ic_gitlab_internal', workspaceId: ws, provider: 'gitlab', account: 'acme-internal', baseUrl: 'https://gitlab.com', secret: null, webhookSecret: null, status: 'error', lastSyncAt: b.at(3), lastError: '401 Unauthorized: personal access token expired', config: {}, createdAt: b.at(40) },
+    { id: 'ic_github_acme', ownerType: 'workspace', label: 'GitHub · acme', host: 'github.com', workspaceId: ws, provider: 'github', account: 'acme', baseUrl: null, secret: null, webhookSecret: null, status: 'connected', lastSyncAt: b.at(0, 1), lastError: null, config: {}, createdAt: b.at(55) },
+    { id: 'ic_delta_dev', ownerType: 'workspace', label: 'Delta · delta.dev', host: 'delta.dev', workspaceId: ws, provider: 'delta', account: 'delta.dev', baseUrl: 'https://delta.dev', secret: null, webhookSecret: null, status: 'connected', lastSyncAt: b.at(0, 3), lastError: null, config: {}, createdAt: b.at(54) },
+    { id: 'ic_gitlab_internal', ownerType: 'workspace', label: 'GitLab · acme-internal', host: 'gitlab.com', workspaceId: ws, provider: 'gitlab', account: 'acme-internal', baseUrl: 'https://gitlab.com', secret: null, webhookSecret: null, status: 'error', lastSyncAt: b.at(3), lastError: '401 Unauthorized: personal access token expired', config: {}, createdAt: b.at(40) },
   );
 
   const S = (h: string) => `https://delta.dev/t/${h}`;

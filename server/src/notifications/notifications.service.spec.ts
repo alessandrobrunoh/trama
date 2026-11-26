@@ -7,6 +7,9 @@ import {
   WorkspaceEntity,
 } from '../database/entities/index.js';
 import * as rules from './notification-rules.js';
+import { freshWorkspaceRoles } from '../contracts/domain.js';
+
+const workspace = { id: 'w1', resolved: () => ({ roles: freshWorkspaceRoles() }) };
 
 function serviceWith(ds: object): NotificationsService {
   return new NotificationsService(
@@ -28,7 +31,7 @@ describe('notification fanout batching', () => {
     const service = serviceWith({
       getRepository: (entity: unknown) => {
         if (entity === WorkspaceEntity)
-          return { findOneBy: vi.fn().mockResolvedValue({ id: 'w1' }) };
+          return { findOneBy: vi.fn().mockResolvedValue(workspace) };
         if (entity === UserEntity) return { find: userFind };
         if (entity === MembershipEntity) return { find: membershipFind };
         throw new Error('Unexpected repository');
@@ -65,7 +68,7 @@ describe('notification fanout batching', () => {
     const service = serviceWith({
       getRepository: (entity: unknown) =>
         entity === WorkspaceEntity
-          ? { findOneBy: vi.fn().mockResolvedValue({ id: 'w1' }) }
+          ? { findOneBy: vi.fn().mockResolvedValue(workspace) }
           : entity === UserEntity
             ? {
                 find: vi
@@ -122,6 +125,47 @@ describe('notification fanout batching', () => {
       actor: context.event.actor,
     });
     expect(maximum).toBe(8);
+    planned.mockRestore();
+  });
+
+  it('does not notify a guest about work in a project outside their list', async () => {
+    const memberships = [
+      { userId: 'guest-in', role: 'guest', access: { projects: { all: false, projectIds: ['p1'] }, includeUnassigned: false, grants: [] } },
+      { userId: 'guest-out', role: 'guest', access: { projects: { all: false, projectIds: ['p2'] }, includeUnassigned: false, grants: [] } },
+      { userId: 'member', role: 'member', access: null },
+    ];
+    const service = serviceWith({
+      getRepository: (entity: unknown) =>
+        entity === WorkspaceEntity
+          ? { findOneBy: vi.fn().mockResolvedValue(workspace) }
+          : entity === UserEntity
+            ? { find: vi.fn().mockResolvedValue(memberships.map((m) => ({ id: m.userId }))) }
+            : entity === MembershipEntity
+              ? { find: vi.fn().mockResolvedValue(memberships) }
+              : {},
+    });
+    const drafts = memberships.map((m) => ({
+      userId: m.userId,
+      kind: 'comment' as const,
+      title: 'New comment',
+      link: 'tasks/ABC-1',
+      subject: { type: 'issue' as const, id: 'i1' },
+    }));
+    const planned = vi.spyOn(rules, 'planNotifications').mockReturnValue(drafts);
+    const context = {
+      event: { type: 'comment.created', actor: { type: 'user', id: 'actor' }, subject: { type: 'issue', id: 'i1' }, data: {}, workspaceId: 'w1' },
+      actorName: 'Actor',
+      issue: { id: 'i1', key: 'ABC-1', title: 'Issue', projectId: 'p1' },
+    };
+    (service as unknown as { context: () => Promise<unknown> }).context = vi.fn().mockResolvedValue(context);
+    const deliver = vi.fn().mockResolvedValue(undefined);
+    (service as unknown as { deliver: ReturnType<typeof vi.fn> }).deliver = deliver;
+    await (service as unknown as { handle: (event: object) => Promise<void> }).handle({
+      workspaceId: 'w1',
+      actor: context.event.actor,
+    });
+    const notified = deliver.mock.calls.map((call) => (call[2] as { userId: string }).userId);
+    expect(notified.sort()).toEqual(['guest-in', 'member']);
     planned.mockRestore();
   });
 

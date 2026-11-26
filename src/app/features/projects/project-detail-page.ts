@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
+  LucideArrowRightLeft,
   LucideBox,
   LucideDynamicIcon,
   LucideEllipsis,
@@ -51,15 +52,20 @@ import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectMilestoneCards } from './project-milestone-cards';
 import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
+import { ProjectTransferDialog } from './project-transfer-dialog';
 import { ProjectRoadmap } from './project-roadmap';
+import { ProjectShareDialog } from './project-share-dialog';
 import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
+import { ProjectSourcesStore } from './sources/project-sources.store';
+import { ProjectSourcesTab } from './sources/project-sources-tab';
 
-const TABS = ['overview', 'progress', 'tasks'] as const;
+const TABS = ['overview', 'progress', 'tasks', 'sources'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
   progress: 'Progress',
   tasks: 'Tasks',
+  sources: 'Sources',
 };
 
 const ACTIVITY_CAP = 20;
@@ -98,8 +104,11 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectMilestoneCards,
     ProjectMilestoneRows,
     ProjectRoadmap,
+    ProjectShareDialog,
     ProjectTasksTab,
+    ProjectSourcesTab,
     ProjectProperties,
+    ProjectTransferDialog,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -123,6 +132,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
       }
 
       <ng-template appTopBarActions>
+        @if (canShare()) {
+          <button hlmBtn variant="outline" (click)="sharing.set(true)">Share</button>
+        }
         <button hlmBtn variant="outline" (click)="openSettings()">
           Project settings <app-kbd keys="shift+p" />
         </button>
@@ -144,6 +156,11 @@ const TONE_COLOR: Record<BurnTone, string> = {
             <button hlmDropdownMenuItem (triggered)="copyLink()">
               <svg [lucideIcon]="linkIcon" [size]="14" class="text-muted-foreground"></svg> Copy link
             </button>
+            @if (canTransfer()) {
+              <button hlmDropdownMenuItem (triggered)="transferOpen.set(true)">
+                <svg [lucideIcon]="transferIcon" [size]="14" class="text-muted-foreground"></svg> Transfer to workspace…
+              </button>
+            }
             @if (canManage()) {
               <hlm-dropdown-menu-separator />
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
@@ -153,6 +170,10 @@ const TONE_COLOR: Record<BurnTone, string> = {
           </hlm-dropdown-menu>
         </ng-template>
       </ng-template>
+
+      @if (canShare()) {
+        <app-project-share-dialog [project]="p" [(open)]="sharing" />
+      }
 
       <header class="flex flex-col gap-4 px-4 pt-6 sm:px-10">
         <div class="flex items-end gap-5">
@@ -233,6 +254,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
         @case ('tasks') {
           <app-project-tasks-tab [projectId]="p.id" />
         }
+        @case ('sources') {
+          <app-project-sources-tab [projectId]="p.id" />
+        }
         @default {
           <div class="flex min-w-0 flex-1 max-lg:flex-col">
             <div class="flex min-w-0 flex-1 flex-col gap-[22px] px-4 py-[22px] sm:px-10">
@@ -297,6 +321,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
           </div>
         }
       }
+      @if (canTransfer()) {
+        <app-project-transfer-dialog [project]="p" [(open)]="transferOpen" />
+      }
     } @else {
       <app-empty-state
         [icon]="box"
@@ -325,11 +352,16 @@ export class ProjectDetailPage {
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);
   private readonly listState = inject(ListStateStore);
+  private readonly sources = inject(ProjectSourcesStore);
 
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
+  protected readonly transferIcon = LucideArrowRightLeft;
+  protected readonly transferOpen = signal(false);
+  /** Owners and admins of the open workspace; the target workspace is checked by the server. */
+  protected readonly canTransfer = computed(() => this.store.can('admin'));
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
   protected readonly allTasks = tasksQuery();
@@ -341,6 +373,9 @@ export class ProjectDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly projectLink = computed(() => ['/', this.slug(), 'projects', this.id() ?? '']);
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
+  /** Sharing a project with guests: the "Share projects" capability (owner, admin, organizer by default). */
+  protected readonly canShare = computed(() => this.store.allowed('inviteToProject'));
+  protected readonly sharing = signal(false);
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
   protected readonly current = computed<Tab>(() => {
@@ -353,6 +388,7 @@ export class ProjectDetailPage {
   });
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
     tasks: this.issues().length,
+    sources: this.sources.count(),
   }));
   protected readonly openCount = computed(
     () => this.issues().filter((i) => !isClosedIssue(i, this.store.settings().statuses.issue)).length,
@@ -413,6 +449,13 @@ export class ProjectDetailPage {
     { label: this.project()?.name ?? this.id() ?? '' },
   ]);
 
+  /** The Sources tab counts the project's rules; the tab itself loads them when it is open. */
+  private readonly _sources = effect(() => {
+    const id = this.project()?.id;
+    if (!id || this.current() === 'sources') return;
+    untracked(() => void this.sources.load(id));
+  });
+
   /** A link into the Tasks tab brings its filters in the params: apply them once, then drop them. */
   private readonly _prefilter = effect(() => {
     const p = this.project();
@@ -457,7 +500,7 @@ export class ProjectDetailPage {
   /** The properties live in the rail: bring them into view and focus the first one. */
   protected openSettings(): void {
     const c = this.current();
-    if (c === 'tasks') this.setTab('overview');
+    if (c === 'tasks' || c === 'sources') this.setTab('overview');
     setTimeout(() => {
       const el = document.getElementById('project-properties');
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });

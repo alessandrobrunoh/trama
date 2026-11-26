@@ -80,7 +80,14 @@ import type {
   WorkspaceSnapshot,
 } from '../contracts/domain';
 import type { Capability, ShareLevel } from '../contracts/domain';
-import { resolveWorkspaceSettings, roleHasCapability } from '../contracts/domain';
+import {
+  GUEST_ROLE_ID,
+  findWorkspaceRole,
+  resolveWorkspaceSettings,
+  roleCanWrite,
+  roleHasAdminPower,
+  roleHasCapability,
+} from '../contracts/domain';
 import { uploadIdsIn } from '../upload-url';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
@@ -405,12 +412,31 @@ export class TramaStore {
   commentThread(subject: SubjectRef): CommentThreadInfo {
     return this._commentThreads().get(subjectKey(subject.type, subject.id)) ?? IDLE_THREAD;
   }
-  /** Whether the current user may act at `minRole` or above. */
+  /**
+   * Whether the current user may act at `minRole` or above. Roles are workspace-defined, so a role is
+   * placed on the old ladder by what it can do: the owner role is `owner`, a role with administrative
+   * power is `admin`, one that can change everyday work is `member`, anything else is `viewer`
+   * (an Organizer or a Guest therefore counts as `member`). Without the workspace roles, the old ranks apply.
+   */
   can(minRole: Role): boolean {
     const order: Role[] = ['viewer', 'member', 'admin', 'owner'];
     const mine = this._myRole();
-    return !!mine && order.indexOf(mine) >= order.indexOf(minRole);
+    if (!mine) return false;
+    const role = findWorkspaceRole(this.settings().roles, mine);
+    const rank = role
+      ? role.owner
+        ? 3
+        : roleHasAdminPower(role)
+          ? 2
+          : roleCanWrite(role)
+            ? 1
+            : 0
+      : order.indexOf(mine);
+    return rank >= order.indexOf(minRole);
   }
+
+  /** The current user is a guest: invited to some projects only, not to the workspace as a whole. */
+  readonly isGuest = computed(() => this._myRole() === GUEST_ROLE_ID);
 
   /** Workspace settings with the defaults applied (permission policy, estimate scale, week start, time zone…). */
   readonly settings = computed<WorkspaceSettings>(() => resolveWorkspaceSettings(this._workspace()?.settings));
@@ -1517,6 +1543,13 @@ export class TramaStore {
   /** PATCH token / baseUrl; the server re-validates against the provider. */
   async updateIntegration(id: ID, input: UpdateIntegrationInput): Promise<IntegrationDetail | undefined> {
     return this.write('update integration', (s) => this.api.integrations.update(s, id, input), {
+      onResult: (c) => this.upsertIntegration(c),
+    });
+  }
+
+  /** Withdraw the credential on purpose (status `revoked`, token wiped); a new token reconnects it. */
+  async revokeIntegration(id: ID): Promise<IntegrationDetail | undefined> {
+    return this.write('revoke integration', (s) => this.api.integrations.revoke(s, id), {
       onResult: (c) => this.upsertIntegration(c),
     });
   }

@@ -153,8 +153,22 @@ export class InvitesService {
     let role = invite.role;
     await this.ds.transaction(async (m) => {
       const current = await m.findOneBy(MembershipEntity, { workspaceId: workspace.id, userId: user.id });
-      if (current) role = current.role;
-      else {
+      if (current) {
+        role = current.role;
+        // Already a guest or limited member (invited to another project meanwhile): the projects add up.
+        if (invite.access && !invite.access.projects.all && current.access && !current.access.projects.all) {
+          current.access = {
+            ...current.access,
+            projects: {
+              all: false,
+              projectIds: [
+                ...new Set([...current.access.projects.projectIds, ...invite.access.projects.projectIds]),
+              ],
+            },
+          };
+          await m.save(current);
+        }
+      } else {
         const saved = await m.save(
           m.create(MembershipEntity, {
             id: uid('mb'),

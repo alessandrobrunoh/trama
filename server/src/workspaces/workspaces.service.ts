@@ -16,6 +16,7 @@ import {
   effectiveMemberAccess,
   findWorkspaceRole,
   freshWorkspaceRoles,
+  isProjectLimited,
   normalizeCapabilities,
   normalizeGrantList,
   normalizeMemberAccess,
@@ -28,12 +29,15 @@ import {
   AgentEntity,
   ApiTokenEntity,
   InviteEntity,
+  IssueEntity,
   MembershipEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
+import { applyProjectScope, currentAccess } from '../auth/member-access.js';
 import { notFound, slugify, uid } from '../common/util.js';
 import { EventsService } from '../events/events.service.js';
+import { visibleMemberships } from './people-scope.js';
 import {
   assertCanChangeRole,
   assertCanRemoveMember,
@@ -41,31 +45,13 @@ import {
   type MemberActor,
   type MemberRuleContext,
 } from './member-rules.js';
+import { RESERVED_SLUGS, SLUG_RE } from './workspace-slug.js';
 
-/** Slugs that would collide with client routes. */
-export const RESERVED_SLUGS = new Set([
-  'login',
-  'signup',
-  'register',
-  'blog',
-  'roadmap',
-  'changelog',
-  'compare',
-  'why',
-  'brand',
-  '404',
-  'new-workspace',
-  'settings',
-  'api',
-  'admin',
-  'auth',
-  'workspaces',
-  'invite',
-  'shared',
-  'my-tasks',
-]);
+export { RESERVED_SLUGS };
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
+/** A personal workspace belongs to the account for as long as the account exists. It can only be renamed. */
+const PERSONAL_WORKSPACE_FIXED = (verb: string) =>
+  `A personal workspace cannot be ${verb}. You can rename it.`;
 
 @Injectable()
 export class WorkspacesService {
@@ -246,6 +232,7 @@ export class WorkspacesService {
 
   /** Irreversible: the caller must repeat the workspace slug or name so a stray request cannot delete it. */
   async remove(ws: WorkspaceEntity, confirm: string): Promise<void> {
+    if (ws.personal) throw new ConflictException(PERSONAL_WORKSPACE_FIXED('deleted'));
     const typed = (confirm ?? '').trim();
     if (typed !== ws.slug && typed !== ws.name)
       throw new BadRequestException('confirm must be the exact slug or name of the workspace you are deleting');
@@ -254,8 +241,10 @@ export class WorkspacesService {
 
   // ───────── members
 
-  async listMembers(workspaceId: string) {
-    const rows = await this.memberships.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+  /** Everyone in the workspace, or, for someone limited to some projects, the people on those projects. */
+  async listMembers(workspaceId: string, viewer?: Pick<WorkspaceContext, 'workspace' | 'access' | 'userId'>) {
+    const all = await this.memberships.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+    const rows = viewer ? visibleMemberships(all, viewer.workspace.resolved().roles, viewer.access, viewer.userId) : all;
     const users = await this.users.findBy({ id: In(rows.map((r) => r.userId)) });
     const byId = new Map(users.map((u) => [u.id, u]));
     return rows.map((m) => Object.assign(m, { user: byId.get(m.userId) }));
@@ -315,6 +304,7 @@ export class WorkspacesService {
   async removeMember(ws: WorkspaceEntity, caller: MemberActor, id: string) {
     const workspaceId = ws.id;
     const m = await this.getMembership(workspaceId, id);
+    if (ws.personal && m.userId === ws.primaryOwnerId) throw new ConflictException(PERSONAL_WORKSPACE_FIXED('left'));
     assertCanRemoveMember(await this.ruleContext(ws), caller, m);
     await this.ds.transaction(async (tx) => {
       await tx.delete(MembershipEntity, { id });
@@ -324,6 +314,7 @@ export class WorkspacesService {
 
   /** The primary owner hands the workspace over: the target becomes owner and primary owner; the caller stays an owner. */
   async transferOwnership(ws: WorkspaceEntity, caller: MemberActor, membershipId: string) {
+    if (ws.personal) throw new ConflictException(PERSONAL_WORKSPACE_FIXED('handed over'));
     const target = await this.getMembership(ws.id, membershipId);
     assertCanTransferOwnership(ws, caller, target.userId);
     if (target.role !== 'owner') {
@@ -383,8 +374,19 @@ export class WorkspacesService {
 
   // ───────── agents
 
-  listAgents(workspaceId: string) {
-    return this.agents.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+  /** Every agent, or, for someone limited to some projects, the agents with a task on those projects. */
+  async listAgents(workspaceId: string) {
+    const rows = await this.agents.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+    if (!isProjectLimited(currentAccess()) || !rows.length) return rows;
+    const qb = this.ds
+      .getRepository(IssueEntity)
+      .createQueryBuilder('i')
+      .select('DISTINCT i."assigneeId"', 'id')
+      .where('i."workspaceId" = :workspaceId', { workspaceId })
+      .andWhere('i."assigneeId" IN (:...agentIds)', { agentIds: rows.map((row) => row.id) });
+    applyProjectScope(qb, 'i', 'projectId');
+    const used = new Set((await qb.getRawMany<{ id: string }>()).map((row) => row.id));
+    return rows.filter((row) => used.has(row.id));
   }
 
   async getAgent(workspaceId: string, id: string) {

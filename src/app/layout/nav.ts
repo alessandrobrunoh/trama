@@ -149,6 +149,22 @@ export const MORE_NAV: NavItem[] = [
 /** Every destination reachable from the sidebar, for the command bar and the mobile menu. */
 export const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...MORE_NAV];
 
+/**
+ * Destinations a guest does not get: saved views and statistics (workspace-wide), Ask and "Connect your
+ * agent" (AI and tokens need the whole workspace). Everything else shows only what their projects hold.
+ */
+export const GUEST_HIDDEN_SEGMENTS: ReadonlySet<string> = new Set(['assistant', 'views', 'stats', 'connect']);
+
+/** Whether a guest may open the first path segment of a workspace URL (`tasks`, `settings`, …). */
+export function guestMayOpen(segment: string | null | undefined): boolean {
+  return !segment || !GUEST_HIDDEN_SEGMENTS.has(segment);
+}
+
+/** `items` without the destinations a guest does not get. Everyone else keeps them all. */
+export function navForRole<T extends { segment: string }>(items: readonly T[], guest: boolean): T[] {
+  return guest ? items.filter((item) => guestMayOpen(item.segment)) : [...items];
+}
+
 /** `items` in the user's custom `order` (segments); entries missing from it keep their default order after the listed ones. */
 export function orderNav(items: readonly NavItem[], order: readonly string[]): NavItem[] {
   const rank = (n: NavItem): number => {

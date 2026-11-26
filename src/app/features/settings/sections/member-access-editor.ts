@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, model } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
+import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
 import {
+  GUEST_ROLE_ID,
   MEMBER_ACTION_META,
   MEMBER_RESOURCE_ORDER,
   MEMBER_RESOURCES,
@@ -24,9 +26,10 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
 @Component({
   selector: 'app-member-access-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmCheckbox],
+  imports: [HlmButtonImports, HlmCheckbox, V3Segmented],
   host: { class: 'flex flex-col gap-3' },
   template: `
+    @if (showGrants()) {
     <div class="flex flex-wrap items-center gap-1.5">
       @for (p of presetButtons(); track p.id) {
         <button type="button" hlmBtn variant="outline" size="sm" class="h-7 text-xs" [disabled]="disabled()" (click)="applyPreset(p.id)">
@@ -35,24 +38,35 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
       }
       <span class="text-faint ml-auto font-mono text-[10.5px]">{{ summary() }}</span>
     </div>
+    }
 
     @if (showProjects()) {
     <div class="border-border overflow-hidden border">
-      <div class="flex items-start gap-3 px-3 py-2.5">
-        <hlm-checkbox
-          class="mt-0.5"
-          [checked]="value().projects.all"
-          [disabled]="disabled()"
-          aria-label="All projects, including ones created later"
-          (checkedChange)="setAllProjects($event)"
-        />
-        <span class="min-w-0">
-          <span class="text-foreground block text-[13px]">All projects</span>
-          <span class="text-muted-foreground block text-xs leading-snug">Including projects created after this person joins. Turn off to choose which ones they can see.</span>
+      <div class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+        <span class="min-w-0 flex-1">
+          <span class="text-foreground block text-[13px]">Projects</span>
+          <span class="text-muted-foreground block text-xs leading-snug">
+            @if (isGuest()) {
+              A guest only sees the projects chosen here, never the rest of the workspace.
+            } @else if (value().projects.all) {
+              Every project, including the ones created later.
+            } @else {
+              Only the projects chosen here. New projects stay hidden until they are added.
+            }
+          </span>
         </span>
+        @if (!isGuest()) {
+          <v3-segmented
+            aria-label="Which projects"
+            [options]="scopeOptions"
+            [disabled]="disabled()"
+            [value]="value().projects.all ? 'all' : 'some'"
+            (valueChange)="setAllProjects($event === 'all')"
+          />
+        }
       </div>
-      @if (!value().projects.all) {
-        <div class="px-3 pt-1 pb-2.5">
+      @if (isGuest() || !value().projects.all) {
+        <div class="border-border border-t px-3 pt-2 pb-2.5">
           @if (projects().length) {
             <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
               @for (p of projects(); track p.id) {
@@ -67,22 +81,28 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
                 </label>
               }
             </div>
+            @if (!value().projects.projectIds.length) {
+              <p class="text-status-needs-input mt-2 text-xs">Pick at least one project, or they will see nothing.</p>
+            }
           } @else {
             <p class="text-muted-foreground text-xs">This workspace has no projects yet.</p>
           }
-          <label class="mt-3 flex items-center gap-2 text-[13px]">
-            <hlm-checkbox
-              [checked]="value().includeUnassigned"
-              [disabled]="disabled()"
-              (checkedChange)="setUnassigned($event)"
-            />
-            Also see work that is not in a project
-          </label>
+          @if (!isGuest()) {
+            <label class="mt-3 flex items-center gap-2 text-[13px]">
+              <hlm-checkbox
+                [checked]="value().includeUnassigned"
+                [disabled]="disabled()"
+                (checkedChange)="setUnassigned($event)"
+              />
+              Also see work that is not in a project
+            </label>
+          }
         </div>
       }
     </div>
     }
 
+    @if (showGrants()) {
     <div class="border-border overflow-hidden border" role="group" aria-label="What they can do">
       <div class="text-faint border-border flex items-center gap-3 border-b px-3 py-1.5 font-mono text-[10px] tracking-[1px] uppercase">
         <span class="flex-1">Action</span>
@@ -123,6 +143,7 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
         This is what the role starts with. People keep these actions; an invitation can add more, not take them away.
       }
     </p>
+    }
   `,
 })
 export class MemberAccessEditor {
@@ -130,11 +151,19 @@ export class MemberAccessEditor {
   readonly role = input<Role>('member');
   readonly projects = input<{ id: string; name: string }[]>([]);
   readonly showProjects = input(true);
+  /** Hide the action table (the invite dialog edits the projects and the extra actions in separate parts). */
+  readonly showGrants = input(true);
   /** Grants the role already gives. Shown checked and not removable. */
   readonly locked = input<readonly MemberGrant[]>([]);
   readonly disabled = input(false);
   readonly value = model.required<MemberAccess>();
 
+  protected readonly scopeOptions: V3SegmentOption[] = [
+    { value: 'all', label: 'All projects' },
+    { value: 'some', label: 'Some projects' },
+  ];
+  /** Guests always work from a list of projects: there is no "all projects" for them. */
+  protected readonly isGuest = computed(() => this.role() === GUEST_ROLE_ID);
   protected readonly columns = MEMBER_ACTION_META;
   protected readonly groups = computed(() =>
     GROUPS.map((name) => ({
