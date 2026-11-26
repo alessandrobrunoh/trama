@@ -20,6 +20,7 @@ pub use openapi::api_doc;
 /// Every module's routes, each behind its `trama_auth::Gate`. Keep sorted by crate name.
 fn routes() -> Routes {
     Routes::new()
+        .merge(trama_ai::router())
         .merge(trama_auth::router())
         .merge(trama_comments::router())
         .merge(trama_events::router())
@@ -76,6 +77,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let events = trama_events::Events::start(db.clone(), config.database_url.clone());
     let state = trama_common::with_platform_services(AppState::new(db.clone(), config))?
         .with_extension(events.clone());
+    let state = trama_ai::with_ai_services(state);
     let state = trama_notifications::with_services(state);
     // notifications are produced from the domain events this instance records
     let notifications = trama_notifications::spawn(&state);
