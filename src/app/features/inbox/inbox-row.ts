@@ -4,7 +4,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { AgoPipe } from '../../shared/ago';
-import { laterLabel, type InboxEntry } from './inbox-model';
+import type { InboxEntry } from './inbox-model';
 
 @Component({
   selector: 'app-inbox-row',
@@ -74,7 +74,6 @@ export class InboxRow {
     const parts: string[] = [];
     if (e.key && !e.sentence.includes(e.key)) parts.push(e.key);
     if (e.text && e.text !== e.sentence) parts.push(e.text);
-    if (e.section === 'later' && e.attention) parts.push(laterLabel(e.attention));
     return parts.join(' · ');
   });
 

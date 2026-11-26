@@ -18,33 +18,23 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideCheck,
-  LucideChevronsUpDown,
   LucideBox,
   LucideCircleUserRound,
-  LucideCopy,
-  LucideGitBranch,
-  LucideStar,
   LucideDynamicIcon,
   LucideExternalLink,
   LucideInbox,
   LucideLink,
   LucideListFilter,
   LucidePlus,
-  LucideSearch,
-  LucideSlidersHorizontal,
   LucideListTree,
   LucideTrash2,
-  LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
-  FavoritesStore,
   ListStateStore,
   TramaStore,
   UiStore,
@@ -78,15 +68,9 @@ import { ProjectGlyph } from '../projects/project-glyph';
 import { FilterBar, type FilterMatch, type FilterPreset } from '../../shared/filter-bar/filter-bar';
 import { fieldLabel } from '../views/view-model';
 import { IssueActions } from './issue-actions';
-import { IssueFlow } from './issue-flow';
 import { IssueCard, IssueRow } from './issue-items';
 import {
-  DEFAULT_DISPLAY,
-  GROUP_LABEL,
-  PROPS,
-  PROP_LABEL,
   SORTS,
-  SORT_LABEL,
   groupLabel,
   groupUniverse,
   issueFlow,
@@ -112,7 +96,6 @@ interface RowColumn {
   key: string;
   items: IssueTreeRow[];
   count: number;
-  parentIds: string[];
 }
 
 const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
@@ -154,8 +137,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
     SearchInput,
     FilterBar,
     HlmButtonImports,
-    HlmPopoverImports,
-    HlmSwitchImports,
     HlmContextMenuImports,
     HlmDropdownMenuImports,
     HlmTooltip,
@@ -172,7 +153,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
     Kanban,
     KanbanItemDirective,
     KanbanLabelDirective,
-    IssueFlow,
     NgTemplateOutlet,
     Kbd,
     StatusBar,
@@ -203,12 +183,11 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           [items]="filterPool()"
           [ctx]="queryCtx()"
           [locked]="showBase() ? baseFilters() : []"
-          [matchable]="true"
-          [match]="match()"
-          (matchChange)="match.set($event)"
-          [presets]="presetMap()"
+          [presets]="d().layout === 'board' ? {} : presetMap()"
           [presetActive]="presetActive()"
           (presetPick)="statusPresetChange.emit($event.id)"
+          [showGroup]="d().layout !== 'board'"
+          [showSort]="d().layout !== 'board'"
           [sort]="sortSpec()"
           [defaultSort]="false"
           (sortChange)="setSort($event)"
@@ -261,155 +240,11 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
                 }
               }
             </div>
-            <span class="bg-border h-[18px] w-px max-sm:hidden" aria-hidden="true"></span>
           </div>
         }
         @if (hint(); as h) {
           <span hint class="text-faint hidden font-mono text-[11px] xl:inline">{{ h }}</span>
         }
-        @if (searchOpen() || search().trim()) {
-          <input
-            hint
-            type="text"
-            data-task-filter
-            class="border-border placeholder:text-faint focus:border-ring h-[22px] w-44 border bg-transparent px-2 font-mono text-[11px] outline-none max-md:hidden"
-            autocomplete="off"
-            placeholder="Search tasks…"
-            aria-label="Filter tasks"
-            [value]="search()"
-            (input)="search.set($any($event.target).value)"
-            (keydown.escape)="closeSearch()"
-            (blur)="search().trim() || closeSearch()"
-          />
-        }
-        <div trailing class="ms-1 flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            class="text-faint hover:text-foreground hover:bg-hover inline-flex size-[22px] items-center justify-center outline-none focus-visible:text-foreground max-md:hidden"
-            aria-label="Search tasks"
-            hlmTooltip="Search tasks"
-            (click)="openSearch()"
-          >
-            <svg [lucideIcon]="searchIcon" [size]="13"></svg>
-          </button>
-          @if (hasTree()) {
-            <button
-              type="button"
-              class="text-faint hover:text-foreground hover:bg-hover inline-flex size-[22px] items-center justify-center outline-none focus-visible:text-foreground"
-              [attr.aria-label]="anyExpanded() ? 'Collapse all sub-tasks' : 'Expand all sub-tasks'"
-              [hlmTooltip]="anyExpanded() ? 'Collapse all sub-tasks' : 'Expand all sub-tasks'"
-              (click)="toggleAll()"
-            >
-              <svg [lucideIcon]="expandAllIcon" [size]="14"></svg>
-            </button>
-          }
-
-          <hlm-popover align="end" sideOffset="4">
-            <button
-              hlmPopoverTrigger
-              type="button"
-              class="text-faint hover:text-foreground hover:bg-hover aria-expanded:text-foreground inline-flex size-[22px] items-center justify-center outline-none focus-visible:text-foreground"
-              aria-label="Display options"
-              hlmTooltip="Display options"
-            >
-              <svg [lucideIcon]="displayIcon" [size]="13"></svg>
-            </button>
-            <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72 p-0 text-[13px]">
-              <div class="flex flex-col gap-2.5 p-3">
-                <label class="flex cursor-pointer items-center justify-between gap-3">
-                  <span class="text-muted-foreground">Show empty groups</span>
-                  <hlm-switch
-                    size="sm"
-                    aria-label="Show empty groups"
-                    [checked]="d().showEmptyGroups"
-                    (checkedChange)="patch({ showEmptyGroups: $event })"
-                  />
-                </label>
-                @if (pageSwitch() && allowsFlow()) {
-                  <!-- the page switch (List / Board / Timeline) is made of pages; Flow is a list layout -->
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="text-muted-foreground">List layout</span>
-                    <span class="bg-muted/60 flex rounded-md p-0.5">
-                      @for (o of listLayouts; track o.id) {
-                        <button
-                          type="button"
-                          class="h-6 rounded-[5px] px-2 text-xs"
-                          [class]="d().layout === o.id ? 'bg-background shadow-xs' : 'text-muted-foreground'"
-                          [attr.aria-pressed]="d().layout === o.id"
-                          [hlmTooltip]="o.hint"
-                          (click)="patch({ layout: o.id })"
-                        >
-                          {{ o.label }}
-                        </button>
-                      }
-                    </span>
-                  </div>
-                }
-                @if (d().layout !== 'board') {
-                  <label class="flex cursor-pointer items-center justify-between gap-3">
-                    <span class="text-muted-foreground">Nest sub-tasks</span>
-                    <hlm-switch
-                      size="sm"
-                      aria-label="Nest sub-tasks under their parent"
-                      [checked]="d().nested"
-                      (checkedChange)="patch({ nested: $event })"
-                    />
-                  </label>
-                }
-                @if (d().layout === 'list') {
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="text-muted-foreground">Density</span>
-                    <span class="bg-muted/60 flex rounded-md p-0.5">
-                      @for (o of densities; track o) {
-                        <button
-                          type="button"
-                          class="h-6 rounded-[5px] px-2 text-xs capitalize"
-                          [class]="
-                            d().density === o ? 'bg-background shadow-xs' : 'text-muted-foreground'
-                          "
-                          (click)="patch({ density: o })"
-                        >
-                          {{ o }}
-                        </button>
-                      }
-                    </span>
-                  </div>
-                }
-              </div>
-              <div class="p-3 pt-1">
-                <p class="text-muted-foreground mb-2 text-xs">Display properties</p>
-                <div class="flex flex-wrap gap-1.5">
-                  @for (p of props; track p) {
-                    <button
-                      type="button"
-                      class="h-6 rounded-md px-2 text-xs transition-colors"
-                      [class]="
-                        isShown(p)
-                          ? 'bg-selected text-foreground'
-                          : 'bg-secondary text-muted-foreground hover:text-foreground'
-                      "
-                      [attr.aria-pressed]="isShown(p)"
-                      (click)="toggleProp(p)"
-                    >
-                      {{ propLabels[p] }}
-                    </button>
-                  }
-                </div>
-              </div>
-              <div class="flex justify-end px-3 pb-2">
-                <button
-                  hlmBtn
-                  variant="ghost"
-                  size="sm"
-                  class="text-muted-foreground h-7 text-xs"
-                  (click)="resetDisplay()"
-                >
-                  Reset to default
-                </button>
-              </div>
-            </hlm-popover-content>
-          </hlm-popover>
-        </div>
         </app-filter-bar>
       </div>
     </div>
@@ -437,21 +272,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           </button>
         }
       </app-empty-state>
-    } @else if (d().layout === 'flow') {
-      <app-issue-flow
-        [groups]="rowColumns()"
-        [grouped]="effectiveGroup() !== 'none'"
-        [statuses]="store.settings().statuses.issue"
-        [nested]="nested()"
-        [selected]="selectedSet()"
-        [selectable]="canEdit()"
-        [selecting]="selection().length > 0"
-        [canEdit]="canEdit()"
-        [menu]="issueMenu"
-        [groupLabel]="groupLabel"
-        (toggleExpand)="toggleRow($event)"
-        (toggleSelect)="onSelect($event.issue, $event.event)"
-      />
     } @else {
       <app-kanban
         [columns]="rowColumns()"
@@ -593,32 +413,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
               Open issue in {{ i.source === 'gitlab' ? 'GitLab' : i.source === 'github' ? 'GitHub' : 'tracker' }} ↗
             </a>
           }
-          <button hlmDropdownMenuItem (triggered)="actions.copyKeys(ids)">
-            <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy
-            {{ ids.length > 1 ? 'keys' : 'key' }}
-            <hlm-dropdown-menu-shortcut>⇧⌘K</hlm-dropdown-menu-shortcut>
-          </button>
-          @if (ids.length === 1) {
-            <button hlmDropdownMenuItem (triggered)="actions.copyBranch(i.id)">
-              <svg [lucideIcon]="branchIcon" [size]="14"></svg> Copy git branch name
-              <hlm-dropdown-menu-shortcut>⇧⌘G</hlm-dropdown-menu-shortcut>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="favorites.toggle('issue', i.id)">
-              <svg
-                [lucideIcon]="starIcon"
-                [size]="14"
-                [attr.fill]="favorites.has('issue', i.id) ? 'currentColor' : 'none'"
-              ></svg>
-              {{ favorites.has('issue', i.id) ? 'Remove from favorites' : 'Add to favorites' }}
-            </button>
-            <button
-              hlmDropdownMenuItem
-              (triggered)="actions.openPrompt('duplicate', ids)"
-              [disabled]="!!i.duplicateOfId"
-            >
-              <svg [lucideIcon]="copyIcon" [size]="14"></svg> Mark as duplicate…
-            </button>
-          }
         </hlm-dropdown-menu-group>
         @if (store.allowed('deleteIssues')) {
           <hlm-dropdown-menu-separator />
@@ -659,13 +453,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
       </ng-template>
       <ng-template #assigneeSub>
         <hlm-dropdown-menu-sub class="max-h-80 w-52 overflow-y-auto">
-          @if (store.me(); as me) {
-            <button hlmDropdownMenuItem (triggered)="actions.setAssignee(ids, me.id)">
-              <app-actor-avatar [actor]="{ type: 'user', id: me.id }" [size]="16" /> Assign to me
-              <hlm-dropdown-menu-shortcut><app-kbd keys="i" /></hlm-dropdown-menu-shortcut>
-            </button>
-            <hlm-dropdown-menu-separator />
-          }
           @for (o of assigneeOpts(); track o.value) {
             <button hlmDropdownMenuItem (triggered)="actions.setAssignee(ids, o.value || null)">
               <app-issue-option-glyph [option]="o" /> <span class="truncate">{{ o.label }}</span>
@@ -720,25 +507,6 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           <span class="text-foreground font-mono text-[11.5px] whitespace-nowrap">
             <span class="tabular-nums">{{ selection().length }}</span> selected
           </span>
-          <button
-            type="button"
-            class="text-faint hover:text-foreground -ms-1.5 inline-flex size-5 shrink-0 items-center justify-center outline-none focus-visible:text-foreground"
-            aria-label="Clear selection"
-            hlmTooltip="Clear selection · Esc"
-            (click)="ui.clearSelected()"
-          >
-            <svg [lucideIcon]="xIcon" [size]="12"></svg>
-          </button>
-          @if (selection().length < ordered().length) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground -ms-1.5 shrink-0 font-mono text-[11px] whitespace-nowrap outline-none focus-visible:underline"
-              hlmTooltip="Select all · ⌘A"
-              (click)="selectAll()"
-            >
-              Select all
-            </button>
-          }
           <span class="bg-border h-4 w-px shrink-0" aria-hidden="true"></span>
           <button
             hlmBtn
@@ -762,39 +530,10 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
             hlmBtn
             variant="outline"
             class="shrink-0"
-            hlmTooltip="Set priority"
-            (click)="actions.openPrompt('priority', selection())"
-          >
-            Priority <app-kbd keys="p" />
-          </button>
-          <button
-            hlmBtn
-            variant="outline"
-            class="shrink-0"
-            hlmTooltip="Labels"
-            (click)="actions.openPrompt('label', selection())"
-          >
-            Labels <app-kbd keys="l" />
-          </button>
-          <button
-            hlmBtn
-            variant="outline"
-            class="shrink-0"
             hlmTooltip="Move to project · ⇧P"
             (click)="actions.openPrompt('project', selection())"
           >
             Move to project <app-kbd keys="m" />
-          </button>
-          <button
-            hlmBtn
-            variant="outline"
-            size="icon-sm"
-            class="size-[26px] shrink-0"
-            aria-label="Copy keys"
-            hlmTooltip="Copy keys · ⇧⌘K"
-            (click)="actions.copyKeys(selection())"
-          >
-            <svg [lucideIcon]="copyIcon" [size]="13"></svg>
           </button>
           @if (store.allowed('deleteIssues')) {
             <button
@@ -817,7 +556,6 @@ export class IssueBoard {
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
-  protected readonly favorites = inject(FavoritesStore);
   private readonly document = inject(DOCUMENT);
   private readonly vp = inject(Viewport);
   private readonly router = inject(Router);
@@ -904,8 +642,6 @@ export class IssueBoard {
   protected readonly search = rememberKeyed(this.listState, () => `${this.stateKey()}.search`, '');
   /** Do the filters all have to match, or any of them? */
   protected readonly match = rememberKeyed<FilterMatch>(this.listState, () => `${this.stateKey()}.match`, 'all');
-  /** The search field is out (Filter · F); it stays while it holds text. */
-  protected readonly searchOpen = signal(false);
   /** Sub-tasks the user collapsed (ids), remembered while the app is open. */
   private readonly collapsed = rememberKeyed<string[]>(this.listState, () => `${this.stateKey()}.collapsed`, []);
   private anchor: string | null = null;
@@ -916,29 +652,17 @@ export class IssueBoard {
     for (const i of this.issues()) if (i.parentId) parents.add(i.parentId);
     return { now: new Date(), subtaskParents: parents };
   });
-  protected readonly props = PROPS;
   protected readonly listFilterFields = LIST_FILTER_FIELDS;
   protected readonly boardFilterFields = BOARD_FILTER_FIELDS;
-  protected readonly expandAllIcon = LucideChevronsUpDown;
-  protected readonly listLayouts: readonly { id: IssueLayout; label: string; hint: string }[] = [
-    { id: 'list', label: 'List', hint: 'Rows grouped by status' },
-    { id: 'flow', label: 'Flow', hint: 'Tasks through the statuses over time' },
-  ];
   private readonly allLayouts: readonly { id: IssueLayout; label: string; hint: string }[] = [
     { id: 'list', label: 'List', hint: 'Rows grouped by status' },
     { id: 'board', label: 'Board', hint: 'Columns you drag cards between' },
-    { id: 'flow', label: 'Flow', hint: 'Tasks through the statuses over time' },
   ];
   /** Layouts the switch offers (the layout switch of embedded tables). */
   protected readonly layoutChoices = computed(() => {
     const allowed = this.layouts();
     return allowed ? this.allLayouts.filter((l) => allowed.includes(l.id)) : this.allLayouts;
   });
-  protected readonly allowsFlow = computed(() => this.layouts()?.includes('flow') ?? true);
-  protected readonly groupLabels = GROUP_LABEL;
-  protected readonly sortLabels = SORT_LABEL;
-  protected readonly propLabels = PROP_LABEL;
-  protected readonly densities = ['comfortable', 'compact'] as const;
 
   // context-menu option lists
   protected readonly statusOpts = promptOptions(this.store, 'status', []);
@@ -946,16 +670,10 @@ export class IssueBoard {
   protected readonly assigneeOpts = computed(() => promptOptions(this.store, 'assignee', []));
 
   protected readonly plus = LucidePlus;
-  protected readonly searchIcon = LucideSearch;
-  protected readonly xIcon = LucideX;
   protected readonly inbox = LucideInbox;
   protected readonly filterIcon = LucideListFilter;
-  protected readonly displayIcon = LucideSlidersHorizontal;
   protected readonly noUser = LucideCircleUserRound;
   protected readonly projectIcon = LucideBox;
-  protected readonly copyIcon = LucideCopy;
-  protected readonly branchIcon = LucideGitBranch;
-  protected readonly starIcon = LucideStar;
   protected readonly linkIcon = LucideLink;
   protected readonly openIcon = LucideExternalLink;
   protected readonly subtaskIcon = LucideListTree;
@@ -995,7 +713,8 @@ export class IssueBoard {
       : `Drop to move to ${this.label(key)}`;
   protected readonly effectiveGroup = computed<IssueGroup>(() => {
     const g = this.d().groupBy;
-    return this.d().layout === 'board' && g === 'none' ? 'status' : g;
+    // The board has no Group control: its columns are the statuses (a saved view may fix another grouping).
+    return this.d().layout === 'board' && (g === 'none' || !this.forceGroup()) ? 'status' : g;
   });
   /** What the filter bar shows as the grouping (`null` = no grouping). */
   protected readonly groupField = computed<string | null>(() => {
@@ -1100,21 +819,15 @@ export class IssueBoard {
   /** The rows each group shows: the matching tasks, as a tree when nested. */
   protected readonly rowColumns = computed<RowColumn[]>(() => {
     if (!this.nested()) {
-      return this.columns().map((c) => ({ key: c.key, items: flatIssueRows(c.items), count: c.items.length, parentIds: [] }));
+      return this.columns().map((c) => ({ key: c.key, items: flatIssueRows(c.items), count: c.items.length }));
     }
     const byId = this.store.issueById();
     const matching = this.matching();
     const collapsed = new Set(this.collapsed());
     return this.columns().map((c) => {
       const tree = buildIssueTree(c.items, byId, matching, collapsed);
-      return { key: c.key, items: tree.rows, count: c.items.length, parentIds: tree.parentIds };
+      return { key: c.key, items: tree.rows, count: c.items.length };
     });
-  });
-  private readonly parentIds = computed(() => [...new Set(this.rowColumns().flatMap((c) => c.parentIds))]);
-  protected readonly hasTree = computed(() => this.nested() && this.parentIds().length > 0);
-  protected readonly anyExpanded = computed(() => {
-    const collapsed = new Set(this.collapsed());
-    return this.parentIds().some((id) => !collapsed.has(id));
   });
   /** The rows by task id, to follow ← / → from the focused row. */
   private readonly rowById = computed(() => {
@@ -1348,10 +1061,6 @@ export class IssueBoard {
         });
       });
     });
-    // The Flow layout draws each task's status changes: make sure they are loaded, not just the recent ones.
-    effect(() => {
-      if (this.d().layout === 'flow') void this.store.loadStatusHistory();
-    });
     // Prev / next on the detail page follow this order.
     effect(() => this.actions.navOrder.set(this.ordered()));
     inject(DestroyRef).onDestroy(() => {
@@ -1364,10 +1073,6 @@ export class IssueBoard {
 
   protected patch(p: Partial<IssueDisplay>): void {
     this.state.update((d) => ({ ...d, ...p }));
-  }
-
-  protected resetDisplay(): void {
-    this.state.set({ ...DEFAULT_DISPLAY, hidden: [...DEFAULT_DISPLAY.hidden] });
   }
 
   protected setGroup(field: string | null): void {
@@ -1384,10 +1089,6 @@ export class IssueBoard {
 
   protected toggleRow(id: string): void {
     this.collapsed.update((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
-  }
-
-  protected toggleAll(): void {
-    this.collapsed.set(this.anyExpanded() ? [...this.parentIds()] : []);
   }
 
   /** ← collapses the focused row, or moves to its parent; → expands it, or moves to its first sub-task. */
@@ -1426,16 +1127,6 @@ export class IssueBoard {
       ?.scrollIntoView({ block: 'nearest' });
   }
 
-  protected isShown(p: IssueProp): boolean {
-    return !this.d().hidden.includes(p);
-  }
-
-  protected toggleProp(p: IssueProp): void {
-    this.patch({
-      hidden: this.isShown(p) ? [...this.d().hidden, p] : this.d().hidden.filter((x) => x !== p),
-    });
-  }
-
   protected label(key: string): string {
     return groupLabel(this.store, this.effectiveGroup(), key);
   }
@@ -1453,22 +1144,6 @@ export class IssueBoard {
   /** Filter · F: open the "add filter" menu (properties, then values). */
   openFilter(): void {
     this.filterBar()?.openAdd();
-  }
-
-  /** Filter · F: bring out the search field and put the cursor in it. */
-  openSearch(): void {
-    this.searchOpen.set(true);
-    // phones always show their own field; on desktop wait for the inline one to render
-    setTimeout(() =>
-      this.document
-        .querySelector<HTMLInputElement>('input[data-task-filter], app-search-input input')
-        ?.focus(),
-    );
-  }
-
-  protected closeSearch(): void {
-    this.search.set('');
-    this.searchOpen.set(false);
   }
 
   // ───────────────────────── create / move ─────────────────────────
