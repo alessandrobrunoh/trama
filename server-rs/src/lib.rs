@@ -23,6 +23,7 @@ fn routes() -> Routes {
         .merge(trama_auth::router())
         .merge(trama_comments::router())
         .merge(trama_events::router())
+        .merge(trama_notifications::router())
         .merge(trama_sharing::router())
         .merge(trama_system::router())
         .merge(trama_uploads::router())
@@ -74,6 +75,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let events = trama_events::Events::start(db.clone(), config.database_url.clone());
     let state = trama_common::with_platform_services(AppState::new(db.clone(), config))?
         .with_extension(events.clone());
+    let state = trama_notifications::with_services(state);
+    // notifications are produced from the domain events this instance records
+    let notifications = trama_notifications::spawn(&state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("Trama API listening on http://localhost:{port}/api");
@@ -82,6 +86,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app(state).into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+    notifications.abort();
     events.shutdown().await;
     db.close().await?;
     Ok(())
