@@ -64,6 +64,7 @@ trama-events = { path = "crates/events" }
 trama-external-identities = { path = "crates/external-identities" }
 trama-favorites = { path = "crates/favorites" }
 trama-insights = { path = "crates/insights" }
+trama-integrations = { path = "crates/integrations" }
 trama-issues = { path = "crates/issues" }
 trama-migration = { path = "crates/migration" }
 trama-milestones = { path = "crates/milestones" }
@@ -127,6 +128,7 @@ trama-events.workspace = true
 trama-external-identities.workspace = true
 trama-favorites.workspace = true
 trama-insights.workspace = true
+trama-integrations.workspace = true
 trama-issues.workspace = true
 trama-migration.workspace = true
 trama-milestones.workspace = true
