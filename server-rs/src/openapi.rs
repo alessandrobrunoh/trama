@@ -13,6 +13,7 @@ use utoipa::openapi::OpenApi as Document;
     ),
     tags(
         (name = "auth", description = "Sign-up, sessions and API token introspection"),
+        (name = "comments", description = "Comments on issues, projects, milestones and artifacts"),
         (name = "events", description = "Activity log and the live event stream"),
         (name = "system", description = "Health and operations"),
         (name = "uploads", description = "Files stored in the workspace and attached to records"),
@@ -25,6 +26,7 @@ pub(crate) struct ApiDoc;
 pub fn api_doc() -> Document {
     let mut doc = ApiDoc::openapi();
     doc.merge(trama_auth::ApiDoc::openapi());
+    doc.merge(trama_comments::ApiDoc::openapi());
     doc.merge(trama_events::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
     doc.merge(trama_uploads::ApiDoc::openapi());
