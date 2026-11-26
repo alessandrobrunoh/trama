@@ -24,6 +24,11 @@ status codes, bodies and side effects.
   matching the TypeScript contract in `contracts/domain.ts` field for field, including which
   fields are omitted vs `null` (`#[serde(skip_serializing_if = "Option::is_none")]` for optional
   TS fields `foo?:`, plain `Option<T>` for `foo: T | null`).
+- Types and rules that `contracts/domain.ts` already defines come from `trama-contracts`; use
+  them instead of redefining them (`trama_contracts::issues::Issue`, `roles::role_allows`,
+  `settings::resolve_workspace_settings`, `status::require_status`, …). Its crate docs explain
+  the conventions. Endpoint-specific bodies (DTOs, list wrappers) stay in the module's
+  `schemas.rs`.
 - Dates: `trama_core::time::to_iso` (`2026-11-25T14:01:36.424Z`). Ids: `trama_core::ids::uid`
   with the NestJS prefix. Entities (`trama-entities`) are storage rows; map them into schemas.
 - Status codes: NestJS answers 201 for `@Post` unless the controller sets `@HttpCode`; match it.

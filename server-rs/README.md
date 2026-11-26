@@ -10,6 +10,7 @@ which server answered.
 | --- | --- | --- |
 | `trama-api` | `src/` | The binary: wires every module router under `/api`, the OpenAPI document, startup and shutdown |
 | `trama-core` | `crates/core` | Config, Nest-compatible errors, ids, ISO dates, the `ApiJson` body extractor, HTTP layers, test databases |
+| `trama-contracts` | `crates/contracts` | `contracts/domain.ts` in Rust: wire types, roles and capabilities, member access, settings, status and label catalogs |
 | `trama-entities` | `crates/entities` | SeaORM entities, one module per table (generated, see `lib.rs`) |
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
 | `trama-system` | `crates/system` | `GET /api/health` |
