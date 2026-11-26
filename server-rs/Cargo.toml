@@ -19,6 +19,7 @@ axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 dotenvy = "0.15"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hex = "0.4"
 http-body-util = "0.1"
 indexmap = "2"
@@ -26,6 +27,8 @@ lettre = { version = "0.11.24", default-features = false, features = ["builder",
 percent-encoding = "2"
 rand = "0.9"
 regex = "1"
+# ECDSA (VAPID), ECDH, HKDF and AES-GCM for Web Push; already in the tree through rustls.
+ring = "0.17"
 # Outgoing HTTP. Requests to user-chosen URLs go through trama_common::safe_fetch.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 sha2 = "0.11"
@@ -53,6 +56,7 @@ trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-events = { path = "crates/events" }
 trama-migration = { path = "crates/migration" }
+trama-notifications = { path = "crates/notifications" }
 trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
 trama-uploads = { path = "crates/uploads" }
@@ -105,6 +109,7 @@ trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true
 trama-migration.workspace = true
+trama-notifications.workspace = true
 trama-sharing.workspace = true
 trama-system.workspace = true
 trama-uploads.workspace = true
