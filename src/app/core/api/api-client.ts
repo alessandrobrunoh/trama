@@ -55,6 +55,8 @@ import type {
   ProjectInviteResult,
   ProjectShare,
   Role,
+  ThreadDecision,
+  ThreadRecord,
   SharedProject,
   PublicView,
   SavedView,
@@ -507,6 +509,19 @@ export class ApiClient {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
   };
 
+  /** What `trama sync` keeps for a task: the thread record (read-only here) and the decisions agents recorded. */
+  readonly threads = {
+    /** The record of the task's thread; rejects with a 404 `ApiError` when the task was never synced. */
+    record: (slug: string, idOrKey: string, o?: RequestOptions) =>
+      this.get<ThreadRecord>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/thread`, undefined, o),
+    /** Decisions, newest first. `path` keeps those that cover a file, `issue` those of one task. */
+    decisions: (
+      slug: string,
+      query: { path?: string; issue?: string; limit?: number } = {},
+      o?: RequestOptions,
+    ) => this.get<ThreadDecision[]>(`${this.w(slug)}/decisions`, query, o),
+  };
+
   readonly uploads = {
     /** A file to insert into a description or comment. Not visible to anyone else until that text is saved. */
     stage: (slug: string, file: File) =>
@@ -702,6 +717,12 @@ export class ApiClient {
       this.post<TimeEntry>(`${this.w(slug)}/time-entries`, input, o),
     remove: (slug: string, id: ID, o?: RequestOptions) =>
       this.del(`${this.w(slug)}/time-entries/${id}`, o),
+    /** Entries `trama sync` suggested from a thread's active time. They count only once accepted. */
+    suggestions: (slug: string, o?: RequestOptions) =>
+      this.get<TimeEntry[]>(`${this.w(slug)}/time-entries`, { source: 'suggested' }, o),
+    /** Turns a suggestion into a manual entry (the owner only). */
+    accept: (slug: string, id: ID, o?: RequestOptions) =>
+      this.post<TimeEntry>(`${this.w(slug)}/time-entries/${id}/accept`, {}, o),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

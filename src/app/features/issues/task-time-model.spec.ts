@@ -47,6 +47,14 @@ describe('trackedOn', () => {
   it('skips broken entries', () => {
     expect(trackedOn([entry('x', 't1', at(19, 10), at(19, 9))], 't1', NOW).totalMs).toBe(0);
   });
+
+  it('leaves suggested entries out until a person accepts them', () => {
+    const suggested: TimeEntry = { ...entry('s', 't1', at(19, 8), at(19, 9)), source: 'suggested' };
+    const accepted: TimeEntry = { ...suggested, id: 'm', source: 'manual' };
+    expect(trackedOn([suggested], 't1', NOW).totalMs).toBe(0);
+    expect(entriesOf([suggested, accepted], 't1').map((e) => e.id)).toEqual(['m']);
+    expect(trackedOn([accepted], 't1', NOW).totalMs).toBe(3_600_000);
+  });
 });
 
 describe('entries', () => {

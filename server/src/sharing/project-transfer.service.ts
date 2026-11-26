@@ -59,7 +59,7 @@ interface Plan {
 }
 
 /**
- * Moves a project, with its milestones, issues, time entries, comments, artifacts and history, to another
+ * Moves a project, with its milestones, issues, time entries, comments, artifacts, thread records and history, to another
  * workspace. The caller must be able to administer both workspaces. Issue keys are kept (so the project tag
  * must be free in the target), statuses and labels are mapped to the target's by type and name, guests are
  * carried over as limited members, and anything that pointed at a person who is not in the target is cleared.
@@ -369,6 +369,20 @@ export class ProjectTransferService {
         [sub.tgt, sub.src, project.id, issueIds],
       ),
     );
+
+    // the thread record and the decisions of a task go with the task
+    if (issueIds.length) {
+      await m.query(`UPDATE "task_thread_records" SET "workspaceId" = $1 WHERE "workspaceId" = $2 AND "issueId" = ANY($3)`, [
+        sub.tgt,
+        sub.src,
+        issueIds,
+      ]);
+      await m.query(`UPDATE "task_decisions" SET "workspaceId" = $1 WHERE "workspaceId" = $2 AND "issueId" = ANY($3)`, [
+        sub.tgt,
+        sub.src,
+        issueIds,
+      ]);
+    }
 
     const artifactIds = firstColumn(
       await m.query(

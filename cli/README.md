@@ -163,6 +163,35 @@ trama timer add AUTH-142 --started-at 2026-05-01T09:00:00Z --ended-at 2026-05-01
 trama timer delete te_123
 ```
 
+### The `/trama` verbs
+
+Short, hand-written commands for the agent flow of the `trama-cli` skill. A task links **one** thread
+(`DELTA_THREAD_URL` names the current one); an agent keeps a *record* of it with `sync`. In a terminal (or with
+`-o table`) they print one-line results (`✓ summary · 2 decisions · 3 files · 47m suggested`); piped, JSON that also
+carries the line as `message`. Every verb honours `--dry-run`.
+
+```bash
+trama show AUTH-142 [--json]                  # task, subtasks (any depth), decisions, record: { task, subtasks, decisions, record }
+trama ls [--mine] [--open|--all] [--limit N]  # open tasks; --mine needs a key that acts as a person
+trama link AUTH-142 [--thread URL_OR_ID]      # default: DELTA_THREAD_URL; exit 6 when another thread is linked (names it)
+trama sub AUTH-142 "Retry metrics" [--link] [--thread URL_OR_ID]   # subtask in the parent's project and kind
+trama status AUTH-142 in-progress             # in-progress / in_progress / a workspace status name; people own the rest
+trama sync AUTH-142 --summary "Alert wired" --decision "Alert after 3 failures@src/auth/" \
+  --files-from-git --pr acme/web#423 --minutes 47 [--file PATH]... [--turns N] [--thread URL] [--summary-file F|-]
+trama sync --all --summary "…"                # every task linked to the current thread
+trama decisions [--path FILE] [--issue ID] [--limit N]   # newest first; a path matches the file, a directory above it or a glob
+trama ask "refresh tokens"                    # decisions and records that match; lists them, does not answer
+trama estimate AUTH-142                       # suggested points and the finished tasks behind them; writes nothing
+trama time start AUTH-142 | stop | status     # same requests as `trama timer`
+trama time log AUTH-142 1h15 [--at END] [--description T]   # 1h15, 1h, 45m, 90 (minutes) or 1:15
+trama time suggestions                        # entries `sync --minutes` suggested; `accept <id>` (or `time accept <id>`) takes one
+```
+
+`--decision "TEXT@path,path"` takes the paths after the last `@` (no spaces); end a text with a lone `@` to keep an
+@handle. `--files-from-git` adds the working-tree changes and the branch's changes since it left the default branch,
+and only warns outside a repository. A bare thread id (`th_…`) needs `TRAMA_THREAD_URL_BASE`, or is joined to
+the directory of `DELTA_THREAD_URL`. `--pr owner/repo#123` is read as GitHub when the project's repository is.
+
 `trama commands` lists all of these next to the generated commands. Project `health` is not a flag: the API still
 stores it, but it duplicates the project status, so the CLI and MCP no longer expose it.
 

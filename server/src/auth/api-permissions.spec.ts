@@ -130,6 +130,19 @@ describe('requiredPermission', () => {
       );
   });
 
+  it('maps the thread record routes to the task permissions', () => {
+    const table: [string, string, string][] = [
+      ['POST', '/api/w/:slug/tasks/:idOrKey/thread/sync', 'tasks:write'],
+      ['GET', '/api/w/:slug/tasks/:idOrKey/thread', 'tasks:read'],
+      ['GET', '/api/w/:slug/tasks/:idOrKey/estimate-suggestion', 'tasks:read'],
+      ['GET', '/api/w/:slug/decisions', 'tasks:read'],
+    ];
+    for (const [method, route, expected] of table)
+      expect(requiredPermission(method, route), `${method} ${route}`).toBe(
+        expected,
+      );
+  });
+
   it('fails closed on a nested sub-resource that is in the catalog but not mapped', () => {
     expect(
       requiredPermission('GET', '/api/w/:slug/tasks/:idOrKey/comments'),
@@ -191,7 +204,7 @@ describe('MCP tool catalog', () => {
   it("declares exactly the permission the API derives from each tool's route", () => {
     expect(tools.length).toBeGreaterThan(50);
     for (const t of tools) {
-      const removed = /^\/(teams|customers|customer-|decisions|releases|input-requests|repositories|intake)/.test(t.path);
+      const removed = /^\/(teams|customers|customer-|releases|input-requests|repositories|intake)/.test(t.path);
       if (removed) continue;
       const path = t.path.replace(/^\/issues/, '/tasks');
       const route = `/api/w/:slug${path.replace(/\{(\w+)\}/g, ':$1')}`;

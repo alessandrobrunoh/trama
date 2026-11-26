@@ -1,13 +1,50 @@
 ---
 name: trama-cli
-description: Work with Trama tasks and their context from the `trama` CLI when MCP is unavailable, when the user requests the shell interface, or when a CLI workflow is otherwise appropriate.
+description: Work with Trama tasks and their thread record from the `trama` CLI when MCP is unavailable, when the user requests the shell interface, or when a CLI workflow is otherwise appropriate.
 ---
 
 # Trama through the `trama` CLI
 
-Use the CLI for the same task-first workflow described in `trama`: a Task is the unit of work, with sub-tasks, comments and artifacts, and it can belong to a Project. Agents can work across multiple tasks directly. Keep full transcripts in execution tools, not Trama.
+Use the CLI for the same flow described in `trama` (`/trama TRM-128`): a Task is the unit of work, your thread is attached to it as a record, and people own the status. Keep full transcripts in execution tools, not Trama.
+
+## The flow, with short verbs
+
+Read `.trama` first (below). For the task `<ID>` (`TRM-128`, `TRM-128.3`):
+
+1. `trama show <ID> --json`: read the task, subtasks, decisions and record.
+2. `trama link <ID> --thread <current>`: link this thread. If the task already links another thread it exits non-zero ("already linked"): ask the user, then `trama sub <ID> "<title>" --link` and continue on the new subtask.
+3. `trama status <ID> in-progress`: the only status you ever set. Never set `in_review` or `done`.
+4. After each turn that edits files: `trama sync <ID> --summary "…" --files-from-git`.
+5. When you open a PR: `trama sync <ID> --pr <url>`.
+6. Before touching a file: `trama decisions --path <file>`.
+7. `trama sync` also sends your active minutes (`--minutes N`) as a suggested time entry for a person to accept.
+
+The current thread is the environment variable `DELTA_THREAD_URL` (`link`, `sub --link` and `sync --all` read it when `--thread` is not given). If it is unset, ask the user once for the thread link. A bare `th_…` id needs `TRAMA_THREAD_URL_BASE`; otherwise pass the full http(s) URL.
+
+## Short verbs
+
+| Command | What it does |
+|---|---|
+| `trama show <id> [--json]` | Task, subtasks, decisions and record. `--json` (or `-o json`) prints `{ task, subtasks, decisions, record }`; `record` is null when never synced. |
+| `trama ls --mine [--open]` | The signed-in person's open tasks. |
+| `trama link <id> [--thread <url-or-id>]` | Link the thread. Exits non-zero when the task already links a different one and prints the `trama sub` hint. |
+| `trama sub <id> <title> [--link] [--thread <url-or-id>]` | Create a subtask under `<id>` (same project and kind). `--link` links the thread to the new subtask. |
+| `trama status <id> <status>` | Set the status. Accepts `in-progress` and `in_progress`, and the workspace's status labels. Use it only for in progress. |
+| `trama sync <id> [--summary TEXT\|--summary-file F\|--summary -] [--decision "TEXT@path,path"]... [--file PATH]... [--files-from-git] [--pr URL] [--minutes N] [--turns N] [--thread URL]` | Update the record. The summary replaces the old one; files merge in; decisions append. `--pr` takes a URL or `owner/repo#123`. |
+| `trama sync --all` | Sync every task linked to the current thread (`DELTA_THREAD_URL`). |
+| `trama decisions [--path FILE] [--issue ID] [--limit N]` | Past decisions, newest first: `KEY  text  (paths)`. A path matches a decision on that file, a directory prefix or a glob. |
+| `trama ask "<question>"` | Searches decisions and records and lists the matches with their task keys. It does not generate an answer. |
+| `trama estimate <id>` | Suggested points, the reason and the similar finished tasks. It writes nothing; apply it with `trama task update <id> --estimate N` only when the person asks. |
+| `trama time start <id>` | Same as `trama timer start <id>`. |
+| `trama time log <id> <duration> [--at END] [--description TEXT]` | Log a finished entry ending now or at `--at`. Durations: `1h15`, `1h`, `45m`, `90` (minutes), `1:15`. |
+| `trama time stop`, `trama time status` | Stop or show the running timer. |
+| `trama time suggestions` | List suggested entries from `sync`; `trama time suggestions accept <entry-id>` accepts one (the owner only). |
+
+Start or log time only when the user asks. Suggested entries count nothing until a person accepts them.
 
 ## Connect and discover
+
+Everything else is a generated command, one per API operation:
 
 ```bash
 trama whoami
@@ -19,9 +56,9 @@ trama task context BUG-142
 trama task get BUG-142
 trama task create --kind bug --title "Login timeout"
 trama task update BUG-142 --priority high
-trama task create --kind bug --title "Reproduce on Safari" --parent-id BUG-142 --estimate 2 --thread-url https://delta.example/thread/abc
-trama task update BUG-142 --estimate 5 --thread-url https://delta.example/thread/abc
-trama task update BUG-142 --unset estimate,threadUrl
+trama task create --kind bug --title "Reproduce on Safari" --parent-id BUG-142 --estimate 2
+trama task update BUG-142 --estimate 5
+trama task update BUG-142 --unset estimate
 trama task subtasks BUG-142
 trama task list --parent BUG-142 --open
 trama timer start BUG-142
@@ -59,20 +96,18 @@ project_name = "Project name"
 
 Use the `trama-project-context` skill when available. Never save credentials in `.trama`, and do not silently replace a stale mapping.
 
-Find matching tasks within the saved project scope and read their context before creating or updating anything. When the user names multiple tasks, read each one and update the ones affected.
-
-Use the CLI's current search and task context operations as exposed by `trama commands`. Do not assume that a command exists just because an older skill or client named it.
+Find matching tasks within the saved project scope and read their context (`trama show`) before creating or updating anything. When the user names multiple tasks, read each one and update the ones affected.
 
 ## Write carefully
 
-Use the discovered task create/update operations. Include clear task context, valid catalog values, and only justified optional fields. Attach artifacts to the relevant task(s), and record concise factual progress as comments. If a person's input is needed, say so in a comment on the task. Set `in_review` while a PR is open and `done` only once the change is merged and verified.
+Record progress with `trama sync`, not with comments: the summary, files, decisions and PR belong to the record. Use comments (`trama comment create`) only for a question or note a person must see, such as an open decision or a blocker. Include clear task context, valid catalog values, and only justified optional fields in task create/update. Attach other artifacts (builds, test reports) to the relevant task with `trama artifact create`. Do not set `in_review` or `done`: the person moves the task after reviewing the PR you attached with `sync --pr`.
 
 Preview writes with `--dry-run` when the command supports it. Confirm the result with a read. Do not delete tasks or silently overwrite another person's assignment.
 
-## Subtasks, estimates, thread link and time
+## Subtasks, estimates and time
 
-- A subtask is a task created with `--parent-id <key>`; subtasks nest to any depth and keep their own status. `trama task subtasks <key>` prints the whole tree (indented text in a terminal or with `-o table`, nested JSON when piped; `--depth 1` for direct children), and `trama task list --parent <key>` filters a normal list. The API has no parent filter, so both read the newest 500 tasks and warn when that limit is reached (narrow with `--project-id`).
-- `--estimate <points>` sets the estimate (use the scale from `trama workspace get`); `--thread-url <http(s) url>` links the thread working on the task. Both come back on `trama task get`; clear them with `--unset estimate,threadUrl`.
+- A subtask is a task created with `trama sub <ID> "<title>"` or `--parent-id <key>`; subtasks nest to any depth and keep their own status. `trama task subtasks <key>` prints the whole tree (indented text in a terminal or with `-o table`, nested JSON when piped; `--depth 1` for direct children), and `trama task list --parent <key>` filters a normal list. The API has no parent filter, so both read the newest 500 tasks and warn when that limit is reached (narrow with `--project-id`).
+- `--estimate <points>` sets the estimate (use the scale from `trama workspace get`). Link a thread with `trama link`, not `--thread-url`: it refuses to replace a different thread.
 - `trama timer` is the signed-in person's own timer: `start [KEY]` (stops a running one), `status`, `stop`, `list [KEY]`, `add [KEY] --started-at … --ended-at …` (ISO-8601 with a zone) and `delete <entry id>`. Start it only when the user asks to track time. Custom tokens are refused.
 
 ## Errors and limits

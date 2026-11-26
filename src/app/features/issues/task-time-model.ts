@@ -31,7 +31,7 @@ export function trackedOn(entries: readonly TimeEntry[], issueId: string, now: n
   const day = startOfDay(now);
   const out: TaskTracked = { todayMs: 0, totalMs: 0, runningMs: 0 };
   for (const e of entries) {
-    if (e.issueId !== issueId) continue;
+    if (e.issueId !== issueId || e.source === 'suggested') continue;
     const start = Date.parse(e.startedAt);
     const end = e.endedAt ? Date.parse(e.endedAt) : now;
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
@@ -45,7 +45,7 @@ export function trackedOn(entries: readonly TimeEntry[], issueId: string, now: n
 /** Entries of a task, newest first. */
 export function entriesOf(entries: readonly TimeEntry[], issueId: string): TimeEntry[] {
   return entries
-    .filter((e) => e.issueId === issueId)
+    .filter((e) => e.issueId === issueId && e.source !== 'suggested')
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0));
 }
 

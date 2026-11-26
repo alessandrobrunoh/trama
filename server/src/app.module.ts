@@ -25,6 +25,7 @@ import { RoutingModule } from './routing/routing.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
+import { ThreadsModule } from './threads/threads.module.js';
 import { TimeEntriesModule } from './time-entries/time-entries.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
 import { ViewsModule } from './views/views.module.js';
@@ -48,6 +49,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     ProjectsModule,
     SharingModule,
     IssuesModule,
+    ThreadsModule,
     MilestonesModule,
     ArtifactsModule,
     UploadsModule,

@@ -6,6 +6,7 @@ import { INTEGRATION_ENTITIES } from '../integrations/entities.js';
 import { ROUTING_ENTITIES } from '../routing/entities.js';
 import { TIME_ENTRY_ENTITIES } from '../time-entries/time-entry.entity.js';
 import { SHARING_ENTITIES } from '../sharing/project-placement.entity.js';
+import { THREAD_ENTITIES } from '../threads/thread.entity.js';
 import { MIGRATIONS } from './migrations/index.js';
 
 export const DEFAULT_DATABASE_URL =
@@ -28,6 +29,7 @@ export function dataSourceOptions(url?: string): DataSourceOptions {
       ...ROUTING_ENTITIES,
       ...TIME_ENTRY_ENTITIES,
       ...SHARING_ENTITIES,
+      ...THREAD_ENTITIES,
     ],
     migrations: MIGRATIONS,
     migrationsRun: true,

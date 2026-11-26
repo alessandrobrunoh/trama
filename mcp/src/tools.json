@@ -76,10 +76,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across projects, tasks and artifacts (titles).",
+  "description": "Full-text search across projects, tasks, artifacts, decisions and thread records. A decision hit's title is its text, a record hit's title its task's title; both carry the task key and issueId.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: project,issue,artifact",
+   "types": "query string Comma-separated: project,issue,artifact,decision,record",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -478,7 +478,7 @@
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
-   "threadUrl": "body string Link to the Delta thread working on this task (http/https, max 2048; null clears)",
+   "threadUrl": "body string Link to the Delta thread working on this task (http/https, max 2048; null clears). A task links one thread: setting a different URL while one is linked fails with 409 thread_already_linked; unlink first or create a subtask.",
    "estimate": "body number Estimate in points (>=0, <=1000; null clears)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Task classification; does not change the key",
    "duplicateOfId": "body string Id or key of the original (null clears)",
@@ -598,6 +598,55 @@
   "path": "/tasks/{idOrKey}/artifacts",
   "permission": "artifacts:read",
   "description": "Artifacts attached to a task.",
+  "params": {
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)"
+  }
+ },
+ {
+  "name": "sync_thread",
+  "method": "POST",
+  "path": "/tasks/{idOrKey}/thread/sync",
+  "permission": "tasks:write",
+  "description": "Update the record of the thread linked to a task (trama sync): replace the summary, merge touched files, append decisions, attach the PR it opened, suggest active time. Send only what changed. A task links one thread: a different threadUrl fails with 409 thread_already_linked. Suggested time counts only once its owner accepts it.",
+  "params": {
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)",
+   "threadUrl": "body string Link this thread to the task when it has none (http/https, max 2048)",
+   "summary": "body string What the thread did so far (replaces the previous summary, max 4000)",
+   "decisions": "body object[] Decisions made since the last sync, appended: [{text (max 1000), paths? (files, directory prefixes like src/auth/ or globs like src/auth/*; max 50)}] (max 20)",
+   "files": "body string[] Repository paths touched since the last sync (relative, no .., max 500)",
+   "pullRequestUrl": "body string The PR or MR the thread opened: attached to the task as a pull_request artifact (the same URL updates in place)",
+   "activeMinutes": "body integer Active minutes in the thread since the last sync (1-720): stored as a suggested time entry the person accepts",
+   "turns": "body integer Turns of the thread so far"
+  }
+ },
+ {
+  "name": "get_thread_record",
+  "method": "GET",
+  "path": "/tasks/{idOrKey}/thread",
+  "permission": "tasks:read",
+  "description": "The record of the thread linked to a task as last synced: summary, files, turns, sync count and the task's decisions (oldest first). 404 when the task was never synced.",
+  "params": {
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)"
+  }
+ },
+ {
+  "name": "list_decisions",
+  "method": "GET",
+  "path": "/decisions",
+  "permission": "tasks:read",
+  "description": "Decisions agents recorded on tasks, newest first. With path, only those covering that file: the same path, a directory prefix (src/auth/) or a glob (src/auth/*, src/**/*.ts). Decisions without paths match only with issue. Read these before touching a file.",
+  "params": {
+   "path": "query string Repository file, relative (e.g. src/auth/session.ts)",
+   "issue": "query string Only the decisions of this task (id or key)",
+   "limit": "query integer Newest first, at most this many (1-200, default 50)"
+  }
+ },
+ {
+  "name": "suggest_estimate",
+  "method": "GET",
+  "path": "/tasks/{idOrKey}/estimate-suggestion",
+  "permission": "tasks:read",
+  "description": "Points suggested for a task from similar finished tasks (same project, shared labels, similar title): the median of up to 5 estimates, snapped to the workspace scale. suggestion is null with fewer than 2 matches. It only suggests; people set the estimate.",
   "params": {
    "idOrKey": "path string! Task id or key (e.g. CORA-142)"
   }

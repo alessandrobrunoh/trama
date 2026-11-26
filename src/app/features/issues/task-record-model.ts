@@ -1,9 +1,30 @@
 // Pure model of the Delta thread record on the task page (v3 "06 Task detail"): what can be said about a linked
-// thread from the data Trama holds today, and nothing more. The thread itself (decisions, files, turns) lives
-// in Delta; Trama keeps its link, the pull requests and the task's own events.
-import type { Artifact, ActorRef, ISODate, StatusEntry } from '../../core';
+// thread from the data Trama holds. Trama keeps the thread's link, the pull requests, the task's own events and
+// what the agent last synced with `trama sync` (summary, decisions, files, turns): the panel shows those.
+import type { Artifact, ActorRef, ISODate, StatusEntry, ThreadRecord } from '../../core';
 import { resolveStatusEntry } from '../../core';
+import { ago } from '../../shared/ago';
 import type { StreamEntry } from './issue-stream-model';
+
+/** "synced 4m ago", or "synced just now": when the agent last updated the record. */
+export function syncedText(iso: ISODate | undefined | null, now = Date.now()): string {
+  const a = ago(iso, now);
+  if (!a) return '';
+  return a === 'now' ? 'synced just now' : `synced ${a} ago`;
+}
+
+/** "38 turns · 6 files": the size of the thread as the last sync reported it. Empty when it reported nothing. */
+export function recordSize(r: Pick<ThreadRecord, 'turns' | 'files'>): string {
+  const parts: string[] = [];
+  if (r.turns !== null && r.turns > 0) parts.push(`${r.turns} turn${r.turns === 1 ? '' : 's'}`);
+  if (r.files.length) parts.push(`${r.files.length} file${r.files.length === 1 ? '' : 's'}`);
+  return parts.join(' · ');
+}
+
+/** The first `max` changed files, and how many more there are ("2 more files"). */
+export function recordFiles(files: readonly string[], max = 6): { shown: string[]; more: number } {
+  return { shown: files.slice(0, max), more: Math.max(0, files.length - max) };
+}
 
 /** "th_8f2a19" from a Delta thread URL: its last path segment, shortened when it is long. */
 export function threadId(url: string | undefined | null): string {

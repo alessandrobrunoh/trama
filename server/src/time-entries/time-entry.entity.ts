@@ -1,4 +1,5 @@
 import { Column, Entity, ForeignKey, Index, PrimaryColumn } from 'typeorm';
+import type { TimeEntrySource } from '../contracts/domain.js';
 import {
   IssueEntity,
   ProjectEntity,
@@ -23,6 +24,8 @@ export class TimeEntryEntity extends Wire {
   @Column({ type: 'varchar', default: '' }) description: string;
   @Column({ type: 'timestamptz' }) startedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) endedAt: Date | null;
+  /** `suggested` entries come from `trama sync`: they count nowhere until their owner accepts them. */
+  @Column({ type: 'varchar', default: 'manual' }) source: TimeEntrySource;
   @Column({ type: 'timestamptz', default: () => 'now()' }) createdAt: Date;
   @Column({ type: 'timestamptz', default: () => 'now()' }) updatedAt: Date;
 }

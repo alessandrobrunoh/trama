@@ -1,7 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
-import { IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { IsIn, IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Ctx, RequireUser, Roles, type WorkspaceContext } from '../auth/request-context.js';
+import type { TimeEntrySource } from '../contracts/domain.js';
 import { TimeEntriesService } from './time-entries.service.js';
+
+const SOURCES: TimeEntrySource[] = ['timer', 'manual', 'suggested'];
+
+class ListTimeEntriesQuery {
+  @IsOptional() @IsIn(SOURCES) source?: TimeEntrySource;
+}
 
 class TimeEntryTargetDto {
   @IsOptional() @IsString() @MaxLength(500) description?: string;
@@ -21,9 +28,17 @@ class ManualTimeEntryDto extends TimeEntryTargetDto {
 export class TimeEntriesController {
   constructor(private readonly service: TimeEntriesService) {}
 
+  /** Without `source`, suggestions are left out; `?source=suggested` lists only those. */
   @Get()
-  list(@Ctx() ctx: WorkspaceContext) {
-    return this.service.list(ctx.workspace.id, ctx.userId!);
+  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListTimeEntriesQuery) {
+    return this.service.list(ctx.workspace.id, ctx.userId!, q.source);
+  }
+
+  /** Counts a suggestion (from `trama sync`) as the caller's own time. Dismiss one with DELETE. */
+  @Post(':id/accept')
+  @HttpCode(200)
+  accept(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
+    return this.service.accept(ctx.workspace.id, ctx.userId!, id);
   }
 
   @Post('start')

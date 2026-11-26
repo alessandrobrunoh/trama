@@ -12,6 +12,7 @@ import {
   mondayOf,
   reportDays,
   segments,
+  suggestionCards,
   summarize,
   trackedByTask,
   valueRows,
@@ -101,6 +102,11 @@ describe('timesheet grid', () => {
     expect(grid.total).toBe(3 * HOUR + 0.5 * HOUR + HOUR + HOUR + 20 * 60_000);
   });
 
+  it('leaves suggested entries out of the grid', () => {
+    const suggested = { ...entry('1', 'a', at(23, 9), at(23, 10)), source: 'suggested' } as TimeEntry;
+    expect(segments([suggested], NOW)).toEqual([]);
+  });
+
   it('splits an entry that crosses midnight and counts a running timer up to now', () => {
     const segs = segments([entry('1', 'a', at(23, 23), at(24, 1)), entry('2', 'a', at(25, 11), null)], NOW);
     const grid = buildGrid(segs, days, issues);
@@ -153,5 +159,29 @@ describe('estimates against hours', () => {
     expect(doneSamples(issues, tracked).map((s) => s.issue.id)).toEqual(['a']);
     expect(doneSamples(issues, tracked, { from: at(24, 0), to: at(26, 0) }).map((s) => s.issue.id)).toEqual(['a']);
     expect(doneSamples(issues, tracked, { from: at(1, 0), to: at(2, 0) })).toEqual([]);
+  });
+});
+
+describe('suggested time', () => {
+  const suggested = (id: string, issueId: string | null, from: number, to: number | null): TimeEntry =>
+    ({ ...entry(id, issueId, from, to), source: 'suggested' }) as TimeEntry;
+
+  it('words each suggestion as a card, newest first', () => {
+    const cards = suggestionCards([
+      suggested('old', 't1', at(23, 7, 30), at(23, 7, 55)),
+      suggested('new', 't2', at(24, 9), at(24, 10, 15)),
+    ]);
+    expect(cards.map((c) => c.id)).toEqual(['new', 'old']);
+    expect(cards[1]).toEqual({
+      id: 'old',
+      issueId: 't1',
+      amount: '25m',
+      when: 'Mon 07:30 – 07:55 · thread was active',
+    });
+    expect(cards[0].amount).toBe('1h 15m');
+  });
+
+  it('skips entries that are not suggestions or have no end', () => {
+    expect(suggestionCards([entry('1', 't1', at(23, 9), at(23, 10)), suggested('2', 't1', at(23, 9), null)])).toEqual([]);
   });
 });

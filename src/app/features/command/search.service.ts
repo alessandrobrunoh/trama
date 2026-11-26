@@ -3,7 +3,14 @@ import { ApiClient } from '../../core/api/api-client';
 import { TramaStore } from '../../core/stores/trama.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'project' | 'issue';
+/**
+ * `decision` and `record` hits come from `trama sync`: a decision an agent recorded and the record of a task's
+ * thread. Both belong to a task (`key`), which is where opening them goes.
+ */
+export type HitType = 'project' | 'issue' | 'decision' | 'record';
+
+/** The hits that are about a task's thread record rather than the task itself. */
+export const RECORD_HIT_TYPES: readonly HitType[] = ['decision', 'record'];
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -14,14 +21,18 @@ export interface SearchHit {
   subtitle?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['project', 'issue'];
+export const HIT_ORDER: HitType[] = ['project', 'issue', 'decision', 'record'];
 export const HIT_LABEL: Record<HitType, string> = {
   project: 'Projects',
   issue: 'Tasks',
+  decision: 'Decisions',
+  record: 'Thread records',
 };
 export const HIT_SINGULAR: Record<HitType, string> = {
   project: 'Project',
   issue: 'Task',
+  decision: 'Decision',
+  record: 'Thread record',
 };
 
 const TYPE_ALIASES: Record<string, HitType> = {
@@ -30,6 +41,8 @@ const TYPE_ALIASES: Record<string, HitType> = {
   issues: 'issue',
   issue: 'issue',
   tasks: 'issue',
+  decisions: 'decision',
+  records: 'record',
 };
 
 function asHit(raw: unknown, forcedType?: HitType): SearchHit | null {
@@ -118,6 +131,9 @@ export class SearchService {
   path(h: SearchHit): string[] {
     switch (h.type) {
       case 'issue':
+      case 'decision':
+      case 'record':
+        // A decision or a record opens the task it belongs to.
         return ['tasks', h.key ?? h.id];
       case 'project':
         return ['projects', h.id];
