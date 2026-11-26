@@ -14,7 +14,9 @@ use utoipa::openapi::OpenApi as Document;
     tags(
         (name = "auth", description = "Sign-up, sessions and API token introspection"),
         (name = "events", description = "Activity log and the live event stream"),
+        (name = "sharing", description = "Shared with me, Show in placements and project transfer"),
         (name = "system", description = "Health and operations"),
+        (name = "uploads", description = "Files stored in the workspace and attached to records"),
         (name = "workspaces", description = "Workspaces, members, roles, agents, tokens, labels and statuses"),
     ),
 )]
@@ -26,7 +28,9 @@ pub fn api_doc() -> Document {
     let mut doc = ApiDoc::openapi();
     doc.merge(trama_auth::ApiDoc::openapi());
     doc.merge(trama_events::ApiDoc::openapi());
+    doc.merge(trama_sharing::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
+    doc.merge(trama_uploads::ApiDoc::openapi());
     doc.merge(trama_workspaces::ApiDoc::openapi());
     doc
 }

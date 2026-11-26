@@ -54,7 +54,9 @@ trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-events = { path = "crates/events" }
 trama-migration = { path = "crates/migration" }
+trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
+trama-uploads = { path = "crates/uploads" }
 trama-workspaces = { path = "crates/workspaces" }
 
 [workspace.lints.rust]
@@ -103,7 +105,9 @@ trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true
 trama-migration.workspace = true
+trama-sharing.workspace = true
 trama-system.workspace = true
+trama-uploads.workspace = true
 trama-workspaces.workspace = true
 
 [dev-dependencies]
