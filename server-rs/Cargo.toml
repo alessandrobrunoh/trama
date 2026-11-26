@@ -15,9 +15,12 @@ publish = false
 aes-gcm = "0.10.3"
 # Password hashes: argon2id, the PHC strings the NestJS `argon2` package writes.
 argon2 = { version = "0.5.3", features = ["std"] }
+async-trait = "0.1"
 axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA time zone names (workspace `timeZone` setting), matched case-insensitively like `Intl`.
+chrono-tz = { version = "0.10", features = ["case-insensitive"] }
 dotenvy = "0.15"
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hex = "0.4"
@@ -48,7 +51,10 @@ url = "2"
 utoipa = { version = "6", features = ["chrono"] }
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 
+trama-ai = { path = "crates/ai" }
+trama-artifacts = { path = "crates/artifacts" }
 trama-auth = { path = "crates/auth" }
+trama-comments = { path = "crates/comments" }
 trama-common = { path = "crates/common" }
 trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
@@ -61,6 +67,7 @@ trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
 trama-uploads = { path = "crates/uploads" }
 trama-views = { path = "crates/views" }
+trama-workspaces = { path = "crates/workspaces" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -103,7 +110,10 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
 utoipa-scalar.workspace = true
+trama-ai.workspace = true
+trama-artifacts.workspace = true
 trama-auth.workspace = true
+trama-comments.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true
@@ -114,6 +124,7 @@ trama-sharing.workspace = true
 trama-system.workspace = true
 trama-uploads.workspace = true
 trama-views.workspace = true
+trama-workspaces.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true

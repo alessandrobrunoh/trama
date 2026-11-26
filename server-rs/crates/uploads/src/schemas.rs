@@ -38,8 +38,10 @@ pub struct UploadForm {
 }
 
 /// The wire form of an artifact row (`ArtifactEntity.toJSON`: nulls dropped, no `workspaceId`
-/// or `uploadId`).
-pub(crate) fn artifact_view(row: &artifacts::Model) -> Artifact {
+/// or `uploadId`). The artifacts routes and the upload route share it, so both answer with the
+/// same body.
+#[must_use]
+pub fn artifact_view(row: &artifacts::Model) -> Artifact {
     Artifact {
         id: row.id.clone(),
         issue_id: row.issue_id.clone(),
