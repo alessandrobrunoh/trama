@@ -12,6 +12,15 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
   return 'name' in a;
 }
 
+/** The four dark avatar tints of the v3 design, picked by the user's hue: blue, brown, green, violet. */
+function userTint(hue: number): string {
+  const h = ((hue % 360) + 360) % 360;
+  if (h < 45 || h >= 330) return '#4a2c26';
+  if (h < 170) return '#2e4430';
+  if (h < 270) return '#2b3a5c';
+  return '#3f3552';
+}
+
 /**
  * Avatar for a user or agent. The shapes differ on purpose:
  *   user  → round, initials on a hue-derived tint
@@ -36,7 +45,7 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
         <hlm-avatar class="after:hidden" [style.width.px]="size()" [style.height.px]="size()">
           <span
             hlmAvatarFallback
-            class="font-medium text-white"
+            class="font-normal text-[#dce3f7]"
             [style.background]="userBg()"
             [style.font-size.px]="fontSize()"
           >
@@ -82,9 +91,13 @@ export class ActorAvatar {
     return isResolved(x) ? x : this.store.resolveActor(x);
   });
   protected readonly ini = computed(() => initials(this.a().name));
-  protected readonly fontSize = computed(() => Math.max(8, Math.round(this.size() * 0.45)));
+  /** v3: 9.5px initials on the 22px avatar, 7.5px on the 16px one (timeline bars). */
+  protected readonly fontSize = computed(() => {
+    const size = this.size();
+    return size === 22 ? 9.5 : size === 16 ? 7.5 : Math.max(8, Math.round(size * 0.45));
+  });
   protected readonly glyph = computed(() => Math.round(this.size() * 0.62));
-  protected readonly userBg = computed(() => `hsl(${this.a().hue ?? 220} 32% 40%)`);
+  protected readonly userBg = computed(() => userTint(this.a().hue ?? 220));
 }
 
 /** Avatar + name (+ optional secondary text). */

@@ -32,6 +32,7 @@ import {
   LucidePlus,
   LucideSearch,
   LucideSlidersHorizontal,
+  LucideListTree,
   LucideTrash2,
   LucideX,
 } from '@lucide/angular';
@@ -121,6 +122,10 @@ const ROW_PX = 40;
 const ROW_COMPACT_PX = 32;
 const SUBTASK_ROW_PX = 38;
 
+/** The chips the filter bar offers up front ("Assignee any"): the v3 task list and board rows. */
+const LIST_FILTER_FIELDS: readonly string[] = ['assigneeId', 'projectId', 'thread', 'source'];
+const BOARD_FILTER_FIELDS: readonly string[] = ['thread'];
+
 const FILTER_LABEL: Record<string, string> = {
   status: 'Status',
   kind: 'Type',
@@ -185,7 +190,7 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
         <app-search-input noun="issues" [(value)]="search" />
       </div>
       <div
-        class="px-5 py-2.5 max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2 md:min-h-[42px]"
+        class="px-5 py-2 max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2 md:min-h-10"
         data-mobile-sticky
       >
         <app-filter-bar
@@ -194,6 +199,7 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           [filters]="filters()"
           (filtersChange)="filters.set($event)"
           [extended]="true"
+          [suggested]="d().layout === 'board' ? boardFilterFields : listFilterFields"
           [items]="filterPool()"
           [ctx]="queryCtx()"
           [locked]="showBase() ? baseFilters() : []"
@@ -220,28 +226,28 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
               @if (pageSwitch()) {
                 <a
                   [routerLink]="['/', store.slug(), 'tasks']"
-                  class="flex h-5 items-center px-2.5 outline-none focus-visible:underline"
+                  class="flex h-[22px] items-center px-2.5 outline-none focus-visible:underline"
                   [class]="d().layout !== 'board' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
                   [attr.aria-current]="d().layout !== 'board' ? 'page' : null"
                   >List</a
                 >
                 <a
                   [routerLink]="['/', store.slug(), 'board']"
-                  class="border-border -ms-px flex h-5 items-center border-l px-2.5 outline-none focus-visible:underline"
+                  class="border-border -ms-px flex h-[22px] items-center border-l px-2.5 outline-none focus-visible:underline"
                   [class]="d().layout === 'board' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
                   [attr.aria-current]="d().layout === 'board' ? 'page' : null"
                   >Board</a
                 >
                 <a
                   [routerLink]="['/', store.slug(), 'timeline']"
-                  class="border-border -ms-px flex h-5 items-center border-l px-2.5 outline-none focus-visible:underline text-muted-foreground hover:text-foreground"
+                  class="border-border -ms-px flex h-[22px] items-center border-l px-2.5 outline-none focus-visible:underline text-muted-foreground hover:text-foreground"
                   >Timeline</a
                 >
               } @else {
                 @for (l of layoutChoices(); track l.id; let first = $first) {
                   <button
                     type="button"
-                    class="flex h-5 items-center px-2.5 outline-none focus-visible:underline"
+                    class="flex h-[22px] items-center px-2.5 outline-none focus-visible:underline"
                     [class]="
                       (first ? '' : 'border-border -ms-px border-l ') +
                       (d().layout === l.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')
@@ -543,48 +549,59 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
     <!-- Right-click menu (acts on the selection when the clicked issue is part of it) -->
     <ng-template #issueMenu let-i>
       @let ids = targetsFor(i);
-      <hlm-dropdown-menu class="w-60">
-        <hlm-dropdown-menu-label class="truncate">{{
-          ids.length > 1 ? ids.length + ' tasks' : i.key + ' · ' + i.title
-        }}</hlm-dropdown-menu-label>
+      <!-- v3 · 14 Row menu: Open · Status · Assign to… · Priority | Add subtask · Copy link · provider | Delete -->
+      <hlm-dropdown-menu class="w-[260px]">
+        @if (ids.length > 1) {
+          <hlm-dropdown-menu-label class="truncate">{{ ids.length }} tasks</hlm-dropdown-menu-label>
+        }
         <hlm-dropdown-menu-group>
+          @if (ids.length === 1) {
+            <button hlmDropdownMenuItem (triggered)="actions.open(i)">
+              <svg [lucideIcon]="openIcon" [size]="14"></svg> Open
+              <hlm-dropdown-menu-shortcut>↵</hlm-dropdown-menu-shortcut>
+            </button>
+          }
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="statusSub">
             <app-status-icon entity="issue" [status]="i.status" /> Status
-            <hlm-dropdown-menu-item-sub-indicator />
+            <hlm-dropdown-menu-shortcut>S</hlm-dropdown-menu-shortcut>
+          </button>
+          <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="assigneeSub">
+            <svg [lucideIcon]="noUser" [size]="14"></svg> Assign to…
+            <hlm-dropdown-menu-shortcut>A</hlm-dropdown-menu-shortcut>
           </button>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="prioritySub">
             <app-priority-icon [priority]="i.priority" /> Priority
-            <hlm-dropdown-menu-item-sub-indicator />
-          </button>
-          <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="assigneeSub">
-            <svg [lucideIcon]="noUser" [size]="14"></svg> Assignee
-            <hlm-dropdown-menu-item-sub-indicator />
+            <hlm-dropdown-menu-shortcut>P</hlm-dropdown-menu-shortcut>
           </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
         <hlm-dropdown-menu-group>
           @if (ids.length === 1) {
-            <button hlmDropdownMenuItem (triggered)="actions.open(i)">
-              <svg [lucideIcon]="openIcon" [size]="14"></svg> Open
-              <hlm-dropdown-menu-shortcut><app-kbd keys="enter" /></hlm-dropdown-menu-shortcut>
+            <button hlmDropdownMenuItem (triggered)="ui.openCreate('issue', { parentId: i.id })">
+              <svg [lucideIcon]="subtaskIcon" [size]="14"></svg> Add subtask
+              <hlm-dropdown-menu-shortcut>⇧C</hlm-dropdown-menu-shortcut>
             </button>
+          }
+          <button hlmDropdownMenuItem (triggered)="actions.copyLinks(ids)">
+            <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy
+            {{ ids.length > 1 ? 'links' : 'link' }}
+            <hlm-dropdown-menu-shortcut>⇧⌘L</hlm-dropdown-menu-shortcut>
+          </button>
+          @if (ids.length === 1 && i.externalUrl) {
+            <a hlmDropdownMenuItem [href]="i.externalUrl" target="_blank" rel="noopener noreferrer">
+              <svg [lucideIcon]="openIcon" [size]="14"></svg>
+              Open issue in {{ i.source === 'gitlab' ? 'GitLab' : i.source === 'github' ? 'GitHub' : 'tracker' }} ↗
+            </a>
           }
           <button hlmDropdownMenuItem (triggered)="actions.copyKeys(ids)">
             <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy
             {{ ids.length > 1 ? 'keys' : 'key' }}
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+k" /></hlm-dropdown-menu-shortcut>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="actions.copyLinks(ids)">
-            <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy
-            {{ ids.length > 1 ? 'links' : 'link' }}
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+l" /></hlm-dropdown-menu-shortcut>
+            <hlm-dropdown-menu-shortcut>⇧⌘K</hlm-dropdown-menu-shortcut>
           </button>
           @if (ids.length === 1) {
             <button hlmDropdownMenuItem (triggered)="actions.copyBranch(i.id)">
               <svg [lucideIcon]="branchIcon" [size]="14"></svg> Copy git branch name
-              <hlm-dropdown-menu-shortcut
-                ><app-kbd keys="mod+shift+g"
-              /></hlm-dropdown-menu-shortcut>
+              <hlm-dropdown-menu-shortcut>⇧⌘G</hlm-dropdown-menu-shortcut>
             </button>
             <button hlmDropdownMenuItem (triggered)="favorites.toggle('issue', i.id)">
               <svg
@@ -608,10 +625,8 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           <button hlmDropdownMenuItem variant="destructive" (triggered)="actions.remove(ids)">
             <svg [lucideIcon]="trash" [size]="14"></svg> Delete{{
               ids.length > 1 ? ' ' + ids.length + ' tasks' : ''
-            }}…
-            <hlm-dropdown-menu-shortcut
-              ><app-kbd keys="mod+backspace"
-            /></hlm-dropdown-menu-shortcut>
+            }}
+            <hlm-dropdown-menu-shortcut>⌫</hlm-dropdown-menu-shortcut>
           </button>
         }
       </hlm-dropdown-menu>
@@ -694,7 +709,7 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
     <!-- Bulk action bar -->
     @if (selection().length) {
       <div
-        class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4 max-md:fixed max-md:bottom-[calc(3.0625rem+env(safe-area-inset-bottom)+0.5rem)]"
+        class="pointer-events-none absolute inset-x-0 bottom-11 z-20 flex justify-center px-4 max-md:fixed max-md:bottom-[calc(3.0625rem+env(safe-area-inset-bottom)+0.5rem)]"
       >
         <!-- v3 selection bar: "2 selected" | Status S · Assign A · Move to project M · Delete ⌫ -->
         <div
@@ -902,6 +917,8 @@ export class IssueBoard {
     return { now: new Date(), subtaskParents: parents };
   });
   protected readonly props = PROPS;
+  protected readonly listFilterFields = LIST_FILTER_FIELDS;
+  protected readonly boardFilterFields = BOARD_FILTER_FIELDS;
   protected readonly expandAllIcon = LucideChevronsUpDown;
   protected readonly listLayouts: readonly { id: IssueLayout; label: string; hint: string }[] = [
     { id: 'list', label: 'List', hint: 'Rows grouped by status' },
@@ -941,6 +958,7 @@ export class IssueBoard {
   protected readonly starIcon = LucideStar;
   protected readonly linkIcon = LucideLink;
   protected readonly openIcon = LucideExternalLink;
+  protected readonly subtaskIcon = LucideListTree;
   protected readonly trash = LucideTrash2;
   protected readonly checkIcon = LucideCheck;
 

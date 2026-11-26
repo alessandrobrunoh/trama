@@ -54,10 +54,10 @@ function requestLine(a: Artifact): string {
     @let e = entry();
     @let i = issue();
     <header class="flex flex-col gap-2">
-      <p class="text-delta font-mono text-[10.5px] leading-[13px] uppercase">
+      <p class="text-delta font-mono text-[10.5px] leading-[14px] uppercase">
         {{ e.kicker }} · {{ e.at | ago }} ago
       </p>
-      <h2 class="font-title text-foreground text-[30px] leading-[36px] tracking-[-0.3px]">
+      <h2 class="font-title text-foreground text-[30px] leading-[30px] tracking-[-0.3px]">
         {{ i?.title ?? e.sentence }}
       </h2>
       @if (i) {
@@ -66,7 +66,7 @@ function requestLine(a: Artifact): string {
           <v3-status [status]="i.status" />
           <v3-source [issue]="i" />
           @if (i.assigneeId) {
-            <app-actor-avatar [actor]="{ type: 'user', id: i.assigneeId }" [size]="20" />
+            <app-actor-avatar [actor]="{ type: 'user', id: i.assigneeId }" [size]="22" />
           }
         </div>
       }
