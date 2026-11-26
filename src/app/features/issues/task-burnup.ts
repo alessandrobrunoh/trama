@@ -1,13 +1,15 @@
-// The Progress view of a task (v3 "34 Task detail · Progress"): a small burn-up of its subtasks. Scope in grey,
+// The Progress view of a task (v3 "34 Task detail · Progress"): a small burn-up of its subtasks, shown at the
+// top of the Subtasks list once some subtask has been started (`hasBurnup`). Scope in grey,
 // Started and Done in amber, a dashed projection from today to the due date, and the Today / Due markers. The
 // series come from the subtasks' own dates (`buildBurnup`, shared with the project and milestone chart); the
 // plot is plain SVG, 60px tall, as wide as the section.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { format } from 'date-fns';
-import { TramaStore, type Issue } from '../../core';
+import { type EstimateScale, TramaStore, type Issue } from '../../core';
 import { trackWidth } from '../stats/charts/chart-utils';
 import {
   buildBurnup,
+  type BurnModel,
   dateOfDay,
   dayOf,
   fmtNum,
@@ -28,6 +30,27 @@ const HEALTH: Record<BurnHealth, { label: string; tone: 'yellow' | 'green' | 're
   late: { label: 'Past due', tone: 'red' },
   idle: { label: 'Not started', tone: 'faint' },
 };
+
+/** The burn-up of the subtasks of `issue` (`tasks`: every task below it, at any depth). */
+export function taskBurnModel(
+  issue: Issue,
+  tasks: readonly Issue[],
+  scale: EstimateScale,
+): BurnModel {
+  return buildBurnup({
+    issues: tasks,
+    points: usesPoints(tasks, scale),
+    startDay: dayOf(issue.startedAt ?? issue.createdAt),
+    targetDay: issue.dueDate ? dayOf(issue.dueDate) : null,
+    today: todayDay(),
+    linkedDay: new Map<string, number>(),
+  });
+}
+
+/** Enough to chart: there is scope and at least one subtask has been started or finished. */
+export function hasBurnup(model: BurnModel): boolean {
+  return model.totals.scope > 0 && model.totals.started > 0;
+}
 
 @Component({
   selector: 'app-task-burnup',
@@ -105,18 +128,9 @@ export class TaskBurnup {
   /** Every task below it, at any depth. */
   readonly tasks = input.required<readonly Issue[]>();
 
-  protected readonly model = computed(() => {
-    const i = this.issue();
-    const tasks = this.tasks();
-    return buildBurnup({
-      issues: tasks,
-      points: usesPoints(tasks, this.store.estimateScale()),
-      startDay: dayOf(i.startedAt ?? i.createdAt),
-      targetDay: i.dueDate ? dayOf(i.dueDate) : null,
-      today: todayDay(),
-      linkedDay: new Map<string, number>(),
-    });
-  });
+  protected readonly model = computed(() =>
+    taskBurnModel(this.issue(), this.tasks(), this.store.estimateScale()),
+  );
 
   private readonly yMax = computed(() => Math.max(this.model().yMax, 1));
 

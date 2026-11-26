@@ -11,7 +11,6 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideDynamicIcon, LucidePencil } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { TramaStore } from '../../core';
@@ -113,7 +112,7 @@ export class IssueTitle {
 @Component({
   selector: 'app-issue-description',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon, UploadFile],
+  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, UploadFile],
   host: { class: 'block' },
   template: `
     @if (editing()) {
@@ -183,7 +182,7 @@ export class IssueTitle {
       </div>
     } @else {
       <div
-        class="group/md relative -mx-1 px-1"
+        class="-mx-1 px-1"
         [class]="canEdit() ? 'hover:bg-hover cursor-text' : ''"
         [attr.role]="canEdit() ? 'button' : null"
         [attr.tabindex]="canEdit() ? 0 : null"
@@ -205,13 +204,6 @@ export class IssueTitle {
             }}
           </p>
         }
-        @if (canEdit()) {
-          <svg
-            [lucideIcon]="pencil"
-            [size]="13"
-            class="text-muted-foreground absolute top-1 right-1 opacity-0 group-hover/md:opacity-100"
-          ></svg>
-        }
       </div>
     }
   `,
@@ -225,7 +217,6 @@ export class IssueDescription {
   protected readonly tab = signal<'write' | 'preview'>('write');
   protected readonly draft = signal('');
   protected readonly uploading = signal(false);
-  protected readonly pencil = LucidePencil;
   private readonly ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
 
   constructor() {

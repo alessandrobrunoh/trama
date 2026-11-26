@@ -2,20 +2,18 @@
 // panel for the thread linked to the task, or the empty state when there is none. Trama holds the link, the pull
 // requests and the task's own events, so the panel shows those: head (thread id, who linked it, open / copy),
 // the latest agent report, key events and the pull requests. Decisions and changed files stay in Delta.
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { format } from 'date-fns';
 import {
   LucideDynamicIcon,
   LucideFileText,
   LucideGitMerge,
   LucideGitPullRequest,
-  LucidePlus,
 } from '@lucide/angular';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { Clipboard, TramaStore, type Artifact, type Issue } from '../../core';
 import { AgoPipe } from '../../shared/ago';
 import { Kbd } from '../../shared/kbd';
-import { IssueThreadLink } from './issue-thread-link';
 import { buildStream } from './issue-stream-model';
 import {
   artifactLine,
@@ -32,7 +30,7 @@ const REPORT_MAX = 420;
 @Component({
   selector: 'app-task-record',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, Kbd, LucideDynamicIcon, AgoPipe, IssueThreadLink, TaskSectionHead],
+  imports: [HlmButton, Kbd, LucideDynamicIcon, AgoPipe, TaskSectionHead],
   host: { class: 'flex w-full min-w-0 flex-col gap-3' },
   template: `
     @let i = issue();
@@ -72,9 +70,7 @@ const REPORT_MAX = 420;
         @if (report(); as r) {
           <div class="border-border flex flex-col gap-2 border-b px-[18px] py-3.5">
             <div class="flex items-baseline gap-2">
-              <span class="text-faint font-mono text-[10px] leading-[13px]">LATEST REPORT</span>
-              <span class="flex-1"></span>
-              <span class="text-faint font-mono text-[10.5px] leading-[14px]">{{ r.by }} · {{ r.at | ago }} ago</span>
+              <span class="text-faint font-mono text-[10px] leading-[13px]">SUMMARY</span>
             </div>
             <p class="text-text-2 text-[13.5px] leading-[21px] break-words">{{ r.text }}</p>
           </div>
@@ -141,12 +137,6 @@ const REPORT_MAX = 420;
           <button hlmBtn variant="outline" type="button" (click)="copyCommand()">
             Copy /trama {{ i.key }} <app-kbd keys="shift+c" />
           </button>
-          @if (canCreate()) {
-            <button hlmBtn variant="ghost" type="button" (click)="newSubtask.emit()">
-              <svg [lucideIcon]="plusIcon" [size]="13" aria-hidden="true"></svg> New subtask
-            </button>
-          }
-          <app-issue-thread-link variant="action" [issue]="i" [canEdit]="canEdit()" />
         </div>
       </article>
     }
@@ -157,14 +147,9 @@ export class TaskRecord {
   private readonly clipboard = inject(Clipboard);
 
   readonly issue = input.required<Issue>();
-  readonly canEdit = input(false);
-  /** The page opens the "add subtask" input. */
-  readonly newSubtask = output<void>();
 
-  protected readonly plusIcon = LucidePlus;
   protected readonly prIcon = LucideGitPullRequest;
 
-  protected readonly canCreate = computed(() => this.store.allowed('createIssues'));
   protected readonly id = computed(() => threadId(this.issue().threadUrl));
   protected readonly host = computed(() => {
     try {
@@ -199,11 +184,7 @@ export class TaskRecord {
       .at(-1);
     if (!last) return null;
     const text = last.body.replace(/[#*_`>]+/g, '').replace(/\s+/g, ' ').trim();
-    return {
-      text: text.length > REPORT_MAX ? `${text.slice(0, REPORT_MAX).trimEnd()}…` : text,
-      by: this.store.actorName(last.author),
-      at: last.createdAt,
-    };
+    return { text: text.length > REPORT_MAX ? `${text.slice(0, REPORT_MAX).trimEnd()}…` : text };
   });
 
   protected readonly events = computed(() => {
