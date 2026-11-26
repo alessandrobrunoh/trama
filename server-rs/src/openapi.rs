@@ -25,7 +25,8 @@ use utoipa::openapi::OpenApi as Document;
         (name = "issues", description = "Tasks: the unit of work, its keys, sub-issues and briefing"),
         (name = "milestones", description = "Project milestones"),
         (name = "notifications", description = "The inbox, notification settings and Web Push"),
-        (name = "search", description = "Search across projects, issues and artifacts"),
+        (name = "outgoing-webhooks", description = "Signed webhooks to your own URLs for domain events"),
+        (name = "search",description = "Search across projects, issues and artifacts"),
         (name = "sharing", description = "Shared with me, Show in placements and project transfer"),
         (name = "system", description = "Health and operations"),
         (name = "uploads", description = "Files stored in the workspace and attached to records"),
@@ -52,6 +53,7 @@ pub fn api_doc() -> Document {
     doc.merge(trama_issues::ApiDoc::openapi());
     doc.merge(trama_milestones::ApiDoc::openapi());
     doc.merge(trama_notifications::ApiDoc::openapi());
+    doc.merge(trama_outgoing_webhooks::ApiDoc::openapi());
     doc.merge(trama_search::ApiDoc::openapi());
     doc.merge(trama_sharing::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());

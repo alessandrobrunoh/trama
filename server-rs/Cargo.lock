@@ -3372,6 +3372,7 @@ dependencies = [
  "trama-migration",
  "trama-milestones",
  "trama-notifications",
+ "trama-outgoing-webhooks",
  "trama-search",
  "trama-sharing",
  "trama-system",
@@ -3766,6 +3767,35 @@ dependencies = [
  "trama-core",
  "trama-entities",
  "trama-events",
+ "trama-migration",
+ "url",
+ "utoipa",
+]
+
+[[package]]
+name = "trama-outgoing-webhooks"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "hex",
+ "http-body-util",
+ "ring",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "trama-auth",
+ "trama-common",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-events",
+ "trama-integrations",
  "trama-migration",
  "url",
  "utoipa",
