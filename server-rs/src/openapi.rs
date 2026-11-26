@@ -13,6 +13,7 @@ use utoipa::openapi::OpenApi as Document;
     ),
     tags(
         (name = "auth", description = "Sign-up, sessions and API token introspection"),
+        (name = "comments", description = "Comments on issues, projects, milestones and artifacts"),
         (name = "events", description = "Activity log and the live event stream"),
         (name = "external-identities", description = "A person's logins in other tools"),
         (name = "favorites", description = "What a person pins in a workspace"),
@@ -30,6 +31,7 @@ pub(crate) struct ApiDoc;
 pub fn api_doc() -> Document {
     let mut doc = ApiDoc::openapi();
     doc.merge(trama_auth::ApiDoc::openapi());
+    doc.merge(trama_comments::ApiDoc::openapi());
     doc.merge(trama_events::ApiDoc::openapi());
     doc.merge(trama_external_identities::ApiDoc::openapi());
     doc.merge(trama_favorites::ApiDoc::openapi());

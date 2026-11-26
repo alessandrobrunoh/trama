@@ -21,6 +21,7 @@ pub use openapi::api_doc;
 fn routes() -> Routes {
     Routes::new()
         .merge(trama_auth::router())
+        .merge(trama_comments::router())
         .merge(trama_events::router())
         .merge(trama_external_identities::router())
         .merge(trama_favorites::router())
