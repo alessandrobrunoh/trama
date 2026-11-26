@@ -21,6 +21,7 @@ pub use openapi::api_doc;
 fn routes() -> Routes {
     Routes::new()
         .merge(trama_ai::router())
+        .merge(trama_artifacts::router())
         .merge(trama_attention::router())
         .merge(trama_auth::router())
         .merge(trama_comments::router())
@@ -32,6 +33,7 @@ fn routes() -> Routes {
         .merge(trama_system::router())
         .merge(trama_uploads::router())
         .merge(trama_views::router())
+        .merge(trama_workspaces::router())
 }
 
 /// The whole application over `state`.

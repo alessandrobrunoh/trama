@@ -13,6 +13,7 @@ use utoipa::openapi::OpenApi as Document;
     ),
     tags(
         (name = "ai", description = "Suggestions, the assistant, SuperGrok and project proposals"),
+        (name = "artifacts", description = "What a task produced or points to: pull requests, builds, links, files"),
         (name = "attention", description = "What needs the current user: review requests and failing CI"),
         (name = "auth", description = "Sign-up, sessions and API token introspection"),
         (name = "comments", description = "Comments on issues, projects, milestones and artifacts"),
@@ -24,6 +25,7 @@ use utoipa::openapi::OpenApi as Document;
         (name = "system", description = "Health and operations"),
         (name = "uploads", description = "Files stored in the workspace and attached to records"),
         (name = "views", description = "Saved views, sharing and the public link"),
+        (name = "workspaces", description = "Workspaces, members, roles, agents, tokens, labels and statuses"),
     ),
 )]
 pub(crate) struct ApiDoc;
@@ -33,6 +35,7 @@ pub(crate) struct ApiDoc;
 pub fn api_doc() -> Document {
     let mut doc = ApiDoc::openapi();
     doc.merge(trama_ai::ApiDoc::openapi());
+    doc.merge(trama_artifacts::ApiDoc::openapi());
     doc.merge(trama_attention::ApiDoc::openapi());
     doc.merge(trama_auth::ApiDoc::openapi());
     doc.merge(trama_comments::ApiDoc::openapi());
@@ -44,5 +47,6 @@ pub fn api_doc() -> Document {
     doc.merge(trama_system::ApiDoc::openapi());
     doc.merge(trama_uploads::ApiDoc::openapi());
     doc.merge(trama_views::ApiDoc::openapi());
+    doc.merge(trama_workspaces::ApiDoc::openapi());
     doc
 }
