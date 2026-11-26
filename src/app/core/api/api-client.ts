@@ -42,6 +42,9 @@ import type {
   ProjectAiKind,
   ProjectAiResult,
   ProjectPlacement,
+  ProjectUpdate,
+  CreateProjectUpdateInput,
+  UpdateProjectUpdateInput,
   ProjectTransferPreview,
   ProjectTransferResult,
   GitProvider,
@@ -426,6 +429,21 @@ export class ApiClient {
     /** Owner or admin of both workspaces. The project leaves `slug` for `target`. */
     transfer: (slug: string, id: ID, target: string) =>
       this.post<ProjectTransferResult>(`${this.w(slug)}/projects/${id}/transfer`, { target }),
+  };
+
+  /** Written status updates of a project (Project · Updates), newest first. Posting needs `manageProjects`. */
+  readonly projectUpdates = {
+    list: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.get<ProjectUpdate[]>(`${this.w(slug)}/projects/${projectId}/updates`, undefined, o),
+    /** A health in the input also sets the project's health. */
+    create: (slug: string, projectId: ID, input: CreateProjectUpdateInput, o?: RequestOptions) =>
+      this.post<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates`, input, o),
+    /** Author only. */
+    update: (slug: string, projectId: ID, updateId: ID, input: UpdateProjectUpdateInput, o?: RequestOptions) =>
+      this.patch<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${updateId}`, input, o),
+    /** Author, or anyone who can manage projects. */
+    remove: (slug: string, projectId: ID, updateId: ID, o?: RequestOptions) =>
+      this.del(`${this.w(slug)}/projects/${projectId}/updates/${updateId}`, o),
   };
 
   /** Projects shared with the signed-in person (they are a guest there), and where they show them. */

@@ -56,13 +56,16 @@ import { ProjectTransferDialog } from './project-transfer-dialog';
 import { ProjectRoadmap } from './project-roadmap';
 import { ProjectShareDialog } from './project-share-dialog';
 import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
+import { ProjectUpdatesStore } from './project-updates.store';
+import { ProjectUpdatesTab } from './project-updates-tab';
 import { ProjectSourcesStore } from './sources/project-sources.store';
 import { ProjectSourcesTab } from './sources/project-sources-tab';
 
-const TABS = ['overview', 'progress', 'tasks', 'sources'] as const;
+const TABS = ['overview', 'updates', 'progress', 'tasks', 'sources'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
+  updates: 'Updates',
   progress: 'Progress',
   tasks: 'Tasks',
   sources: 'Sources',
@@ -107,6 +110,7 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectShareDialog,
     ProjectTasksTab,
     ProjectSourcesTab,
+    ProjectUpdatesTab,
     ProjectProperties,
     ProjectTransferDialog,
   ],
@@ -242,7 +246,11 @@ const TONE_COLOR: Record<BurnTone, string> = {
               (click)="setTab(t)"
             >
               {{ tabLabel[t] }}
-              @if (counts()[t]) {
+              @if (t === 'updates') {
+                @if (updatesStore.newCount()) {
+                  <span class="text-faint font-mono text-[10.5px] leading-4 tabular-nums">{{ updatesStore.newCount() }} new</span>
+                }
+              } @else if (counts()[t]) {
                 <span class="text-faint font-mono text-[10.5px] leading-4 tabular-nums">{{ counts()[t] }}</span>
               }
             </button>
@@ -256,6 +264,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
         }
         @case ('sources') {
           <app-project-sources-tab [projectId]="p.id" />
+        }
+        @case ('updates') {
+          <app-project-updates-tab [project]="p" />
         }
         @default {
           <div class="flex min-w-0 flex-1 max-lg:flex-col">
@@ -353,6 +364,7 @@ export class ProjectDetailPage {
   private readonly clipboard = inject(Clipboard);
   private readonly listState = inject(ListStateStore);
   private readonly sources = inject(ProjectSourcesStore);
+  protected readonly updatesStore = inject(ProjectUpdatesStore);
 
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
@@ -456,6 +468,13 @@ export class ProjectDetailPage {
     untracked(() => void this.sources.load(id));
   });
 
+  /** The Updates tab counts what is new since it was last open; the list loads with the page. */
+  private readonly _updates = effect(() => {
+    const id = this.project()?.id;
+    if (!id) return;
+    untracked(() => void this.updatesStore.load(id));
+  });
+
   /** A link into the Tasks tab brings its filters in the params: apply them once, then drop them. */
   private readonly _prefilter = effect(() => {
     const p = this.project();
@@ -500,7 +519,7 @@ export class ProjectDetailPage {
   /** The properties live in the rail: bring them into view and focus the first one. */
   protected openSettings(): void {
     const c = this.current();
-    if (c === 'tasks' || c === 'sources') this.setTab('overview');
+    if (c === 'tasks' || c === 'sources' || c === 'updates') this.setTab('overview');
     setTimeout(() => {
       const el = document.getElementById('project-properties');
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
