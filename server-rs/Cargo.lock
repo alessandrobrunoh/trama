@@ -3225,6 +3225,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "trama-ai"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "http-body-util",
+ "regex",
+ "reqwest",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tracing",
+ "trama-auth",
+ "trama-common",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-migration",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "trama-api"
 version = "0.1.0"
 dependencies = [
@@ -3238,8 +3266,10 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-subscriber",
+ "trama-ai",
  "trama-artifacts",
  "trama-auth",
+ "trama-comments",
  "trama-common",
  "trama-core",
  "trama-events",
@@ -3301,6 +3331,33 @@ dependencies = [
  "trama-core",
  "trama-entities",
  "trama-migration",
+ "utoipa",
+]
+
+[[package]]
+name = "trama-comments"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "http-body-util",
+ "regex",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "trama-auth",
+ "trama-common",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-events",
+ "trama-migration",
+ "trama-uploads",
+ "url",
  "utoipa",
 ]
 
