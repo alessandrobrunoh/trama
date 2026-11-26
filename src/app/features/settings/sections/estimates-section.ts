@@ -95,10 +95,6 @@ import { SECTION_KIT } from './section-kit';
             </div>
           </div>
           <span class="text-faint font-mono text-[10.5px] leading-[normal]">Shortcut&nbsp;&nbsp;E&nbsp;&nbsp;on any task</span>
-        } @else {
-          <p class="text-muted-foreground text-[12.5px] leading-[19px]">
-            With this scale a task has no estimate field. Values already set are kept and come back if you pick a scale again.
-          </p>
         }
       </div>
     </div>

@@ -102,7 +102,6 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
               <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 ACTS AS
                 <app-select [options]="owners()" [value]="owner()" (valueChange)="owner.set($event)" label="Acts as" [disabled]="!canConnect()" />
-                <span class="text-muted-foreground font-sans text-[12px] normal-case">The agent can never do more than this person can.</span>
               </div>
               <div class="flex justify-end">
                 <button hlmBtn type="submit" [disabled]="!name().trim() || !canConnect()">Continue</button>
@@ -127,7 +126,6 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
               <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 SCOPE
                 <app-select [options]="scopes" [(value)]="scope" label="Scope" />
-                <span class="text-muted-foreground font-sans text-[12px] leading-snug normal-case">{{ scopeInfo().description }}</span>
               </div>
               <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 EXPIRATION
@@ -228,7 +226,6 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
           <ul class="flex flex-col gap-2.5 text-[12.5px] leading-[normal]">
             <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> Acts as {{ ownerName() }}: {{ ownerRole() }}</li>
             <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> {{ scopeLabel() }} scope · {{ expiryText() }}</li>
-            <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> Every action carries its name and an agent badge</li>
             <li class="text-muted-foreground flex items-center gap-2"><svg [lucideIcon]="xIcon" [size]="13" class="shrink-0"></svg> Can't invite, delete or change roles</li>
           </ul>
         </div>

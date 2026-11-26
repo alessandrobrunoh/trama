@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { LucideArrowLeft, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTriangleAlert } from '@lucide/angular';
+import { LucideArrowLeft, LucideBan, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { TOKEN_SCOPES, type Agent, type ApiToken, type TokenScope } from '../../../core/contracts/domain';
 import { PROVIDER_META } from '../../../core/meta';
@@ -105,10 +105,7 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
                 {{ a.name }} can do anything {{ firstName(a.ownerUserId) }} can, except transfer or delete the workspace.
               </p>
             } @else {
-              <p class="text-muted-foreground text-[12px] leading-[18px]">No owner. Edit the agent to pick the person it acts as.</p>
-            }
-            @if (a.description) {
-              <p class="text-text-2 border-border border-t pt-2.5 text-[12px] leading-[18px]">{{ a.description }}</p>
+              <p class="text-muted-foreground text-[12px] leading-[18px]">No owner.</p>
             }
           </div>
 
@@ -139,7 +136,6 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
                 <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
                   SCOPE
                   <app-select [options]="scopes" [(value)]="scope" label="Scope" />
-                  <span class="text-muted-foreground font-sans text-[12px] leading-snug normal-case">{{ scopeInfo().description }}</span>
                 </div>
                 <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
                   EXPIRATION
@@ -160,22 +156,19 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
                   </span>
                 </div>
                 <span class="bg-secondary border-border text-text-2 shrink-0 border px-[7px] py-0.5 font-mono text-[11px] leading-[normal]">{{ scopeLabel(t) }}</span>
-                @if (canManage()) {
-                  <button type="button" class="text-muted-foreground hover:text-red shrink-0 font-mono text-[10.5px]" [attr.aria-label]="'Revoke ' + t.name" (click)="revoke(t)">Revoke</button>
-                }
               </div>
             } @empty {
               @if (!creating() && !secret()) {
-                <div class="text-muted-foreground border-border border-t px-3.5 py-4 text-[12.5px] leading-snug">
-                  No token yet, so this agent cannot call Trama.{{ canTokens() ? ' Create one to connect it.' : '' }}
-                </div>
+                <div class="text-muted-foreground border-border border-t px-3.5 py-4 text-[12.5px] leading-snug">No tokens yet.</div>
               }
             }
           </div>
 
-          @if (canManage()) {
+          @if (canManage() && tokens().length) {
             <div>
-              <button hlmBtn variant="destructive" (click)="remove(a)">Remove agent</button>
+              <button hlmBtn variant="destructive" (click)="revokeAll()">
+                <svg [lucideIcon]="banIcon" [size]="13"></svg> Revoke all tokens
+              </button>
             </div>
           }
         </aside>
@@ -201,6 +194,7 @@ export class AgentDetail {
   protected readonly settingsIcon = LucideSettings2;
   protected readonly plus = LucidePlus;
   protected readonly warn = LucideTriangleAlert;
+  protected readonly banIcon = LucideBan;
   protected readonly scopes = AGENT_SCOPES;
   protected readonly expiry = EXPIRY;
 
@@ -218,7 +212,6 @@ export class AgentDetail {
   protected readonly secret = signal<string | null>(null);
   /** The most recent secret, kept for the Connect examples until the panel is left. */
   protected readonly lastSecret = signal<string | null>(null);
-  protected readonly scopeInfo = computed(() => TOKEN_SCOPES[this.scope() as TokenScope] ?? TOKEN_SCOPES.write);
 
   protected readonly tokens = computed(() =>
     this.store
@@ -231,12 +224,7 @@ export class AgentDetail {
   protected readonly activity = computed(() => this.mine().slice(0, 12));
 
   protected readonly stats = computed<StatCell[]>(() => {
-    const last = this.mine()[0]?.at;
-    return [
-      { label: 'Actions', value: String(this.mine().length) },
-      { label: 'Last active', value: last ? this.ago(last) : 'Never' },
-      { label: 'Tokens', value: String(this.tokens().length) },
-    ];
+    return [{ label: 'Actions', value: String(this.mine().length) }];
   });
 
   constructor() {
@@ -267,13 +255,6 @@ export class AgentDetail {
   protected scopeLabel(t: ApiToken): string {
     return TOKEN_SCOPES[t.scope ?? 'write'].label;
   }
-  private ago(iso: string): string {
-    const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
-    return `${Math.round(mins / 1440)}d ago`;
-  }
 
   protected startCreate(a: Agent): void {
     this.name.set(a.name);
@@ -302,24 +283,14 @@ export class AgentDetail {
     }
   }
 
-  protected revoke(t: ApiToken): void {
+  protected revokeAll(): void {
+    const all = this.tokens();
     this.ui.setConfirmDelete({
-      title: `Revoke ${t.name}?`,
-      description: 'The agent loses access with this token immediately.',
-      confirmLabel: 'Revoke',
+      title: 'Revoke all tokens?',
+      description: 'The agent loses access with these tokens immediately.',
+      confirmLabel: 'Revoke all',
       onConfirm: async () => {
-        await this.store.deleteToken(t.id);
-      },
-    });
-  }
-
-  protected remove(a: Agent): void {
-    this.ui.setConfirmDelete({
-      title: `Remove ${a.name}?`,
-      description: 'Its tokens are revoked at once. The activity it recorded stays in the history.',
-      confirmLabel: 'Remove',
-      onConfirm: async () => {
-        if (await this.store.deleteAgent(a.id)) this.back.emit();
+        for (const t of all) await this.store.deleteToken(t.id);
       },
     });
   }

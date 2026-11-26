@@ -19,7 +19,6 @@ import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
 import { PersonalConnectionsStore } from '../../../core/stores/personal-connections.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import { RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { ConnectionAddForm, ConnectionTokenForm, accountLine, needsAttention, statusDot, statusLabel } from './connection-kit';
 import { ExternalIdentitiesSection } from './external-identities-section';
@@ -40,7 +39,6 @@ import { SECTION_KIT } from './section-kit';
     HlmInputImports,
     LucideDynamicIcon,
     ProviderIcon,
-    RelativeTimePipe,
     ConnectionAddForm,
     ConnectionTokenForm,
     ExternalIdentitiesSection,
@@ -66,15 +64,14 @@ import { SECTION_KIT } from './section-kit';
     <app-settings-block title="Connections" [caption]="store.connections().length ? '' + store.connections().length : ''">
       @if (store.connections().length) {
         <div class="bg-card border-border border">
-          <div class="bg-bg-deep text-faint grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] sm:grid-cols-[minmax(0,1fr)_230px_120px_14px]">
+          <div class="bg-bg-deep text-faint grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal]">
             <span>ACCOUNT</span>
-            <span class="hidden sm:block">ADDED</span>
             <span>STATE</span>
             <span></span>
           </div>
           @for (c of store.connections(); track c.id) {
             <div
-              class="border-border grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 border-t px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_230px_120px_14px]"
+              class="border-border grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 border-t px-4 py-2.5"
               [class]="needsAttention(c) ? 'bg-red/5' : ''"
             >
               <div class="flex min-w-0 items-center gap-2">
@@ -102,7 +99,6 @@ import { SECTION_KIT } from './section-kit';
                   <span class="text-faint truncate font-mono text-[10.5px] leading-[normal]">{{ line(c) }}</span>
                 </div>
               </div>
-              <span class="text-text-2 hidden font-mono text-[10.5px] leading-[normal] sm:block">{{ c.createdAt | relativeTime }}</span>
               <span>
                 <span class="border-border text-text-2 inline-flex items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
                   <span class="size-1.5" [class]="dot(c.status)" aria-hidden="true"></span>{{ statusText(c.status) }}
@@ -143,7 +139,7 @@ import { SECTION_KIT } from './section-kit';
         </div>
       } @else if (store.loaded()) {
         <p class="bg-card border-border text-muted-foreground border px-4 py-3.5 text-[12.5px] leading-[19px]">
-          No personal accounts yet. Add one to use it in rules on the projects you can write to, next to the workspace's own connections.
+          No personal accounts yet.
         </p>
       }
     </app-settings-block>

@@ -2,20 +2,17 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, u
 import {
   LucideBan,
   LucideDynamicIcon,
-  LucideEllipsis,
   LucideKeyRound,
   LucidePencil,
   LucidePlus,
   LucideRefreshCw,
-  LucideRotateCw,
   LucideTrash2,
   LucideTriangleAlert,
-  LucideWebhook,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import type { CreateIntegrationInput, IntegrationDetail, WebhookSetup } from '../../../core/api/api.types';
+import type { CreateIntegrationInput, IntegrationDetail } from '../../../core/api/api.types';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
@@ -31,17 +28,14 @@ import {
   statusLabel,
   type ConnProvider,
 } from './connection-kit';
-import { OutgoingWebhooks } from './outgoing-webhooks';
 import { SECTION_KIT } from './section-kit';
-import { WebhookSetupDialog } from './webhook-setup-dialog';
 
 type Row = IntegrationDetail & { detailed: boolean };
 
 /** What the right-hand pane shows. */
 type Selection =
   | { kind: 'conn'; id: string }
-  | { kind: 'connect'; preset: string | null }
-  | { kind: 'webhooks' };
+  | { kind: 'connect'; preset: string | null };
 
 const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
   { provider: 'github', title: 'GITHUB' },
@@ -68,8 +62,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
     RelativeTimePipe,
     ConnectionAddForm,
     ConnectionTokenForm,
-    OutgoingWebhooks,
-    WebhookSetupDialog,
     ...SECTION_KIT,
   ],
   host: { class: 'block h-full min-h-0 overflow-y-auto' },
@@ -145,26 +137,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
               }
             </div>
           }
-          <div class="flex flex-col gap-0.5">
-            <div class="flex items-center px-3">
-              <span class="text-faint font-mono text-[10.5px] leading-[normal]">OTHER</span>
-            </div>
-            <button
-              type="button"
-              class="hover:bg-hover/60 flex items-center gap-2.5 border-l-2 px-3 py-2 text-left"
-              [class]="selection().kind === 'webhooks' ? 'bg-selected border-primary' : 'border-transparent'"
-              [attr.aria-current]="selection().kind === 'webhooks' ? 'true' : null"
-              (click)="select({ kind: 'webhooks' })"
-            >
-              <span class="bg-secondary border-border text-foreground flex size-[26px] shrink-0 items-center justify-center border">
-                <svg [lucideIcon]="hook" [size]="13"></svg>
-              </span>
-              <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span class="text-foreground truncate text-[13px] leading-[normal]">REST &amp; webhooks</span>
-                <span class="text-faint truncate font-mono text-[10px] leading-[normal]">{{ hooksLine() }}</span>
-              </span>
-            </button>
-          </div>
         </nav>
 
         <!-- detail -->
@@ -172,12 +144,9 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
           @switch (selection().kind) {
             @case ('connect') {
               <h3 class="font-title text-foreground text-[20px] leading-[normal]">Add connection</h3>
-              <p class="text-muted-foreground mt-1 mb-5 max-w-[640px] text-[13px] leading-snug">
-                Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects. You can add several
-                accounts per provider. Secrets are encrypted and never shown again.
-              </p>
               @if (canAdmin()) {
                 <app-connection-add-form
+                  class="mt-5 block"
                   [preset]="connectPreset()"
                   scopeWord="workspace"
                   [busy]="busy()"
@@ -185,10 +154,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                   (cancelled)="closeConnect()"
                 />
               }
-            }
-
-            @case ('webhooks') {
-              <app-outgoing-webhooks />
             }
 
             @default {
@@ -223,7 +188,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                       </div>
                     }
                     <p class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">
-                      {{ line(c) }} · added {{ c.createdAt | relativeTime }}@if (c.lastWebhookAt) { · last event {{ c.lastWebhookAt | relativeTime }} }
+                      {{ line(c) }} · added {{ c.createdAt | relativeTime }}
                     </p>
                   </div>
                   @if (canAdmin()) {
@@ -234,7 +199,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                       aria-label="Connection actions"
                       [hlmDropdownMenuTrigger]="menu"
                     >
-                      <svg [lucideIcon]="more" [size]="15"></svg>
+                      <svg [lucideIcon]="pencil" [size]="14"></svg>
                     </button>
                     <ng-template #menu>
                       <hlm-dropdown-menu class="w-52">
@@ -242,7 +207,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                         <button hlmDropdownMenuItem (triggered)="startEdit(c)"><svg [lucideIcon]="key" [size]="14"></svg> Replace token…</button>
                         @if (c.status !== 'revoked' && c.provider !== 'delta') {
                           <button hlmDropdownMenuItem (triggered)="revalidate(c)"><svg [lucideIcon]="refresh" [size]="14"></svg> Re-validate</button>
-                          <button hlmDropdownMenuItem (triggered)="rotate(c)"><svg [lucideIcon]="rotateIcon" [size]="14"></svg> Rotate webhook secret</button>
                         }
                         @if (c.status !== 'revoked') {
                           <button hlmDropdownMenuItem (triggered)="revoke(c)"><svg [lucideIcon]="ban" [size]="14"></svg> Revoke</button>
@@ -259,10 +223,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                     <div class="min-w-0 flex-1">
                       <p class="text-foreground text-[13px]">
                         {{ c.status === 'revoked' ? c.label + ' was revoked' : (c.lastError ?? 'The provider rejected this connection') }}
-                      </p>
-                      <p class="text-muted-foreground mt-0.5 text-[12px] leading-snug">
-                        Whatever reads through it, such as a project's sources, shows an error until it is reconnected. Reconnect with a new token, or switch the
-                        source to another connection.
                       </p>
                     </div>
                     @if (canAdmin()) {
@@ -287,46 +247,9 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                   </div>
                 }
 
-                <div class="mt-6">
-                  @if (c.provider === 'delta') {
-                    <app-settings-section title="Delta" caption="stored for agent sessions">
-                      <p class="text-muted-foreground text-[13px] leading-snug">
-                        Delta has no repository or webhook API yet, so there is nothing else to set up.
-                        @if (c.baseUrl) {
-                          <span class="text-foreground font-mono text-xs">{{ c.host }}</span>
-                        }
-                      </p>
-                    </app-settings-section>
-                  } @else {
-                    <app-settings-section
-                      title="Webhook"
-                      [caption]="
-                        c.lastWebhookAt
-                          ? 'last delivery ' + (c.lastWebhookAt | relativeTime)
-                          : c.detailed
-                            ? 'no delivery yet'
-                            : 'details are visible to admins'
-                      "
-                    >
-                      <div class="flex flex-col gap-2">
-                        @if (c.webhookUrl) {
-                          <app-copy-field [value]="c.webhookUrl" label="Webhook URL" />
-                          @if (!c.lastWebhookAt) {
-                            <p class="text-muted-foreground text-[12px]">Add this URL as a webhook in {{ info[c.provider].label }}.</p>
-                          }
-                        } @else {
-                          <span class="text-faint font-mono text-[11.5px]">{{ c.webhookConfigured ? 'Configured' : 'Not configured' }}</span>
-                        }
-                      </div>
-                    </app-settings-section>
-                  }
-                </div>
               } @else {
                 <div class="flex max-w-md flex-col gap-2 pt-2">
                   <h3 class="font-title text-foreground text-[20px] leading-[normal]">Nothing connected yet</h3>
-                  <p class="text-muted-foreground text-[13px] leading-snug">
-                    Connect GitHub, GitLab or Bitbucket to see pull requests and CI on tasks and projects. Add as many accounts as you need: each one has its own name.
-                  </p>
                   @if (canAdmin()) {
                     <div class="pt-2"><button hlmBtn (click)="openConnect(null)">Add connection</button></div>
                   }
@@ -337,8 +260,6 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
         </div>
       </div>
     </div>
-
-    <app-webhook-setup-dialog [setup]="webhook()" [provider]="webhookProvider()" [rotated]="webhookRotated()" (closed)="webhook.set(null)" />
   `,
 })
 export class IntegrationsSection {
@@ -346,14 +267,10 @@ export class IntegrationsSection {
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
 
-  protected readonly info = PROVIDER_INFO;
-  protected readonly hook = LucideWebhook;
   protected readonly plus = LucidePlus;
-  protected readonly more = LucideEllipsis;
   protected readonly pencil = LucidePencil;
   protected readonly key = LucideKeyRound;
   protected readonly refresh = LucideRefreshCw;
-  protected readonly rotateIcon = LucideRotateCw;
   protected readonly ban = LucideBan;
   protected readonly trash = LucideTrash2;
   protected readonly warn = LucideTriangleAlert;
@@ -392,20 +309,11 @@ export class IntegrationsSection {
     const sel = this.selection();
     return sel.kind === 'connect' ? sel.preset : null;
   });
-  protected readonly hooksLine = computed(() => {
-    const n = this.store.outgoingWebhooks().length;
-    return n ? `${n} ${n === 1 ? 'endpoint' : 'endpoints'}` : 'any tracker';
-  });
 
   protected readonly busy = signal(false);
   protected readonly editing = signal<string | null>(null);
   protected readonly renaming = signal<string | null>(null);
   protected readonly nameDraft = signal('');
-
-  // one-time webhook setup
-  protected readonly webhook = signal<WebhookSetup | null>(null);
-  protected readonly webhookProvider = signal<string>('github');
-  protected readonly webhookRotated = signal(false);
 
   constructor() {
     // Details are not in the snapshot: refresh them whenever the connection list changes (live updates too).
@@ -449,7 +357,6 @@ export class IntegrationsSection {
     if (!res) return;
     this.picked.set({ kind: 'conn', id: res.connection.id });
     this.notify.success(`${PROVIDER_INFO[input.provider].label} connected`, { description: res.connection.label });
-    if (res.webhook) this.showWebhook(res.webhook, input.provider, false);
   }
 
   protected startRename(c: Row): void {
@@ -491,19 +398,6 @@ export class IntegrationsSection {
     this.notify.success(c.status === 'revoked' ? 'Connection restored' : 'Connection updated', { description: `Signed in as ${res.account}` });
   }
 
-  protected rotate(c: Row): void {
-    this.ui.setConfirmDelete({
-      title: 'Rotate the webhook secret?',
-      description: `The current secret stops working immediately. Deliveries fail until you paste the new one into ${PROVIDER_INFO[c.provider].label}.`,
-      confirmLabel: 'Rotate secret',
-      onConfirm: async () => {
-        const res = await this.store.rotateWebhookSecret(c.id);
-        // Let the confirm dialog close before opening the setup dialog.
-        if (res?.webhook) setTimeout(() => this.showWebhook(res.webhook!, c.provider, true));
-      },
-    });
-  }
-
   protected revoke(c: Row): void {
     this.ui.setConfirmDelete({
       title: `Revoke ${c.label}?`,
@@ -528,9 +422,4 @@ export class IntegrationsSection {
     });
   }
 
-  private showWebhook(setup: WebhookSetup, provider: string, rotated: boolean): void {
-    this.webhookProvider.set(provider);
-    this.webhookRotated.set(rotated);
-    this.webhook.set(setup);
-  }
 }

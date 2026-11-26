@@ -241,7 +241,7 @@ export class WorkspaceSection {
 
   // ───── look and calendar (server-side workspace settings, saved as they change)
   protected readonly accents = ACCENTS;
-  protected readonly weekOptions: SegmentedOption[] = WEEK_STARTS.map((w) => ({ value: w, label: w[0].toUpperCase() + w.slice(1) }));
+  protected readonly weekOptions: SegmentedOption[] = WEEK_STARTS.filter((w) => w !== 'saturday').map((w) => ({ value: w, label: w[0].toUpperCase() + w.slice(1) }));
   protected readonly browserZone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
   private readonly zones: string[] =
     typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl

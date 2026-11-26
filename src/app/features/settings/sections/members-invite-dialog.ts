@@ -14,7 +14,6 @@ import {
 } from '@angular/core';
 import { LucideDynamicIcon, LucideFolderLock, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import {
   canGrantRole,
@@ -42,7 +41,6 @@ import { SECTION_KIT, SETTINGS_SELECT } from './section-kit';
   imports: [
     HlmDialogImports,
     HlmButtonImports,
-    HlmCheckbox,
     AppSelect,
     EmailChips,
     MemberAccessEditor,
@@ -93,9 +91,6 @@ import { SECTION_KIT, SETTINGS_SELECT } from './section-kit';
                 <app-copy-field [value]="link.url" label="Invite link" />
               </div>
             }
-            <p class="text-faint font-mono text-[10.5px]">
-              A link works for 7 days and only for that email address.
-            </p>
           </div>
           <div class="bg-bg-deep border-border flex shrink-0 items-center gap-2 border-t px-5 py-3">
             <span class="min-w-0 flex-1"></span>
@@ -137,28 +132,6 @@ import { SECTION_KIT, SETTINGS_SELECT } from './section-kit';
                     [disabled]="busy()"
                     [(value)]="access"
                   />
-                  <label class="flex items-start gap-2 text-[13px]">
-                    <hlm-checkbox
-                      class="mt-0.5"
-                      [checked]="extras()"
-                      (checkedChange)="extras.set($event)"
-                    />
-                    <span>
-                      <span class="text-foreground">Add actions beyond the role</span>
-                      <span class="text-muted-foreground block text-[12px] leading-snug"
-                        >Starts from what the role allows. Added for these invitations only.</span
-                      >
-                    </span>
-                  </label>
-                  @if (extras()) {
-                    <app-member-access-editor
-                      [showProjects]="false"
-                      [role]="role()"
-                      [locked]="baseline()"
-                      [disabled]="busy()"
-                      [(value)]="access"
-                    />
-                  }
                 }
               </div>
             </div>
@@ -199,7 +172,6 @@ export class MembersInviteDialog {
   protected readonly emails = signal<string[]>([]);
   protected readonly role = signal<string>('member');
   protected readonly access = signal<MemberAccess>(emptyMemberAccess());
-  protected readonly extras = signal(false);
   protected readonly busy = signal(false);
   protected readonly sent = signal<InviteLink[]>([]);
 
@@ -237,8 +209,7 @@ export class MembersInviteDialog {
   /** What goes into the invitation: nothing when the role applies in full to every project. */
   private readonly payload = computed<MemberAccess | null>(() => {
     if (this.isOwnerRole()) return null;
-    const access = this.extras() ? this.access() : { ...this.access(), grants: [] };
-    return normalizeMemberAccess(access, this.baseline());
+    return normalizeMemberAccess({ ...this.access(), grants: [] }, this.baseline());
   });
   protected readonly canSend = computed(() => {
     if (this.busy() || !this.emails().length || this.invalid().length) return false;
@@ -260,7 +231,6 @@ export class MembersInviteDialog {
       untracked(() => {
         this.emails.set([]);
         this.sent.set([]);
-        this.extras.set(false);
         this.access.set(emptyMemberAccess());
         const options = this.roleChoices();
         this.role.set(

@@ -126,7 +126,7 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
           }
         } @empty {
           <div class="text-muted-foreground border-border border-t px-4 py-8 text-center text-[13px]">
-            {{ store.agents().length ? 'No agent matches.' : 'No agents yet. Connect one to give a coding agent its own identity and token.' }}
+            {{ store.agents().length ? 'No agent matches.' : 'No agents yet.' }}
           </div>
         }
       </div>

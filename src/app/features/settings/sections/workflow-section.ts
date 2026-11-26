@@ -70,7 +70,7 @@ type Dialog =
     <app-section-header
       flush
       title="Workflow"
-      description="The statuses a task moves through. The category decides how a status counts. Only people change one, never a linked PR."
+      description="The statuses a task moves through. The category decides how a status counts."
     >
       <app-segmented actions aria-label="Status catalogs" [options]="subjectOptions" [value]="current()" (valueChange)="setSubject($event)" />
     </app-section-header>
@@ -165,7 +165,7 @@ type Dialog =
     <div class="bg-card border-border flex items-start gap-2.5 border px-3.5 py-2.5">
       <svg [lucideIcon]="info" [size]="14" class="text-muted-foreground mt-[3px] shrink-0"></svg>
       <p class="text-text-2 flex-1 text-[12.5px] leading-[19px]">
-        Canceled isn't Trash: canceled {{ subjectNoun() }} stay in lists and search, closed. A status can only be removed once nothing uses it.
+        Canceled isn't Trash: canceled {{ subjectNoun() }} stay in lists and search, closed.
       </p>
     </div>
 

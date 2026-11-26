@@ -1,22 +1,13 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-  untracked,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import {
   LucideBot,
   LucideBuilding2,
   LucideCrown,
   LucideDynamicIcon,
   LucideFolderLock,
-  LucideLayers,
   LucideLock,
   LucidePlus,
-  LucideUser,
+  LucideUsers,
   type LucideIconInput,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -24,17 +15,12 @@ import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import {
   CAPABILITIES,
   CAPABILITY_META,
-  emptyMemberAccess,
-  MEMBER_GRANTS,
   OWNER_REQUIRED_CAPABILITIES,
   type Capability,
   type CapabilityMeta,
-  type MemberAccess,
   type WorkspaceRole,
 } from '../../../core/contracts/domain';
 import { TramaStore } from '../../../core/stores/trama.store';
-import { UiStore } from '../../../core/stores/ui.store';
-import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT, SETTINGS_FIELD } from './section-kit';
 
 const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
@@ -49,32 +35,27 @@ const RULES: readonly Rule[] = [
   {
     icon: LucideLock,
     title: 'Owner holds the keys',
-    text: 'Only an owner creates, renames or deletes roles, or grants the owner role. The owner role cannot be deleted.',
-  },
-  {
-    icon: LucideLayers,
-    title: 'No inheritance',
-    text: 'A role can do only what is checked on it. Admin, Member and Viewer are not built in.',
-  },
-  {
-    icon: LucideUser,
-    title: 'One role per person',
-    text: 'A member has exactly one role. Extra actions on an invitation are added on top of that role.',
+    text: 'Only the owner can transfer or delete the workspace.',
   },
   {
     icon: LucideBuilding2,
     title: 'Projects belong to the workspace',
-    text: 'Nothing leaves with the person who created it, or with a guest who is removed.',
+    text: 'Nothing leaves with the person who created it.',
   },
   {
     icon: LucideFolderLock,
     title: 'Guests see their projects only',
-    text: 'The people on those projects, and nothing else: no settings, integrations, AI or tokens. Their access is the projects they were invited to.',
+    text: 'No member list, settings, integrations or tokens.',
+  },
+  {
+    icon: LucideUsers,
+    title: 'No teams',
+    text: 'A group of people on a set of projects is a workspace.',
   },
   {
     icon: LucideBot,
     title: 'Agents act as members',
-    text: 'An agent uses the historical member permissions.',
+    text: 'Never more access than their owner.',
   },
 ];
 
@@ -85,7 +66,7 @@ const RULES: readonly Rule[] = [
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmCheckbox, LucideDynamicIcon, MemberAccessEditor, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmCheckbox, LucideDynamicIcon, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
@@ -133,13 +114,9 @@ const RULES: readonly Rule[] = [
             CAPABILITY
           </div>
           @for (role of roles(); track role.id) {
-            <button
-              type="button"
+            <div
               role="columnheader"
-              class="border-border hover:bg-card flex w-24 shrink-0 flex-col items-center gap-[3px] border-l px-1.5 py-1.5"
-              [class.bg-card]="role.id === selected().id"
-              [attr.aria-pressed]="role.id === selected().id"
-              (click)="select(role.id)"
+              class="border-border flex w-24 shrink-0 flex-col items-center gap-[3px] border-l px-1.5 py-1.5"
             >
               <span class="text-foreground flex items-center gap-1 text-[12.5px] leading-[normal] font-medium">
                 @if (role.owner) {
@@ -148,7 +125,7 @@ const RULES: readonly Rule[] = [
                 <span class="max-w-20 truncate">{{ role.name }}</span>
               </span>
               <span class="text-faint font-mono text-[10px] leading-[normal]">{{ countFor(role.id) }}</span>
-            </button>
+            </div>
           }
           <div class="border-border flex h-11 w-10 shrink-0 items-center justify-center border-l">
             @if (isOwner()) {
@@ -204,68 +181,8 @@ const RULES: readonly Rule[] = [
       </div>
     </div>
 
-    @if (selected(); as role) {
-      <app-settings-block
-        [title]="role.name"
-        [description]="
-          role.owner
-            ? 'This role cannot be deleted or renamed away from ownership, and it keeps the ability to manage members.'
-            : 'People with this role can do only what is checked above.'
-        "
-      >
-        <app-settings-card>
-          @if (!role.owner && isOwner()) {
-            <app-card-row label="Name" description="Rename the role or remove it once nobody uses it.">
-              <span class="block w-44">
-                <input
-                  class="${SETTINGS_FIELD}"
-                  aria-label="Role name"
-                  [value]="draftName()"
-                  (input)="draftName.set($any($event.target).value)"
-                />
-              </span>
-              <button
-                hlmBtn
-                variant="outline"
-                [disabled]="busy() || !draftName().trim() || draftName().trim() === role.name"
-                (click)="rename(role)"
-              >
-                Rename
-              </button>
-              <button hlmBtn variant="outline" [disabled]="busy()" (click)="remove(role)">Delete</button>
-            </app-card-row>
-          } @else {
-            <app-card-row [label]="countFor(role.id)" description="People who have this role." />
-          }
-          @if (!role.owner) {
-            <div class="flex flex-col gap-3 px-4 py-3.5">
-              <div class="flex flex-col gap-[3px]">
-                <span class="text-foreground text-[13.5px] leading-[normal]">Work this role starts with</span>
-                <span class="text-muted-foreground text-[12.5px] leading-[18px]">
-                  View, create, edit, delete. Invitations can add, not remove.
-                </span>
-              </div>
-              <app-member-access-editor
-                [showProjects]="false"
-                [role]="role.id"
-                [disabled]="!isOwner() || busy()"
-                [(value)]="grantDraft"
-              />
-              @if (isOwner()) {
-                <div>
-                  <button type="button" hlmBtn [disabled]="busy()" (click)="saveGrants(role)">
-                    Save work permissions
-                  </button>
-                </div>
-              }
-            </div>
-          }
-        </app-settings-card>
-      </app-settings-block>
-    }
-
-    <app-settings-block title="Always true" description="These rules stay, whatever a role's checkboxes say.">
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <app-settings-block title="Always true">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         @for (rule of rules; track rule.title) {
           <div class="border-border flex flex-col gap-1.5 border p-4">
             <svg [lucideIcon]="rule.icon" [size]="15" class="text-primary"></svg>
@@ -279,7 +196,6 @@ const RULES: readonly Rule[] = [
 })
 export class RolesSection {
   private readonly store = inject(TramaStore);
-  private readonly ui = inject(UiStore);
 
   protected readonly groups = GROUP_ORDER;
   protected readonly rules = RULES;
@@ -289,26 +205,8 @@ export class RolesSection {
   protected readonly busy = signal(false);
   protected readonly creating = signal(false);
   protected readonly draftName = signal('');
-  protected readonly selectedId = signal<string | null>(null);
-  protected readonly grantDraft = signal<MemberAccess>({ ...emptyMemberAccess(), grants: [] });
   protected readonly isOwner = computed(() => this.store.can('owner'));
   protected readonly roles = computed(() => this.store.settings().roles);
-  protected readonly selected = computed(
-    () => this.roles().find((role) => role.id === this.selectedId()) ?? this.roles()[0],
-  );
-
-  private readonly syncDraft = effect(() => {
-    const role = this.selected();
-    untracked(() => {
-      if (!role) return;
-      if (!this.creating()) this.draftName.set(role.name);
-      this.grantDraft.set({
-        ...emptyMemberAccess(),
-        grants: role.owner ? [...MEMBER_GRANTS] : [...role.grants],
-      });
-      if (!this.selectedId()) this.selectedId.set(role.id);
-    });
-  });
 
   protected meta(cap: Capability): CapabilityMeta {
     return CAPABILITY_META[cap];
@@ -327,11 +225,6 @@ export class RolesSection {
     return role.owner && (OWNER_REQUIRED_CAPABILITIES as readonly string[]).includes(cap);
   }
 
-  protected select(id: string): void {
-    this.creating.set(false);
-    this.selectedId.set(id);
-  }
-
   protected async create(event: Event): Promise<void> {
     event.preventDefault();
     const name = this.draftName().trim();
@@ -342,27 +235,6 @@ export class RolesSection {
     if (!id) return;
     this.creating.set(false);
     this.draftName.set('');
-    this.selectedId.set(id);
-  }
-
-  protected async rename(role: WorkspaceRole): Promise<void> {
-    const name = this.draftName().trim();
-    if (!name || name === role.name || this.busy()) return;
-    this.busy.set(true);
-    await this.store.updateRole(role.id, { name });
-    this.busy.set(false);
-  }
-
-  protected remove(role: WorkspaceRole): void {
-    this.ui.setConfirmDelete({
-      title: `Delete ${role.name}?`,
-      description: 'People and invitations using it have to move first. This cannot be undone.',
-      confirmLabel: 'Delete role',
-      onConfirm: async () => {
-        const ok = await this.store.deleteRole(role.id);
-        if (ok) this.selectedId.set(null);
-      },
-    });
   }
 
   protected async toggleCap(role: WorkspaceRole, cap: Capability, on: boolean): Promise<void> {
@@ -372,13 +244,6 @@ export class RolesSection {
     else next.delete(cap);
     this.busy.set(true);
     await this.store.updateRole(role.id, { capabilities: [...next] });
-    this.busy.set(false);
-  }
-
-  protected async saveGrants(role: WorkspaceRole): Promise<void> {
-    if (!this.isOwner() || this.busy() || role.owner) return;
-    this.busy.set(true);
-    await this.store.updateRole(role.id, { grants: [...this.grantDraft().grants] });
     this.busy.set(false);
   }
 }

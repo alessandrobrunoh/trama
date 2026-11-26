@@ -1,6 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { BRANCH_FORMATS, type BranchFormat } from '../../../core/branch-name';
 import { BranchNames } from '../../../core/branch-prefs';
 import {
@@ -53,16 +52,14 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
 @Component({
   selector: 'app-preferences-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, HlmButtonImports, AppSelect, Kbd, ...SECTION_KIT],
+  imports: [NgTemplateOutlet, AppSelect, Kbd, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
       title="Preferences"
       description="How Trama looks and behaves for you. Only you see these; they stay in this browser."
-    >
-      <button actions hlmBtn variant="ghost" size="sm" (click)="prefs.reset()">Reset to defaults</button>
-    </app-section-header>
+    />
 
     <app-settings-block title="Theme">
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">
@@ -157,7 +154,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             (checkedChange)="prefs.emojiShortcodes.set($event)"
           />
         </app-card-row>
-        <app-card-row label="Git branch format" description="Used by Copy branch name on a task. Stored in this browser only.">
+        <app-card-row label="Git branch format" description="Used by Copy branch name on a task.">
           <div class="w-[240px]">
             <app-select
               size="sm"
@@ -238,7 +235,7 @@ export class PreferencesSection {
 
   protected readonly homeOptions: Option[] = HOME_VIEWS.map((v) => ({ value: v, label: HOME_VIEW_LABELS[v] }));
   protected readonly sendOptions: SegmentedOption[] = SEND_KEYS.map((v) => ({ value: v, label: SEND_LABELS[v] }));
-  protected readonly fontOptions: SegmentedOption[] = FONT_SIZES.map((v) => ({ value: v, label: FONT_LABELS[v] }));
+  protected readonly fontOptions: SegmentedOption[] = FONT_SIZES.filter((v) => v !== 'xlarge').map((v) => ({ value: v, label: FONT_LABELS[v] }));
   protected readonly motionOptions: SegmentedOption[] = MOTION_MODES.map((v) => ({ value: v, label: MOTION_LABELS[v] }));
   protected readonly branchOptions: Option[] = BRANCH_FORMATS.map((v) => ({ value: v, label: BRANCH_LABELS[v] }));
 
