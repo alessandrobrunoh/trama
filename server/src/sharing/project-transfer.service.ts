@@ -332,6 +332,25 @@ export class ProjectTransferService {
 
     await m.query(`UPDATE "milestones" SET "workspaceId" = $1 WHERE "projectId" = $2`, [sub.tgt, project.id]);
 
+    // written updates move with the project; the health each reported follows the mapping, or is dropped
+    // when the target has no such health
+    const targetHealth = new Set(target.resolved().statuses.projectHealth.map((entry) => entry.id));
+    const reported = (
+      (await m.query(
+        `SELECT DISTINCT "health" FROM "project_updates" WHERE "projectId" = $1 AND "health" IS NOT NULL`,
+        [project.id],
+      )) as { health: string }[]
+    ).map((row) => row.health);
+    for (const health of reported) {
+      const next = mapping.statuses.project_health.get(health) ?? health;
+      await m.query(`UPDATE "project_updates" SET "health" = $3 WHERE "projectId" = $1 AND "health" = $2`, [
+        project.id,
+        health,
+        targetHealth.has(next) ? next : null,
+      ]);
+    }
+    await m.query(`UPDATE "project_updates" SET "workspaceId" = $1 WHERE "projectId" = $2`, [sub.tgt, project.id]);
+
     await m.update(ProjectEntity, { id: project.id }, {
       workspaceId: target.id,
       status: (mapping.statuses.project.get(project.status) ?? project.status) as ProjectStatus,

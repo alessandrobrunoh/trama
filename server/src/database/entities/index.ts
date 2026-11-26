@@ -222,6 +222,27 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
 }
 
+/** A written status update on a project: the text and the health its author reported. */
+@Entity('project_updates')
+@Index('IDX_project_updates_project', ['projectId', 'createdAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class ProjectUpdateEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) projectId: string;
+  @Column({ type: 'jsonb' }) author: ActorRef;
+  @Column({ type: 'text' }) body: string;
+  /** Project health catalog id reported with the update. */
+  @Column({ type: 'varchar', nullable: true }) health: string | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) editedAt: Date | null;
+}
+
 @Entity('milestones')
 @Index('IDX_milestones_workspace', ['workspaceId'])
 @Index('IDX_milestones_project', ['projectId'])
@@ -717,6 +738,7 @@ export const ENTITIES = [
   PushSubscriptionEntity,
   AgentEntity,
   ProjectEntity,
+  ProjectUpdateEntity,
   MilestoneEntity,
   IssueEntity,
   ArtifactEntity,

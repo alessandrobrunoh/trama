@@ -15,9 +15,19 @@ import {
   todayDay,
   usesPoints,
   type BurnPoint,
+  type MilestoneState,
 } from '../milestones/milestone-model';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { buildBurnView, burnBadge, projectTargetDay, slackText, type BurnTone } from './project-burnup-model';
+import { milestoneWindows } from './project-updates-model';
+
+const STATE_LABEL: Record<MilestoneState, string> = {
+  done: 'DONE',
+  active: 'IN PROGRESS',
+  overdue: 'OVERDUE',
+  idle: 'NOT STARTED',
+  empty: 'NO TASKS',
+};
 
 /** Plot area of the full chart: 158px tall, 4px above the top line and below the zero line. */
 const PLOT_H = 158;
@@ -52,7 +62,7 @@ const TONE_DOT: Record<BurnTone, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ChartTip],
   host: {
-    '[class]': 'mini() ? "block h-[34px] w-[180px] shrink-0" : "bg-card border-border relative flex min-w-0 flex-col gap-3.5 border px-4 pt-3.5 pb-3"',
+    '[class]': 'mini() ? "block h-[34px] w-[180px] shrink-0" : scopeRisk() ? "border-border relative flex min-w-0 flex-col gap-3.5 border p-5" : "bg-card border-border relative flex min-w-0 flex-col gap-3.5 border px-4 pt-3.5 pb-3"',
   },
   template: `
     @let m = view().model;
@@ -76,6 +86,94 @@ const TONE_DOT: Record<BurnTone, string> = {
           }
         }
       </svg>
+    } @else if (scopeRisk()) {
+      <!-- v3 "10 · Project · Updates": kicker and legend, the milestones named under the plot -->
+      <div class="flex w-full flex-wrap items-center gap-x-4 gap-y-2">
+        <span class="text-foreground font-mono text-[10px] leading-[normal] uppercase">Scope &amp; risk · all milestones</span>
+        <span class="min-w-0 flex-1"></span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="bg-primary h-0.5 w-3.5 shrink-0"></span>
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">actual</span>
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="bg-muted-foreground h-0.5 w-3.5 shrink-0"></span>
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">scope</span>
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="border-primary h-0 w-3.5 shrink-0 border-t-2 border-dashed"></span>
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">forecast</span>
+        </span>
+      </div>
+
+      @if (m.totals.scope === 0) {
+        <p class="text-faint flex h-[158px] items-center justify-center text-center font-mono text-[11px]">
+          Link tasks to see progress over time.
+        </p>
+      } @else {
+        <div class="relative outline-none" tabindex="0" [attr.aria-label]="summary()" (keydown)="onKey($event)" (blur)="hover.set(null)">
+          <svg [attr.viewBox]="'0 0 ' + width() + ' ' + bigH" [attr.width]="width()" [attr.height]="bigH" class="block max-w-full overflow-visible select-none" role="img" [attr.aria-label]="summary()">
+            @for (t of yTicks(); track t.value) {
+              <line [attr.x1]="ml" [attr.x2]="width()" [attr.y1]="t.y" [attr.y2]="t.y" [class]="t.value === 0 ? 'stroke-border' : 'stroke-grid'" stroke-width="1" />
+              <text x="0" [attr.y]="t.y" dominant-baseline="middle" font-size="10" class="fill-faint font-mono">{{ t.label }}</text>
+            }
+            @for (l of msLabels(); track l.id) {
+              @if (l.divider) {
+                <line [attr.x1]="l.x" [attr.x2]="l.x" y1="0" [attr.y2]="plotH" class="stroke-border" stroke-width="1" />
+              }
+              <text [attr.x]="l.x + 8" [attr.y]="bigH - 6" font-size="9.5" [class]="l.current ? 'fill-foreground font-mono' : 'fill-faint font-mono'">{{ l.label }}</text>
+            }
+            @if (todayInside()) {
+              <line [attr.x1]="todayX()" [attr.x2]="todayX()" y1="0" [attr.y2]="plotH" class="stroke-primary" stroke-opacity="0.4" stroke-width="1" />
+              <text [attr.x]="todayX() + 6" [attr.y]="plotH - 20" font-size="9.5" class="fill-primary font-mono">{{ todayLabel() }}</text>
+            }
+            @if (projArea(); as a) {
+              <path [attr.d]="a" class="fill-status-in-progress" fill-opacity="0.1" />
+            }
+            @if (scopeAhead(); as s) {
+              <path [attr.d]="s" class="stroke-muted-foreground" fill="none" stroke-width="1.25" stroke-dasharray="4 4" />
+            }
+            <path [attr.d]="paths().scope" class="stroke-muted-foreground" fill="none" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+            <path [attr.d]="paths().completed" class="stroke-primary" fill="none" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round" />
+            @if (projLine(); as p) {
+              <path [attr.d]="p" class="stroke-primary" fill="none" stroke-width="1.25" stroke-dasharray="4 4" />
+            }
+            @if (hoverX(); as hx) {
+              <line [attr.x1]="hx" [attr.x2]="hx" y1="0" [attr.y2]="plotH" class="stroke-muted-foreground" stroke-opacity="0.55" stroke-width="1" />
+            }
+            @for (d of dots(); track d.key) {
+              <rect [attr.x]="d.x - 3" [attr.y]="d.y - 3" width="6" height="6" [class]="d.cls" />
+            }
+            <rect [attr.x]="ml" y="0" [attr.width]="innerW()" [attr.height]="plotH" fill="transparent" (pointermove)="onMove($event)" (pointerleave)="hover.set(null)" />
+            @for (d of diamonds(); track d.id) {
+              <g (pointerenter)="hoverMs.set(d.id)" (pointerleave)="hoverMs.set(null)">
+                <rect [attr.x]="d.x - 9" [attr.y]="d.y - 9" width="18" height="18" fill="transparent" />
+                <rect [attr.x]="d.x - 4" [attr.y]="d.y - 4" width="8" height="8" class="fill-background stroke-primary" stroke-width="2" />
+              </g>
+            }
+          </svg>
+
+          @if (tip(); as t) {
+            <app-chart-tip [x]="t.x" [y]="PLOT_TOP" [bounds]="width()">
+              <div class="text-muted-foreground mb-1 font-mono text-[11px] tabular-nums">{{ t.title }}</div>
+              <ul class="flex flex-col gap-1">
+                @for (r of t.rows; track r.key) {
+                  <li class="flex items-center gap-2">
+                    <span class="h-0.5 w-2.5 shrink-0" [class]="r.cls"></span>
+                    <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ r.label }}</span>
+                    <span class="text-foreground font-mono tabular-nums">{{ r.value }}</span>
+                  </li>
+                }
+              </ul>
+            </app-chart-tip>
+          }
+          @if (msTip(); as t) {
+            <app-chart-tip [x]="t.x" [y]="t.y" [bounds]="width()" [above]="true">
+              <div class="text-foreground font-medium">{{ t.name }}</div>
+              <div class="text-muted-foreground font-mono text-[11px] tabular-nums">{{ t.date }} · {{ t.progress }}</div>
+            </app-chart-tip>
+          }
+        </div>
+      }
     } @else {
       <div class="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div class="flex flex-wrap items-center gap-x-[18px] gap-y-1.5">
@@ -188,6 +286,8 @@ export class ProjectBurnup {
   readonly milestone = input<Milestone | null>(null);
   /** The 180×34 sparkline. */
   readonly mini = input(false);
+  /** The "Scope & risk" skin of the Updates tab: kicker, actual / forecast legend, milestones named under the plot. */
+  readonly scopeRisk = input(false);
 
   protected readonly toneText = TONE_TEXT;
   protected readonly toneFill = TONE_FILL;
@@ -297,6 +397,26 @@ export class ProjectBurnup {
         x: this.px(day),
         label: format(dateOfDay(day), 'MMM d'),
         anchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
+      };
+    });
+  });
+
+  protected readonly todayLabel = computed(() => `TODAY · ${format(dateOfDay(this.view().model.today), 'MMM d').toUpperCase()}`);
+
+  /** "V1.1 THREADS · DONE" at the start of each milestone, with a divider between them. */
+  protected readonly msLabels = computed(() => {
+    const v = this.view();
+    const states = this.info.states();
+    const first = v.model.startDay;
+    const current = this.info.nextByProject().get(this.project().id)?.ms.id;
+    return milestoneWindows(this.project(), this.milestones()).map((w, i) => {
+      const day = Math.min(Math.max(w.startDay, first), v.endDay);
+      return {
+        id: w.milestone.id,
+        x: this.px(day),
+        divider: i > 0 && day > first,
+        current: w.milestone.id === current,
+        label: `${w.milestone.name.toUpperCase()} · ${STATE_LABEL[states.get(w.milestone.id) ?? 'empty']}`,
       };
     });
   });
