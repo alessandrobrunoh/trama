@@ -12,33 +12,19 @@ import {
   LucideEyeOff,
   LucideList,
   LucideLogIn,
+  LucideLogOut,
   LucideSquareKanban,
   LucideChevronsUpDown,
   LucideCheck,
-  LucideCircleDot,
   LucideEllipsis,
   LucideInbox,
   LucideBox,
-  LucideLayers,
-  LucideLock,
-  LucideBookOpen,
-  LucideCircleHelp,
-  LucideExternalLink,
-  LucideKeyboard,
-  LucideKeyRound,
-  LucideListChecks,
-  LucideMap,
   LucidePlug,
   LucideDynamicIcon,
-  LucideLogOut,
-  LucideMonitor,
-  LucideMoon,
   LucidePanelLeft,
   LucidePlus,
   LucideSearch,
   LucideSettings,
-  LucideSquarePen,
-  LucideSun,
   LucideUserRound,
   LucideX,
   type LucideIcon,
@@ -47,19 +33,14 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { FavoritesStore } from '../core/stores/favorites.store';
 import { SharedProjectsStore } from '../core/stores/shared-projects.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
 import { TimeEntriesStore } from '../core/stores/time-entries.store';
 import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
-import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
-import { Kbd } from '../shared/kbd';
 import { TramaLogo } from '../shared/trama-logo';
-import { StatusIcon } from '../shared/status';
-import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { ProjectGlyph } from '../features/projects/project-glyph';
 import { SettingsSidebar } from '../features/settings/settings-sidebar';
 import { settingsSectionOfUrl } from '../features/settings/settings-nav';
@@ -71,7 +52,6 @@ import {
   SIDEBAR_MAIN_NAV,
   SIDEBAR_WORKSPACE_NAV,
   navForRole,
-  orderNav,
   type NavItem,
 } from './nav';
 
@@ -95,9 +75,7 @@ import {
     HlmDropdownMenuImports,
     HlmButtonImports,
     HlmTooltip,
-    Kbd,
     ActorAvatar,
-    StatusIcon,
     ProjectGlyph,
     SettingsSidebar,
   ],
@@ -177,53 +155,6 @@ import {
           <ul class="flex flex-col gap-px">
             <ng-container *ngTemplateOutlet="navRow; context: { $implicit: item }" />
           </ul>
-        }
-
-        <!-- Pinned: only once something is pinned -->
-        @if (favorites.entries().length) {
-          <ng-container *ngTemplateOutlet="subLabel; context: { $implicit: 'favorites', label: 'PINNED' }" />
-          @if (!ui.isFolded('favorites')) {
-            <ul class="flex flex-col gap-px">
-              @for (e of favorites.entries(); track e.favorite.id) {
-                <li class="group/fav relative">
-                  <a
-                    [routerLink]="['/', slug(), ...e.link]"
-                    routerLinkActive
-                    #fla="routerLinkActive"
-                    [class]="fla.isActive ? rowOn : rowOff"
-                    [attr.title]="e.key ? e.key + ' · ' + e.label : e.label"
-                    (click)="closeMobile()"
-                  >
-                    @switch (e.type) {
-                      @case ('issue') {
-                        <app-status-icon entity="issue" [status]="$any(e.status)" />
-                      }
-                      @case ('project') {
-                        @if (store.getProject(e.subjectId); as pj) {
-                          <app-project-glyph [project]="pj" [size]="15" />
-                        } @else {
-                          <svg [lucideIcon]="projectIcon" [size]="15" class="shrink-0"></svg>
-                        }
-                      }
-                      @case ('view') {
-                        <svg [lucideIcon]="layers" [size]="15" class="shrink-0"></svg>
-                      }
-                    }
-                    <span class="truncate-fade min-w-0 flex-1">{{ e.label }}</span>
-                  </a>
-                  <button
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
-                    aria-label="Remove from pinned"
-                    hlmTooltip="Unpin"
-                    (click)="favorites.toggle(e.type, e.subjectId)"
-                  >
-                    <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                  </button>
-                </li>
-              }
-            </ul>
-          }
         }
 
         <!-- Projects: glyph in the project colour, open task count on the right, "shared" for the ones placed here -->
@@ -380,17 +311,15 @@ import {
         </div>
       }
       <div class="border-sidebar-border flex items-center gap-2.5 border-t px-3.5 py-2.5">
-        <button
-          type="button"
-          class="text-foreground hover:text-sidebar-accent-foreground data-open:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
-          [hlmDropdownMenuTrigger]="userMenu"
-          align="start"
-          side="top"
-          aria-label="User menu"
+        <a
+          [routerLink]="['/', slug(), 'settings', 'profile']"
+          class="text-foreground hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
+          aria-label="Profile"
+          (click)="closeMobile()"
         >
           <app-actor-avatar [actor]="meRef()" [size]="22" />
           <span class="min-w-0 flex-1 truncate text-[12.5px]">{{ session.user()?.name ?? 'Account' }}</span>
-        </button>
+        </a>
         <a
           [routerLink]="['/', slug(), 'inbox']"
           class="text-faint hover:text-foreground relative flex size-[14px] shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
@@ -562,17 +491,7 @@ import {
           <svg [lucideIcon]="item.icon" [size]="15" class="shrink-0"></svg>
           <span class="truncate-fade min-w-0 flex-1">{{ item.label }}</span>
           @if (badge(item.badge, true); as n) {
-            @if (ui.sidebarBadgeStyle() === 'dot') {
-              <span
-                class="size-[5px] shrink-0"
-                [class.bg-primary]="item.badge === 'inbox'"
-                [class.bg-faint]="item.badge !== 'inbox'"
-                role="img"
-                [attr.aria-label]="n + ' pending'"
-              ></span>
-            } @else {
-              <span class="text-faint font-mono text-[11px] tabular-nums" [attr.aria-label]="n + ' pending'">{{ n }}</span>
-            }
+            <span class="text-faint font-mono text-[11px] tabular-nums" [attr.aria-label]="n + ' pending'">{{ n }}</span>
           }
         </a>
       </li>
@@ -606,194 +525,17 @@ import {
             <svg [lucideIcon]="plus" [size]="14"></svg>
             Create workspace
           </button>
-          @if (!store.isGuest()) {
-            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'workspace'])">
-              <svg [lucideIcon]="settings" [size]="14"></svg>
-              Workspace settings
-              <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
-            </button>
-          }
         </hlm-dropdown-menu-group>
-      </hlm-dropdown-menu>
-    </ng-template>
-
-    <ng-template #createMenu>
-      <hlm-dropdown-menu class="w-64">
-        <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('issue')">
-            <svg [lucideIcon]="issueIcon" [size]="14"></svg>
-            <span class="flex flex-1 flex-col">
-              <span>New task</span>
-              <span class="text-muted-foreground text-[11px]">A bug, request or incident</span>
-            </span>
-          </button>
-        </hlm-dropdown-menu-group>
-        @if (!store.isGuest()) {
-          <hlm-dropdown-menu-separator />
-          <hlm-dropdown-menu-group>
-            <button hlmDropdownMenuItem (triggered)="ui.openCreate('view')">
-              <svg [lucideIcon]="layers" [size]="14"></svg>
-              <span class="flex-1">New view</span>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="ui.openCreate('project')">
-              <svg [lucideIcon]="projectIcon" [size]="14"></svg>
-              <span class="flex-1">New project</span>
-            </button>
-          </hlm-dropdown-menu-group>
-        }
-      </hlm-dropdown-menu>
-    </ng-template>
-
-    <ng-template #helpMenu>
-      <hlm-dropdown-menu class="w-64">
-        <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="ui.openModal('shortcuts')">
-            <svg [lucideIcon]="keyboardIcon" [size]="14"></svg>
-            Keyboard shortcuts
-            <hlm-dropdown-menu-shortcut><app-kbd keys="?" /></hlm-dropdown-menu-shortcut>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCommandPalette()">
-            <svg [lucideIcon]="search" [size]="14"></svg>
-            Command palette
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+k" /></hlm-dropdown-menu-shortcut>
-          </button>
-          @if (!store.isGuest()) {
-            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
-              <svg [lucideIcon]="plugIcon" [size]="14"></svg>
-              Connect your agent
-              <hlm-dropdown-menu-shortcut><app-kbd keys="g k" /></hlm-dropdown-menu-shortcut>
-            </button>
-            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'tokens'])">
-              <svg [lucideIcon]="keyIcon" [size]="14"></svg>
-              API tokens
-            </button>
-            <button hlmDropdownMenuItem (triggered)="showChecklist()">
-              <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
-              Setup checklist
-            </button>
-            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'integrations'])">
-              <svg [lucideIcon]="plugIcon" [size]="14"></svg>
-              Integrations
-            </button>
-          }
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'profile'])">
-            <svg [lucideIcon]="settings" [size]="14"></svg>
-            Settings
-            <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
-          </button>
-        </hlm-dropdown-menu-group>
-        <hlm-dropdown-menu-separator />
-        <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="openPublic('/roadmap')">
-            <svg [lucideIcon]="mapIcon" [size]="14"></svg>
-            Roadmap
-            <svg
-              [lucideIcon]="externalIcon"
-              [size]="12"
-              class="text-muted-foreground ms-auto"
-            ></svg>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="openPublic('/blog')">
-            <svg [lucideIcon]="bookIcon" [size]="14"></svg>
-            Blog
-            <svg
-              [lucideIcon]="externalIcon"
-              [size]="12"
-              class="text-muted-foreground ms-auto"
-            ></svg>
-          </button>
-        </hlm-dropdown-menu-group>
-        <hlm-dropdown-menu-separator />
-        <hlm-dropdown-menu-label>What's new</hlm-dropdown-menu-label>
-        <hlm-dropdown-menu-group>
-          @for (e of latestChanges; track e.title) {
-            <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
-              <span class="min-w-0 flex-1 truncate">{{ e.title }}</span>
-              <span class="text-muted-foreground shrink-0 text-xs">{{ e.date.slice(5) }}</span>
-            </button>
-          }
-          <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
-            <span class="flex-1">Full changelog</span>
-            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground"></svg>
-          </button>
-        </hlm-dropdown-menu-group>
-      </hlm-dropdown-menu>
-    </ng-template>
-
-    <ng-template #userMenu>
-      <hlm-dropdown-menu class="w-60">
-        <hlm-dropdown-menu-label class="flex flex-col gap-0.5">
-          <span class="text-foreground text-[13px] font-medium">{{ session.user()?.name }}</span>
-          <span class="text-muted-foreground text-xs font-normal">{{ session.user()?.email }}</span>
-        </hlm-dropdown-menu-label>
-        <hlm-dropdown-menu-separator />
-        <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'profile'])">
-            <svg [lucideIcon]="user" [size]="14"></svg>
-            Profile
-          </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'profile'])">
-            <svg [lucideIcon]="settings" [size]="14"></svg>
-            Settings
-            <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openModal('customize-sidebar')">
-            <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
-            Customize sidebar
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openModal('shortcuts')">
-            <svg [lucideIcon]="help" [size]="14"></svg>
-            Keyboard shortcuts
-            <hlm-dropdown-menu-shortcut><app-kbd keys="?" /></hlm-dropdown-menu-shortcut>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
-            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
-            Connect your agent
-          </button>
-          <button hlmDropdownMenuItem (triggered)="showChecklist()">
-            <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
-            Setup checklist
-          </button>
-          <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
-            <svg [lucideIcon]="bookIcon" [size]="14"></svg>
-            What's new
-            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
-          </button>
-        </hlm-dropdown-menu-group>
-        <hlm-dropdown-menu-separator />
-        <hlm-dropdown-menu-label class="flex items-center justify-between">
-          Theme <app-kbd keys="mod+shift+l" />
-        </hlm-dropdown-menu-label>
-        <hlm-dropdown-menu-group>
-          @for (t of themes; track t.mode) {
-            <button
-              hlmDropdownMenuRadio
-              [checked]="theme.mode() === t.mode"
-              (triggered)="theme.set(t.mode)"
-            >
-              <svg [lucideIcon]="t.icon" [size]="14"></svg>
-              {{ t.label }}
-              <hlm-dropdown-menu-radio-indicator />
-            </button>
-          }
-        </hlm-dropdown-menu-group>
-        <hlm-dropdown-menu-separator />
-        <button hlmDropdownMenuItem variant="destructive" (triggered)="session.logout()">
-          <svg [lucideIcon]="logout" [size]="14"></svg>
-          Log out
-        </button>
       </hlm-dropdown-menu>
     </ng-template>
   `,
 })
 export class AppSidebar {
   protected readonly ui = inject(UiStore);
-  protected readonly favorites = inject(FavoritesStore);
   protected readonly shared = inject(SharedProjectsStore);
   protected readonly notifications = inject(NotificationsStore);
   protected readonly store = inject(TramaStore);
   protected readonly session = inject(SessionStore);
-  protected readonly theme = inject(ThemeService);
   private readonly timers = inject(TimeEntriesStore);
   protected readonly sidebar = inject(HlmSidebarService);
   private readonly router = inject(Router);
@@ -813,17 +555,11 @@ export class AppSidebar {
   protected readonly chevronDown = LucideChevronDown;
   protected readonly arrowUpRight = LucideArrowUpRight;
 
-  /** Home, Inbox, Time, Ask in the user's order; a guest does not get Ask. */
-  protected readonly mainNav = computed(() =>
-    this.visible(
-      orderNav(navForRole(SIDEBAR_MAIN_NAV, this.store.isGuest()), this.ui.sidebarOrder().personal),
-    ),
-  );
+  /** Home, Inbox, Time, Ask; a guest does not get Ask. */
+  protected readonly mainNav = computed(() => navForRole(SIDEBAR_MAIN_NAV, this.store.isGuest()));
   /** Tasks, under the WORKSPACE rule. */
   protected readonly workspaceNav = computed(() =>
-    this.visible(
-      orderNav(navForRole(SIDEBAR_WORKSPACE_NAV, this.store.isGuest()), this.ui.sidebarOrder().workspace),
-    ),
+    navForRole(SIDEBAR_WORKSPACE_NAV, this.store.isGuest()),
   );
 
   /** The first path segment of the current URL (`tasks` for `/acme/tasks/UNPR-1`). */
@@ -938,9 +674,6 @@ export class AppSidebar {
   });
   protected readonly inboxCount = computed(() => this.badge('inbox'));
   protected readonly more = LucideEllipsis;
-  protected readonly lock = LucideLock;
-  protected readonly issueIcon = LucideCircleDot;
-  protected readonly layers = LucideLayers;
   protected readonly closeIcon = LucideX;
   protected readonly projectIcon = LucideBox;
 
@@ -957,26 +690,12 @@ export class AppSidebar {
   protected readonly bellIcon = LucideBell;
   protected readonly chevrons = LucideChevronsUpDown;
   protected readonly search = LucideSearch;
-  protected readonly newIcon = LucideSquarePen;
   protected readonly plus = LucidePlus;
   protected readonly check = LucideCheck;
   protected readonly settings = LucideSettings;
   protected readonly user = LucideUserRound;
-  protected readonly help = LucideCircleHelp;
-  protected readonly keyboardIcon = LucideKeyboard;
-  protected readonly keyIcon = LucideKeyRound;
   protected readonly plugIcon = LucidePlug;
-  protected readonly mapIcon = LucideMap;
-  protected readonly checklistIcon = LucideListChecks;
-  protected readonly bookIcon = LucideBookOpen;
-  protected readonly externalIcon = LucideExternalLink;
-  protected readonly latestChanges = CHANGELOG.slice(0, 3);
   protected readonly logout = LucideLogOut;
-  protected readonly themes: { mode: ThemeMode; label: string; icon: LucideIcon }[] = [
-    { mode: 'light', label: 'Light', icon: LucideSun },
-    { mode: 'dark', label: 'Dark', icon: LucideMoon },
-    { mode: 'system', label: 'System', icon: LucideMonitor },
-  ];
 
   protected readonly slug = computed(
     () => this.store.slug() ?? this.session.workspace()?.slug ?? '',
@@ -984,7 +703,6 @@ export class AppSidebar {
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
-  protected readonly wsInitial = computed(() => this.wsName().trim().charAt(0).toUpperCase() || 'T');
   /** The open workspace is the person's own: named after them, nobody else can be added to leave or take it over. */
   protected readonly isPersonal = computed(
     () => (this.store.workspace() ?? this.session.workspace())?.personal === true,
@@ -1015,13 +733,6 @@ export class AppSidebar {
     const u = this.session.user();
     return u ? ({ type: 'user', id: u.id } as const) : null;
   });
-
-  private visible(items: NavItem[]): NavItem[] {
-    return items.filter((item) => {
-      const mode = this.ui.sidebarVisibilityOf(item.segment);
-      return mode === 'always' || (mode === 'badged' && this.badge(item.badge) > 0);
-    });
-  }
 
   /** My open tasks (not done / canceled / draft). */
   private readonly mineCount = computed(() => {
@@ -1061,15 +772,6 @@ export class AppSidebar {
     if (kind === 'mine') return this.mineCount();
     if (kind === 'time') return text ? this.weekTime() : this.weekTime() ? 1 : 0;
     return 0;
-  }
-
-  protected openPublic(path: string): void {
-    window.open(path, '_blank', 'noopener');
-  }
-
-  protected showChecklist(): void {
-    this.ui.requestChecklist();
-    this.go(['/', this.slug(), 'inbox']);
   }
 
   protected go(commands: string[]): void {

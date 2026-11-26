@@ -10,20 +10,11 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
-import {
-  LucideCheck,
-  LucideChevronRight,
-  LucideDynamicIcon,
-  LucideInbox,
-  LucidePanelLeft,
-  LucideSearch,
-} from '@lucide/angular';
+import { LucideCheck, LucideDynamicIcon, LucidePanelLeft } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { filter, map, startWith } from 'rxjs';
-import { FavoritesStore } from '../core/stores/favorites.store';
-import { NotificationsStore } from '../core/stores/notifications.store';
 import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
@@ -70,33 +61,6 @@ import { PageChrome, type Crumb } from './page-chrome';
           >
             <svg [lucideIcon]="panelLeft" [size]="16"></svg>
           </button>
-          <button
-            hlmBtn
-            variant="ghost"
-            size="icon-sm"
-            class="text-muted-foreground"
-            hlmTooltip="Search  ⌘K"
-            position="bottom"
-            aria-label="Search (⌘K)"
-            (click)="ui.openCommandPalette()"
-          >
-            <svg [lucideIcon]="search" [size]="16"></svg>
-          </button>
-          <a
-            hlmBtn
-            variant="ghost"
-            size="icon-sm"
-            class="text-muted-foreground relative"
-            [routerLink]="['/', slug(), 'inbox']"
-            hlmTooltip="Inbox"
-            position="bottom"
-            aria-label="Inbox"
-          >
-            <svg [lucideIcon]="inbox" [size]="16"></svg>
-            @if (inboxCount() > 0) {
-              <span class="bg-primary ring-background absolute top-1 right-1 size-1.5 rounded-full ring-2" aria-hidden="true"></span>
-            }
-          </a>
         </div>
       }
 
@@ -175,8 +139,6 @@ export class TopBar {
   protected readonly sidebar = inject(HlmSidebarService);
   private readonly router = inject(Router);
   protected readonly store = inject(TramaStore);
-  private readonly favorites = inject(FavoritesStore);
-  private readonly notifications = inject(NotificationsStore);
 
   constructor() {
     let wasBusy = false;
@@ -190,10 +152,7 @@ export class TopBar {
   }
 
   protected readonly checkIcon = LucideCheck;
-  protected readonly sep = LucideChevronRight;
   protected readonly panelLeft = LucidePanelLeft;
-  protected readonly search = LucideSearch;
-  protected readonly inbox = LucideInbox;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -206,18 +165,6 @@ export class TopBar {
 
   protected readonly sidebarCollapsed = computed(() => this.sidebar.state() === 'collapsed');
   protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly inboxCount = computed(
-    () => this.store.attentionCount() + this.notifications.updatesUnread(),
-  );
-  protected readonly favoriteTarget = this.favorites.current;
-  protected readonly actors = computed(() => this.chrome.page()?.actors ?? []);
-
-  /** Page description from <app-page-header>, shown after the trail (muted). */
-  protected readonly description = computed(() => {
-    const d = this.chrome.crumbs() ? undefined : this.chrome.page()?.description;
-    const labels = this.crumbs().map((c) => c.label.toLowerCase());
-    return d && !labels.includes(d.toLowerCase()) ? d : undefined;
-  });
 
   /** Settings pages: the trail is "Settings / General" and the right side shows the save state. */
   protected readonly inSettings = computed(

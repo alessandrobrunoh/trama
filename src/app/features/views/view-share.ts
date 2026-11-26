@@ -52,12 +52,6 @@ const ROW_ON = 'bg-primary/10 border-primary/40';
       >
         <header class="border-border flex min-h-[52px] items-center justify-between gap-3 border-b px-4 py-3.5">
           <h2 class="font-title text-foreground text-[19px] leading-[22px]">Share view</h2>
-          @if (!isPublic()) {
-            <button hlmBtn variant="outline" class="bg-card" (click)="copyLink()">
-              <svg [lucideIcon]="linkIcon" [size]="13"></svg>
-              Copy link
-            </button>
-          }
         </header>
 
         <div class="flex flex-col gap-4 p-4">
@@ -190,11 +184,6 @@ const ROW_ON = 'bg-primary/10 border-primary/40';
                 filters, grouping or display, or see anything else in the workspace.
               </p>
             </div>
-          }
-          @if (!canShare() && canManage()) {
-            <p class="text-faint font-mono text-[10.5px] leading-[15px]">
-              Your role cannot share views with the whole workspace or publicly.
-            </p>
           }
         </div>
 
