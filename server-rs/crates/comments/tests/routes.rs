@@ -98,9 +98,9 @@ async fn creates_reads_edits_and_deletes_a_comment() {
     assert_eq!(all.status, StatusCode::OK, "{}", all.message());
     assert_eq!(all.body.as_array().unwrap().len(), 1);
     // a viewer's member grants are narrower than a member's: as for NestJS, they list one subject
-    let res = w.send(Req::get(URL).session(&t.viewer)).await;
-    assert_eq!(res.status, StatusCode::FORBIDDEN);
-    assert_eq!(res.message(), "List comments for one subject you can access");
+    let denied = w.send(Req::get(URL).session(&t.viewer)).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN);
+    assert_eq!(denied.message(), "List comments for one subject you can access");
     let none = w.send(Req::get(&format!("{URL}?subjectId=in_b")).session(&t.member)).await;
     assert_eq!(none.body, json!([]));
 
