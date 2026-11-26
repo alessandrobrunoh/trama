@@ -1,0 +1,35 @@
+[package]
+name = "trama-views"
+description = "Saved views of the Trama API: the views routes, sharing and invitations, and the public link."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+rand.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+unicode-normalization.workspace = true
+utoipa.workspace = true
+trama-auth.workspace = true
+trama-common.workspace = true
+trama-contracts.workspace = true
+trama-core.workspace = true
+trama-entities.workspace = true
+trama-events.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+sea-orm-migration.workspace = true
+tokio.workspace = true
+tower.workspace = true
+trama-core = { workspace = true, features = ["test-support"] }
+trama-migration.workspace = true
+
+[lints]
+workspace = true

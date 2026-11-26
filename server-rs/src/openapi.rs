@@ -17,6 +17,7 @@ use utoipa::openapi::OpenApi as Document;
         (name = "sharing", description = "Shared with me, Show in placements and project transfer"),
         (name = "system", description = "Health and operations"),
         (name = "uploads", description = "Files stored in the workspace and attached to records"),
+        (name = "views", description = "Saved views, sharing and the public link"),
         (name = "workspaces", description = "Workspaces, members, roles, agents, tokens, labels and statuses"),
     ),
 )]
@@ -31,6 +32,7 @@ pub fn api_doc() -> Document {
     doc.merge(trama_sharing::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
     doc.merge(trama_uploads::ApiDoc::openapi());
+    doc.merge(trama_views::ApiDoc::openapi());
     doc.merge(trama_workspaces::ApiDoc::openapi());
     doc
 }
