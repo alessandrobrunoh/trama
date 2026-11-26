@@ -162,19 +162,18 @@ pub async fn create(
     if !project_exists {
         return Err(AppError::bad_request(format!("Unknown project \"{}\"", input.project_id)));
     }
-    let sort_order = match input.sort_order {
-        Some(order) => order,
-        None => {
-            let max: Option<Option<f64>> = milestones::Entity::find()
-                .select_only()
-                .column_as(Expr::col(milestones::Column::SortOrder).max(), "max")
-                .filter(milestones::Column::WorkspaceId.eq(workspace_id))
-                .filter(milestones::Column::ProjectId.eq(input.project_id.as_str()))
-                .into_tuple()
-                .one(&state.db)
-                .await?;
-            max.flatten().map_or(0.0, |max| max + 1.0)
-        }
+    let sort_order = if let Some(order) = input.sort_order {
+        order
+    } else {
+        let max: Option<Option<f64>> = milestones::Entity::find()
+            .select_only()
+            .column_as(Expr::col(milestones::Column::SortOrder).max(), "max")
+            .filter(milestones::Column::WorkspaceId.eq(workspace_id))
+            .filter(milestones::Column::ProjectId.eq(input.project_id.as_str()))
+            .into_tuple()
+            .one(&state.db)
+            .await?;
+        max.flatten().map_or(0.0, |max| max + 1.0)
     };
     let at = now();
     let row = milestones::ActiveModel {
@@ -244,11 +243,12 @@ pub async fn update(
             fields.push("targetDate");
         }
     }
-    if let Some(sort_order) = patch.sort_order {
-        if sort_order != row.sort_order {
-            changes.sort_order = Set(sort_order);
-            fields.push("sortOrder");
-        }
+    // exact comparison, as `JSON.stringify` compares numbers
+    #[allow(clippy::float_cmp)]
+    let sort_order_changed = patch.sort_order.is_some_and(|order| order != row.sort_order);
+    if let Some(sort_order) = patch.sort_order.filter(|_| sort_order_changed) {
+        changes.sort_order = Set(sort_order);
+        fields.push("sortOrder");
     }
     if fields.is_empty() {
         return Ok(present(&row));

@@ -7,6 +7,9 @@
 //! without a zone is UTC (the server's zone). Days up to 31 are accepted in every month and
 //! overflow into the next one, as V8 does.
 
+// the scanners below index a `[char]` with `c`, `i`, `j`, `p` and `q` like a regex would
+#![allow(clippy::many_single_char_names)]
+
 use chrono::{DateTime, Days, NaiveDate, NaiveTime, TimeDelta, Utc};
 
 fn digit(c: &[char], i: usize) -> bool {
