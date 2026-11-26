@@ -19,6 +19,7 @@ dotenvy = "0.15"
 http-body-util = "0.1"
 percent-encoding = "2"
 rand = "0.9"
+regex = "1"
 sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-json", "with-chrono"] }
 sea-orm-migration = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -29,10 +30,12 @@ tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7", features = ["cors", "limit", "set-header", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+unicode-normalization = "0.1"
 url = "2"
 utoipa = { version = "6", features = ["chrono"] }
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 
+trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-migration = { path = "crates/migration" }

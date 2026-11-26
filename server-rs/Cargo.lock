@@ -2762,6 +2762,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "trama-contracts"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "trama-core",
+ "trama-entities",
+ "trama-migration",
+ "unicode-normalization",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "trama-core"
 version = "0.1.0"
 dependencies = [
