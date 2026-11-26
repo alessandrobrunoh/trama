@@ -37,7 +37,8 @@ const THEMES: { id: ThemeMode; label: string; hint: string }[] = [
 ];
 
 const FONT_LABELS: Record<FontSize, string> = { small: 'Small', default: 'Default', large: 'Large', xlarge: 'X-large' };
-const SEND_LABELS: Record<SendKey, string> = { 'mod-enter': '⌘ / Ctrl + Enter', enter: 'Enter' };
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const SEND_LABELS: Record<SendKey, string> = { 'mod-enter': MAC ? '⌘ ↵' : 'Ctrl ↵', enter: '↵' };
 const MOTION_LABELS: Record<MotionMode, string> = { system: 'System', reduce: 'On', full: 'Off' };
 const BRANCH_LABELS: Record<BranchFormat, string> = {
   'user/key-title': '{user}/{id}-{title}',
@@ -53,7 +54,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
   selector: 'app-preferences-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgTemplateOutlet, HlmButtonImports, AppSelect, Kbd, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
@@ -109,7 +110,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
 
     <app-settings-block title="Layout">
       <app-settings-card>
-        <app-card-row label="Font size" description="Scales text and spacing across the app.">
+        <app-card-row label="Font size">
           <app-segmented
             aria-label="Font size"
             [options]="fontOptions"
@@ -131,8 +132,9 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
     <app-settings-block title="Working">
       <app-settings-card>
         <app-card-row label="Home view" description="What opens when you start Trama.">
-          <div class="w-44">
+          <div class="w-[180px]">
             <app-select
+              size="sm"
               label="Home view"
               [options]="homeOptions"
               [value]="prefs.homeView()"
@@ -140,7 +142,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             />
           </div>
         </app-card-row>
-        <app-card-row label="Send comments with" description="With Enter, use Shift + Enter for a new line.">
+        <app-card-row label="Send comments with">
           <app-segmented
             aria-label="Send comments with"
             [options]="sendOptions"
@@ -156,8 +158,9 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
           />
         </app-card-row>
         <app-card-row label="Git branch format" description="Used by Copy branch name on a task. Stored in this browser only.">
-          <div class="w-56">
+          <div class="w-[240px]">
             <app-select
+              size="sm"
               label="Git branch format"
               [options]="branchOptions"
               [value]="branches.format()"
@@ -165,9 +168,9 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             />
           </div>
         </app-card-row>
-        <div class="bg-bg-deep flex items-center gap-6 px-4 py-3">
+        <div class="bg-bg-deep flex items-center gap-6 px-4 py-3.5">
           <span class="text-foreground flex-1 text-[13.5px]">Preview</span>
-          <code class="text-text-2 min-w-0 truncate font-mono text-[12px]">{{ branches.name(sample.key, sample.title) }}</code>
+          <code class="text-text-2 min-w-0 truncate font-mono text-[11.5px]">{{ branches.name(sample.key, sample.title) }}</code>
         </div>
       </app-settings-card>
     </app-settings-block>

@@ -27,12 +27,12 @@ export function splitEmails(text: string): string[] {
   host: { class: 'block' },
   template: `
     <div
-      class="bg-background border-border focus-within:border-primary flex min-h-[34px] flex-wrap items-center gap-1.5 border px-2 py-1 transition-colors"
+      class="bg-background border-border focus-within:border-primary flex flex-wrap items-center gap-1.5 border p-2 transition-colors"
       (click)="field.focus()"
     >
       @for (email of emails(); track email) {
         <span
-          class="bg-secondary inline-flex items-center gap-1 border px-1.5 py-px font-mono text-[11px] leading-[16px]"
+          class="bg-secondary inline-flex items-center gap-1.5 border py-[3px] pr-1.5 pl-2 font-mono text-[12px] leading-[normal]"
           [class.border-border]="valid(email)"
           [class.border-red]="!valid(email)"
           [class.text-red]="!valid(email)"
@@ -53,7 +53,7 @@ export function splitEmails(text: string): string[] {
         #field
         type="email"
         autocomplete="off"
-        class="placeholder:text-faint min-w-32 flex-1 bg-transparent py-0.5 text-[13px] outline-none"
+        class="placeholder:text-faint min-w-32 flex-1 bg-transparent text-[12.5px] leading-[normal] outline-none"
         [attr.aria-label]="label()"
         [placeholder]="emails().length ? 'Add more…' : placeholder()"
         [disabled]="disabled()"

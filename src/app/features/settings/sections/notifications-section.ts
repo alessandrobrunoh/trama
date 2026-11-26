@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import { LucideBell, LucideDynamicIcon, LucideMail, LucideSmartphone, type LucideIcon } from '@lucide/angular';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import {
   NOTIFICATION_KIND_META,
@@ -21,8 +22,8 @@ interface KindGroup {
 @Component({
   selector: 'app-notifications-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmCheckbox, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  imports: [HlmCheckbox, LucideDynamicIcon, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
@@ -32,9 +33,10 @@ interface KindGroup {
 
     @if (!store.emailAvailable() || !store.pushAvailable()) {
       <div class="border-primary/40 bg-primary/10 flex flex-wrap items-center gap-3 border px-3.5 py-3">
+        <svg [lucideIcon]="mailIcon" [size]="16" class="text-primary shrink-0" aria-hidden="true"></svg>
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="text-foreground text-[13px]">{{ bannerTitle() }}</span>
-          <span class="text-muted-foreground text-[12px] leading-[18px]">
+          <span class="text-muted-foreground text-[12px]">
             An admin adds <code class="font-mono">SMTP_URL</code> for email and VAPID keys for push. Until then those columns are off.
           </span>
         </div>
@@ -47,7 +49,9 @@ interface KindGroup {
           <div class="text-faint flex-1 py-2.5 font-mono text-[10.5px]">WHEN</div>
           @for (channel of channels; track channel.id) {
             <div class="flex w-20 shrink-0 flex-col items-center gap-[3px] py-2.5 sm:w-24" [class.opacity-55]="unavailable(channel.id)">
-              <span class="text-foreground/80 font-mono text-[10.5px]">{{ channel.label }}</span>
+              <span class="text-text-2 flex items-center gap-[5px] font-mono text-[10.5px]">
+                <svg [lucideIcon]="channel.icon" [size]="12" aria-hidden="true"></svg>{{ channel.label }}
+              </span>
               <span class="font-mono text-[9.5px]" [class]="channelStateClass(channel.id)">{{ channelState(channel.id) }}</span>
             </div>
           }
@@ -59,7 +63,7 @@ interface KindGroup {
             <div class="border-border flex items-center border-t pl-4">
               <div class="flex min-w-0 flex-1 flex-col gap-0.5 py-2.5 pr-3">
                 <span class="text-foreground text-[13px]">{{ meta[kind].label }}</span>
-                <span class="text-faint text-[11.5px] leading-[16px]">{{ meta[kind].description }}</span>
+                <span class="text-faint text-[11.5px]">{{ meta[kind].description }}</span>
               </div>
               @for (channel of channels; track channel.id) {
                 <div class="flex w-20 shrink-0 justify-center sm:w-24" [class.opacity-40]="unavailable(channel.id)">
@@ -98,10 +102,11 @@ export class NotificationsSection implements OnInit {
     { title: 'ASSIGNED AND REVIEWS', kinds: ['assigned', 'review_requested'] },
     { title: 'WORK I FOLLOW', kinds: ['comment', 'ci_failed'] },
   ];
-  protected readonly channels: readonly { id: NotificationChannel; label: string }[] = [
-    { id: 'inApp', label: 'IN-APP' },
-    { id: 'email', label: 'EMAIL' },
-    { id: 'push', label: 'PUSH' },
+  protected readonly mailIcon = LucideMail;
+  protected readonly channels: readonly { id: NotificationChannel; label: string; icon: LucideIcon }[] = [
+    { id: 'inApp', label: 'IN-APP', icon: LucideBell },
+    { id: 'email', label: 'EMAIL', icon: LucideMail },
+    { id: 'push', label: 'PUSH', icon: LucideSmartphone },
   ];
 
   protected unavailable(channel: NotificationChannel): boolean {

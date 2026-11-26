@@ -46,7 +46,7 @@ import {
   mappingFromDraft,
   type MappingDraft,
 } from './import-model';
-import { SECTION_KIT, SETTINGS_FIELD, type SegmentedOption, type StatCell } from './section-kit';
+import { SECTION_KIT, SETTINGS_FIELD, SETTINGS_SELECT, type SegmentedOption, type StatCell } from './section-kit';
 
 const POLL_MS = 2000;
 
@@ -63,13 +63,15 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
   selector: 'app-import-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AppSelect, HlmButtonImports, HlmCheckbox, LucideDynamicIcon, NgTemplateOutlet, RelativeTimePipe, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
+      flush
       title="Import"
-      description="Bring work from another tool. Nothing is written until you confirm. Trama only reads from the tracker, and running an import again skips what was already imported."
+      description="Bring work from another tool. Nothing is written until you confirm, and running an import again skips what exists."
     />
     @if (!canManage()) {
-      <app-readonly-note>Only admins can import. You can still see past imports.</app-readonly-note>
+      <app-readonly-note class="mb-0!">Only admins can import. You can still see past imports.</app-readonly-note>
     }
 
     <div class="flex flex-col gap-9">
@@ -84,7 +86,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                   {{ s.n }}
                 }
               </span>
-              <span class="text-[13px] whitespace-nowrap" [class]="step() >= s.n ? 'text-foreground' : 'text-faint'">{{ s.label }}</span>
+              <span class="text-[13px] leading-[normal] whitespace-nowrap" [class]="step() >= s.n ? 'text-foreground' : 'text-faint'">{{ s.label }}</span>
             </li>
             @if (!$last) {
               <li class="bg-border h-px min-w-4 flex-1" aria-hidden="true"></li>
@@ -134,13 +136,13 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
               <svg [lucideIcon]="p.provider === 'github' ? githubIcon : linearIcon" [size]="16"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span class="text-foreground truncate text-[13.5px]">{{ p.sourceLabel }}</span>
-              <span class="text-faint truncate font-mono text-[10.5px]">Read as {{ p.account }} · nothing has been written yet</span>
+              <span class="text-foreground truncate text-[13.5px] leading-[normal]">{{ p.sourceLabel }}</span>
+              <span class="text-faint truncate font-mono text-[10.5px] leading-[normal]">Read as {{ p.account }} · nothing has been written yet</span>
             </div>
-            <button type="button" class="text-muted-foreground hover:text-foreground shrink-0 text-[12.5px]" (click)="resetPreview()">Change</button>
+            <button type="button" class="text-muted-foreground hover:text-foreground shrink-0 text-[12.5px] leading-[normal]" (click)="resetPreview()">Change</button>
           </div>
 
-          <app-stat-strip large [cells]="statCells()" />
+          <app-stat-strip large valueFirst [cells]="statCells()" />
 
           @for (w of p.warnings; track w) {
             <p class="text-status-needs-input -mt-5 flex items-start gap-1.5 font-mono text-[10.5px]">
@@ -166,8 +168,9 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           }
 
           <div class="grid items-start gap-x-5 gap-y-9 lg:grid-cols-2">
-            <app-settings-block title="Status" description="Each state of the tracker becomes one of Trama’s statuses.">
-              <app-settings-card>
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2"><h3 class="text-foreground text-[13px] leading-[normal] font-medium">Status</h3></div>
+              <div class="bg-card border-border divide-border divide-y border" [class]="selectField">
                 @for (s of p.statuses; track s.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -182,16 +185,20 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 }
-              </app-settings-card>
-            </app-settings-block>
+              </div>
+            </section>
 
-            <app-settings-block title="People" description="Matched by email, then by login or name. An assignee left unmatched leaves the issue unassigned.">
-              @if (unmatched() > 0) {
-                <span aside class="text-primary flex items-center gap-1.5 font-mono text-[10.5px]">
-                  <svg [lucideIcon]="warnIcon" [size]="12"></svg>{{ unmatched() }} not matched
-                </span>
-              }
-              <app-settings-card class="max-h-96 overflow-y-auto">
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-foreground text-[13px] leading-[normal] font-medium">People</h3>
+                <span class="flex-1"></span>
+                @if (unmatched() > 0) {
+                  <span class="text-primary flex items-center gap-1.5 font-mono text-[10.5px] leading-[normal]">
+                    <svg [lucideIcon]="warnIcon" [size]="12"></svg>{{ unmatched() }} not matched
+                  </span>
+                }
+              </div>
+              <div class="bg-card border-border divide-border max-h-96 divide-y overflow-y-auto border" [class]="selectField">
                 @for (u of p.users; track u.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -206,16 +213,17 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No people to map.</p>
+                  <p class="text-faint px-3.5 py-3 font-mono text-[10.5px]">No people to map.</p>
                 }
-              </app-settings-card>
-            </app-settings-block>
+              </div>
+            </section>
 
-            <app-settings-block
-              title="Projects"
-              [description]="p.provider === 'github' ? 'Milestones of the repository become milestones of this project (' + p.counts.milestones + ').' : 'Linear projects and their milestones.'"
-            >
-              <app-settings-card>
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2"><h3 class="text-foreground text-[13px] leading-[normal] font-medium">Projects</h3></div>
+              <p class="text-faint font-mono text-[10.5px] leading-[normal]">
+                {{ p.provider === 'github' ? 'Milestones of the repository become milestones of this project (' + p.counts.milestones + ').' : 'Linear projects and their milestones.' }}
+              </p>
+              <div class="bg-card border-border divide-border divide-y border" [class]="selectField">
                 @for (x of p.projects; track x.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -230,17 +238,20 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No projects in the source.</p>
+                  <p class="text-faint px-3.5 py-3 font-mono text-[10.5px]">No projects in the source.</p>
                 }
-              </app-settings-card>
-            </app-settings-block>
+              </div>
+            </section>
 
-            <app-settings-block
-              title="Labels"
-              [caption]="'' + p.labels.length"
-              description="A tracker label can reuse a Trama label, become a new one or be dropped. Labels named bug, security, incident, chore or idea also pick the issue kind."
-            >
-              <app-settings-card class="max-h-96 overflow-y-auto">
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-foreground text-[13px] leading-[normal] font-medium">Labels</h3>
+                <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ p.labels.length }}</span>
+              </div>
+              <p class="text-faint font-mono text-[10.5px] leading-[normal]">
+                A label can reuse a Trama label, become a new one or be dropped. Names like bug or security also pick the issue kind.
+              </p>
+              <div class="bg-card border-border divide-border max-h-96 divide-y overflow-y-auto border" [class]="selectField">
                 @for (l of p.labels; track l.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -255,10 +266,10 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No labels in the source.</p>
+                  <p class="text-faint px-3.5 py-3 font-mono text-[10.5px]">No labels in the source.</p>
                 }
-              </app-settings-card>
-            </app-settings-block>
+              </div>
+            </section>
           </div>
 
           @if (p.sample.length) {
@@ -278,27 +289,27 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           <div class="border-border flex flex-wrap items-center gap-x-6 gap-y-3 border px-3.5 py-3">
             <div class="flex items-center gap-2">
               <hlm-checkbox [checked]="options().includeComments" aria-label="Import comments" (checkedChange)="setOption({ includeComments: $event })" />
-              <span class="text-[12.5px]" title="Copy each issue’s comments. They appear as written by you, with the original author and date in the text.">Import comments</span>
+              <span class="text-text-2 text-[12.5px] leading-[normal]" title="Copy each issue’s comments. They appear as written by you, with the original author and date in the text.">Import comments</span>
             </div>
             <div class="flex items-center gap-2">
               <hlm-checkbox [checked]="options().includeClosed" aria-label="Import closed issues" (checkedChange)="setOption({ includeClosed: $event })" />
-              <span class="text-[12.5px]">Include closed issues</span>
+              <span class="text-text-2 text-[12.5px] leading-[normal]">Include closed issues</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[12.5px]">Default kind</span>
-              <div class="w-[140px]">
+              <span class="text-text-2 text-[12.5px] leading-[normal]">Default kind</span>
+              <div class="w-[140px]" [class]="selectField">
                 <app-select size="sm" label="Default kind" [options]="kindOptions" [value]="options().defaultKind" (valueChange)="setOption({ defaultKind: $any($event) })" />
               </div>
             </div>
           </div>
 
-          <div class="-mt-3 flex flex-wrap items-center gap-2">
-            <span class="text-faint font-mono text-[10.5px]">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-faint font-mono text-[10.5px] leading-[normal]">
               @if (p.counts.issues !== null) { About {{ p.counts.issues }} issues. } Imported issues keep their dates and link back to the original.
             </span>
             <span class="flex-1"></span>
-            <button hlmBtn size="sm" variant="outline" (click)="resetPreview()">Back</button>
-            <button hlmBtn size="sm" [disabled]="busy() || !!active()" (click)="start()">
+            <button hlmBtn variant="outline" (click)="resetPreview()">Back</button>
+            <button hlmBtn [disabled]="busy() || !!active()" (click)="start()">
               @if (active()) {
                 Another import is running
               } @else {
@@ -393,7 +404,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
               }
 
               <div class="flex items-center justify-end gap-2 px-4 py-3">
-                <button hlmBtn size="sm" [disabled]="!canPreview() || busy()" (click)="runPreview()">
+                <button hlmBtn [disabled]="!canPreview() || busy()" (click)="runPreview()">
                   @if (busy() && !preview()) { Reading… } @else { Preview }
                 </button>
               </div>
@@ -404,7 +415,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
 
       <app-settings-block title="History" [caption]="'' + jobs().length">
         <div class="bg-card border-border border">
-          <div class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] md:grid md:grid-cols-[minmax(0,1fr)_96px_minmax(0,200px)_104px_64px]">
+          <div class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] md:grid md:grid-cols-[minmax(0,1fr)_90px_180px_90px_60px]">
             <span>SOURCE</span>
             <span>WHEN</span>
             <span>RESULT</span>
@@ -413,13 +424,13 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           </div>
           @for (j of jobs(); track j.id) {
             <div class="border-border hover:bg-secondary flex flex-col gap-1.5 border-t px-4 py-2.5 first:border-t-0 md:first:border-t">
-              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:grid-cols-[minmax(0,1fr)_96px_minmax(0,200px)_104px_64px]">
-                <span class="text-foreground min-w-0 truncate text-[13px]">{{ j.sourceLabel }}</span>
-                <span class="text-muted-foreground font-mono text-[10.5px]">{{ j.createdAt | relativeTime }}</span>
-                <span class="text-foreground/80 truncate font-mono text-[10.5px] tabular-nums">
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:grid-cols-[minmax(0,1fr)_90px_180px_90px_60px]">
+                <span class="text-foreground min-w-0 truncate text-[13px] leading-[normal]">{{ j.sourceLabel }}</span>
+                <span class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">{{ j.createdAt | relativeTime }}</span>
+                <span class="text-text-2 truncate font-mono text-[10.5px] leading-[normal] tabular-nums">
                   {{ j.progress.created }} created · {{ j.progress.skipped }} skipped@if (j.progress.failed) { · {{ j.progress.failed }} failed }
                 </span>
-                <span class="border-border text-foreground/80 inline-flex w-fit items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px]">
+                <span class="border-border text-text-2 inline-flex w-fit items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
                   <span class="size-1.5" [class]="dotClass(j)"></span>{{ statusText[j.status] }}
                 </span>
                 <span class="flex items-center justify-end gap-1">
@@ -458,9 +469,9 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
     <ng-template #mapRow let-name="name" let-hint="hint" let-options="options" let-value="value" let-label="label" let-kind="kind" let-id="id">
       <div class="flex items-center gap-4 px-3.5 py-2">
         <div class="flex min-w-0 flex-1 items-center gap-2">
-          <span class="text-foreground/80 truncate font-mono text-[12px]">{{ name }}</span>
+          <span class="text-text-2 truncate font-mono text-[12px] leading-[normal]">{{ name }}</span>
           @if (hint) {
-            <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ hint }}</span>
+            <span class="text-faint shrink-0 font-mono text-[10.5px] leading-[normal]">{{ hint }}</span>
           }
         </div>
         <svg [lucideIcon]="arrow" [size]="13" class="text-faint shrink-0"></svg>
@@ -479,6 +490,7 @@ export class ImportSection {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly field = SETTINGS_FIELD;
+  protected readonly selectField = SETTINGS_SELECT;
   protected readonly steps = [
     { n: 1, label: 'Source' },
     { n: 2, label: 'Map and preview' },

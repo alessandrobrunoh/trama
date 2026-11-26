@@ -12,6 +12,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { LucideDynamicIcon, LucideFolderLock, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -31,10 +32,9 @@ import { Notifier } from '../../../core/notify/notifier';
 import { InvitesStore } from '../../../core/stores/invites.store';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { AppSelect, type Option } from '../../create/form-kit';
-import { V3DialogFoot, V3DialogHead, V3Field } from '../../../shared/v3';
 import { EmailChips, isEmail } from './email-chips';
 import { MemberAccessEditor } from './member-access-editor';
-import { SECTION_KIT } from './section-kit';
+import { SECTION_KIT, SETTINGS_SELECT } from './section-kit';
 
 @Component({
   selector: 'app-members-invite-dialog',
@@ -46,29 +46,40 @@ import { SECTION_KIT } from './section-kit';
     AppSelect,
     EmailChips,
     MemberAccessEditor,
-    V3DialogHead,
-    V3DialogFoot,
-    V3Field,
+    LucideDynamicIcon,
     ...SECTION_KIT,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="close()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[560px]"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[520px]"
         [showCloseButton]="false"
         (keydown.meta.enter)="send($event)"
         (keydown.control.enter)="send($event)"
       >
-        <v3-dialog-head (dismiss)="close()">
-          <h2 hlmDialogTitle>Invite people to {{ workspaceName() }}</h2>
-        </v3-dialog-head>
-        <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3 text-[12px]">
-          They join the workspace, not a single project.
-        </p>
+        <div
+          class="flex shrink-0 items-center gap-2.5 px-5 pt-[18px] [&_h2]:font-title [&_h2]:text-foreground [&_h2]:m-0 [&_h2]:text-[20px] [&_h2]:leading-[normal] [&_h2]:font-normal [&_h2]:tracking-normal"
+        >
+          <div class="flex min-w-0 flex-col gap-1">
+            <h2 hlmDialogTitle>Invite people to {{ workspaceName() }}</h2>
+            <p hlmDialogDescription class="text-faint font-mono text-[10.5px] leading-[normal]">
+              They join the workspace, not a single project
+            </p>
+          </div>
+          <span class="min-w-0 flex-1"></span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 outline-none focus-visible:ring-2"
+            aria-label="Close"
+            (click)="close()"
+          >
+            <svg [lucideIcon]="xIcon" [size]="15"></svg>
+          </button>
+        </div>
 
         @if (sent().length) {
-          <div class="flex flex-col gap-3 p-[18px]" role="status">
+          <div class="flex flex-col gap-3 p-5" role="status">
             <p class="text-[13px] leading-snug">
               {{ sent().length === 1 ? 'Invitation sent.' : sent().length + ' invitations sent.' }}
               @if (unmailed().length) {
@@ -86,12 +97,14 @@ import { SECTION_KIT } from './section-kit';
               A link works for 7 days and only for that email address.
             </p>
           </div>
-          <v3-dialog-foot>
+          <div class="bg-bg-deep border-border flex shrink-0 items-center gap-2 border-t px-5 py-3">
+            <span class="min-w-0 flex-1"></span>
             <button hlmBtn size="sm" type="button" (click)="close()">Done</button>
-          </v3-dialog-foot>
+          </div>
         } @else {
-          <div class="flex flex-col gap-4 p-[18px]">
-            <v3-field label="EMAILS">
+          <div class="flex flex-col gap-[18px] p-5">
+            <div class="flex flex-col gap-2">
+              <span class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">EMAILS</span>
               <app-email-chips
                 [emails]="emails()"
                 (emailsChange)="emails.set($event)"
@@ -103,9 +116,10 @@ import { SECTION_KIT } from './section-kit';
                   {{ invalid().join(', ') }} {{ invalid().length === 1 ? 'is not an email address' : 'are not email addresses' }}.
                 </p>
               }
-            </v3-field>
+            </div>
 
-            <v3-field label="ROLE AND PROJECTS">
+            <div class="flex flex-col gap-2 ${SETTINGS_SELECT}">
+              <span class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">ROLE AND PROJECTS</span>
               <div class="flex flex-col gap-3">
                 <app-select
                   size="sm"
@@ -114,7 +128,7 @@ import { SECTION_KIT } from './section-kit';
                   [value]="role()"
                   (valueChange)="role.set($event)"
                 />
-                <p class="text-muted-foreground text-xs leading-snug">{{ roleDetail() }}</p>
+                <p class="text-faint font-mono text-[10.5px] leading-[normal]">{{ roleDetail() }}</p>
                 @if (!isOwnerRole()) {
                   <app-member-access-editor
                     [showGrants]="false"
@@ -147,20 +161,25 @@ import { SECTION_KIT } from './section-kit';
                   }
                 }
               </div>
-            </v3-field>
+            </div>
 
-            <p class="text-muted-foreground border-border border-l-2 pl-3 text-[12px] leading-snug">
-              Only need one project? Open it and use Share. They join as a guest and see nothing else
-              in {{ workspaceName() }}.
-            </p>
+            <div class="bg-bg-deep border-border flex gap-2.5 border px-3 py-2.5">
+              <svg [lucideIcon]="folderLockIcon" [size]="14" class="text-text-2 mt-px shrink-0"></svg>
+              <p class="text-text-2 text-[12px] leading-[18px]">
+                Only need one project? Open it and use Share. They join as a guest and see nothing else
+                in {{ workspaceName() }}.
+              </p>
+            </div>
           </div>
 
-          <v3-dialog-foot>
-            <button hlmBtn variant="ghost" size="sm" type="button" (click)="close()">Cancel</button>
+          <div class="bg-bg-deep border-border flex shrink-0 items-center gap-2 border-t px-5 py-3">
+            <span class="min-w-0 flex-1"></span>
+            <button hlmBtn variant="outline" size="sm" type="button" (click)="close()">Cancel</button>
             <button hlmBtn size="sm" type="button" [disabled]="!canSend()" (click)="send($event)">
               {{ sendLabel() }}
+              <span class="text-[10.5px] opacity-70">⌘↵</span>
             </button>
-          </v3-dialog-foot>
+          </div>
         }
       </hlm-dialog-content>
     </hlm-dialog>
@@ -175,6 +194,8 @@ export class MembersInviteDialog {
   private readonly notifier = inject(Notifier);
   private readonly chips = viewChild(EmailChips);
 
+  protected readonly xIcon = LucideX;
+  protected readonly folderLockIcon = LucideFolderLock;
   protected readonly emails = signal<string[]>([]);
   protected readonly role = signal<string>('member');
   protected readonly access = signal<MemberAccess>(emptyMemberAccess());

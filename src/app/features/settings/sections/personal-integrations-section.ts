@@ -16,6 +16,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import type { CreateIntegrationInput, IntegrationDetail } from '../../../core/api/api.types';
 import { Notifier } from '../../../core/notify/notifier';
+import { SessionStore } from '../../../core/session/session.store';
 import { PersonalConnectionsStore } from '../../../core/stores/personal-connections.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { RelativeTimePipe } from '../../../shared/pipes';
@@ -45,28 +46,27 @@ import { SECTION_KIT } from './section-kit';
     ExternalIdentitiesSection,
     ...SECTION_KIT,
   ],
-  host: { class: 'block' },
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
+      flush
       title="Integrations"
       description="Your own accounts. Use them in rules on any project you can write to, in any workspace. Several accounts per provider are fine."
     >
-      <button actions hlmBtn (click)="openAdd()">
+      <button actions hlmBtn size="sm" (click)="openAdd()">
         <svg [lucideIcon]="plus" [size]="13"></svg>
         Add account
       </button>
     </app-section-header>
 
     @if (adding()) {
-      <div class="mb-8">
-        <app-connection-add-form scopeWord="personal" [busy]="busy()" (submitted)="add($event)" (cancelled)="adding.set(false)" />
-      </div>
+      <app-connection-add-form scopeWord="personal" [busy]="busy()" (submitted)="add($event)" (cancelled)="adding.set(false)" />
     }
 
-    <app-settings-group title="Connections" [caption]="store.connections().length ? '' + store.connections().length : ''">
+    <app-settings-block title="Connections" [caption]="store.connections().length ? '' + store.connections().length : ''">
       @if (store.connections().length) {
-        <div class="bg-bg-deep border-border mt-3 border">
-          <div class="text-faint grid grid-cols-[minmax(0,1fr)_110px_28px] items-center gap-4 px-4 py-2 font-mono text-[10.5px] sm:grid-cols-[minmax(0,1fr)_120px_120px_28px]">
+        <div class="bg-card border-border border">
+          <div class="bg-bg-deep text-faint grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] sm:grid-cols-[minmax(0,1fr)_230px_120px_14px]">
             <span>ACCOUNT</span>
             <span class="hidden sm:block">ADDED</span>
             <span>STATE</span>
@@ -74,14 +74,14 @@ import { SECTION_KIT } from './section-kit';
           </div>
           @for (c of store.connections(); track c.id) {
             <div
-              class="border-border grid grid-cols-[minmax(0,1fr)_110px_28px] items-center gap-4 border-t px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_120px_120px_28px]"
+              class="border-border grid grid-cols-[minmax(0,1fr)_120px_14px] items-center gap-4 border-t px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_230px_120px_14px]"
               [class]="needsAttention(c) ? 'bg-red/5' : ''"
             >
-              <div class="flex min-w-0 items-center gap-2.5">
+              <div class="flex min-w-0 items-center gap-2">
                 <span class="bg-secondary border-border text-foreground flex size-[30px] shrink-0 items-center justify-center border">
                   <app-provider-icon [provider]="c.provider" [size]="15" />
                 </span>
-                <div class="flex min-w-0 flex-col gap-[3px]">
+                <div class="flex min-w-0 flex-col gap-0.5">
                   @if (renaming() === c.id) {
                     <form class="flex items-center gap-2" (submit)="saveName($event, c)">
                       <input
@@ -97,26 +97,24 @@ import { SECTION_KIT } from './section-kit';
                       <button hlmBtn type="button" size="sm" variant="ghost" (click)="renaming.set(null)">Cancel</button>
                     </form>
                   } @else {
-                    <span class="text-foreground truncate text-[13.5px] leading-none">{{ c.label }}</span>
+                    <span class="text-foreground truncate text-[13.5px] leading-[normal]">{{ c.label }}</span>
                   }
-                  <span class="text-faint truncate font-mono text-[10.5px] leading-none">{{ line(c) }}</span>
+                  <span class="text-faint truncate font-mono text-[10.5px] leading-[normal]">{{ line(c) }}</span>
                 </div>
               </div>
-              <span class="text-muted-foreground hidden font-mono text-[11px] sm:block">{{ c.createdAt | relativeTime }}</span>
+              <span class="text-text-2 hidden font-mono text-[10.5px] leading-[normal] sm:block">{{ c.createdAt | relativeTime }}</span>
               <span>
-                <span class="border-border text-muted-foreground inline-flex items-center gap-[5px] border px-1.5 py-[3px] font-mono text-[10px] leading-none">
+                <span class="border-border text-text-2 inline-flex items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
                   <span class="size-1.5" [class]="dot(c.status)" aria-hidden="true"></span>{{ statusText(c.status) }}
                 </span>
               </span>
               <button
-                hlmBtn
-                variant="ghost"
-                size="icon-sm"
-                class="text-muted-foreground"
+                type="button"
+                class="text-muted-foreground hover:text-foreground relative flex size-[14px] items-center justify-center before:absolute before:-inset-2 before:content-['']"
                 [attr.aria-label]="'Actions for ' + c.label"
                 [hlmDropdownMenuTrigger]="menu"
               >
-                <svg [lucideIcon]="more" [size]="16"></svg>
+                <svg [lucideIcon]="more" [size]="14"></svg>
               </button>
               <ng-template #menu>
                 <hlm-dropdown-menu class="w-52">
@@ -144,44 +142,46 @@ import { SECTION_KIT } from './section-kit';
           }
         </div>
       } @else if (store.loaded()) {
-        <p class="text-muted-foreground max-w-[560px] pt-4 text-[13px] leading-snug">
+        <p class="bg-card border-border text-muted-foreground border px-4 py-3.5 text-[12.5px] leading-[19px]">
           No personal accounts yet. Add one to use it in rules on the projects you can write to, next to the workspace's own connections.
         </p>
       }
-    </app-settings-group>
+    </app-settings-block>
 
     @for (c of attention(); track c.id) {
-      <div class="border-red/40 bg-red/5 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3" role="alert">
+      <div class="border-red/40 bg-red/10 flex flex-wrap items-center gap-x-3 gap-y-2 border px-3.5 py-3" role="alert">
         <svg [lucideIcon]="warn" [size]="16" class="text-red shrink-0"></svg>
-        <div class="min-w-0 flex-1">
-          <p class="text-foreground text-[13px]">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p class="text-foreground text-[13px] leading-[normal]">
             {{ c.status === 'revoked' ? c.label + ' was revoked on ' + c.host : (c.lastError ?? c.label + ' was rejected by ' + c.host) }}
           </p>
-          <p class="text-muted-foreground mt-0.5 text-[12px] leading-snug">
+          <p class="text-muted-foreground text-[12px] leading-[normal]">
             Anything that reads through it shows an error to everyone on that project. Reconnect it, or ask an admin to switch the rule to a workspace connection.
           </p>
         </div>
-        <button hlmBtn (click)="startEdit(c)">
+        <button hlmBtn size="sm" (click)="startEdit(c)">
           <svg [lucideIcon]="refresh" [size]="13"></svg>
           Reconnect
         </button>
       </div>
     }
 
-    <div class="border-border text-muted-foreground mt-6 flex items-start gap-3 border px-4 py-3 text-[12.5px] leading-snug">
-      <svg [lucideIcon]="lock" [size]="14" class="mt-0.5 shrink-0"></svg>
-      <p>
-        Personal connections never share their token. On shared projects, other people only see that a source "receives from GitLab via" your connection,
-        by name. If you leave a workspace, its rules that use your connections stop and say so.
+    <div class="bg-card border-border text-text-2 flex items-start gap-2.5 border px-3.5 py-2.5 text-[12.5px] leading-[19px]">
+      <svg [lucideIcon]="lock" [size]="14" class="text-muted-foreground mt-[3px] shrink-0"></svg>
+      <p class="flex-1">
+        Personal connections never share their token. On shared projects others see "receives from GitLab via {{ firstName() }}'s connection". If you leave a
+        workspace, its rules that use your connections stop and say so.
       </p>
     </div>
 
-    <app-external-identities class="mt-8 block" />
+    <app-external-identities />
   `,
 })
 export class PersonalIntegrationsSection {
   protected readonly store = inject(PersonalConnectionsStore);
+  private readonly session = inject(SessionStore);
   private readonly ui = inject(UiStore);
+  protected readonly firstName = computed(() => this.session.user()?.name.split(/\s+/)[0] ?? 'the owner');
   private readonly notify = inject(Notifier);
 
   protected readonly plus = LucidePlus;

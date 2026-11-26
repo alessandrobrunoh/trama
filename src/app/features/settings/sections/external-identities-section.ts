@@ -16,7 +16,7 @@ import { Notifier } from '../../../core/notify/notifier';
 import { Picker, type PickOption } from '../../../shared/picker';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { V3_FIELD, V3Field } from '../../../shared/v3';
-import { SettingsGroup } from './section-kit';
+import { SettingsBlock } from './section-kit';
 
 const PROVIDER_OPTIONS: PickOption[] = EXTERNAL_IDENTITY_PROVIDERS.map((value) => ({
   value,
@@ -24,7 +24,7 @@ const PROVIDER_OPTIONS: PickOption[] = EXTERNAL_IDENTITY_PROVIDERS.map((value) =
 }));
 
 /** Column layout shared by the header and the rows (wide screens). */
-const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]';
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_14px] sm:grid-cols-[120px_200px_minmax(0,1fr)_160px_14px]';
 
 /**
  * The logins the signed-in person has in other tools (settings · Integrations · Personal, "External
@@ -37,10 +37,10 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
 @Component({
   selector: 'app-external-identities',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, Picker, ProviderIcon, V3Field, SettingsGroup],
+  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, Picker, ProviderIcon, V3Field, SettingsBlock],
   host: { class: 'block' },
   template: `
-    <app-settings-group
+    <app-settings-block
       title="External identities"
       [caption]="items() ? '' + items()!.length : ''"
       description="All the logins that are you. Issues assigned to any of them, reviews requested from them, and their activity show up in My tasks and Inbox."
@@ -51,7 +51,7 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
       </button>
 
       @if (adding()) {
-        <form class="border-border grid gap-3 border-b px-1 py-3.5 sm:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end" (submit)="submit($event)">
+        <form class="bg-card border-border grid gap-3 border px-4 py-3.5 sm:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end" (submit)="submit($event)">
           <v3-field label="PROVIDER">
             <app-picker
               variant="input"
@@ -102,15 +102,14 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
 
       @if (items(); as list) {
         @if (list.length) {
-          <div class="border-border mt-4 border">
-            <div class="text-faint border-border bg-bg-deep hidden gap-x-3 border-b py-2.5 pr-[52px] pl-3 font-mono text-[10.5px] leading-none sm:grid" [class]="columns" aria-hidden="true">
-              <span>PROVIDER</span><span>HOST</span><span>LOGIN</span><span>ADDED</span>
+          <div class="bg-card border-border border">
+            <div class="text-faint bg-bg-deep hidden gap-x-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] sm:grid" [class]="columns" aria-hidden="true">
+              <span>PROVIDER</span><span>HOST</span><span>LOGIN</span><span>ADDED</span><span></span>
             </div>
             <ul>
               @for (item of list; track item.id) {
-                <li class="border-border flex items-center gap-3 border-b px-3 py-2.5 last:border-b-0">
-                  <div class="grid min-w-0 flex-1 grid-cols-2 items-center gap-x-3 gap-y-1" [class]="columns">
-                    <span class="text-foreground flex min-w-0 items-center gap-2 text-[13px]">
+                <li class="border-border grid items-center gap-x-4 gap-y-1 border-t px-4 py-2.5" [class]="columns">
+                    <span class="text-foreground flex min-w-0 items-center gap-2 text-[12.5px] leading-[normal]">
                       @switch (item.provider) {
                         @case ('github') { <app-provider-icon provider="github" [size]="14" /> }
                         @case ('gitlab') { <app-provider-icon provider="gitlab" [size]="14" /> }
@@ -120,9 +119,12 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
                       }
                       <span class="truncate">{{ providerLabel(item.provider) }}</span>
                     </span>
-                    <span class="text-muted-foreground min-w-0 truncate font-mono text-[11.5px]">{{ item.host }}</span>
-                    <span class="text-foreground min-w-0 truncate font-mono text-[12.5px]">{{ item.login }}</span>
-                    <span class="text-faint flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
+                    <span class="text-text-2 hidden min-w-0 truncate font-mono text-[10.5px] leading-[normal] sm:block">{{ item.host }}</span>
+                    <span class="text-foreground min-w-0 truncate font-mono text-[12px] leading-[normal]">{{ item.login }}</span>
+                    <span
+                      class="hidden min-w-0 items-center gap-[5px] font-mono sm:flex text-[10.5px] leading-[normal]"
+                      [class]="item.source === 'connection' ? 'text-faint' : 'text-muted-foreground'"
+                    >
                       @if (item.source === 'connection') {
                         <svg [lucideIcon]="linkIcon" [size]="12" aria-hidden="true"></svg>
                         <span class="truncate">from a connection</span>
@@ -130,13 +132,9 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
                         <span class="truncate">by hand</span>
                       }
                     </span>
-                  </div>
                   <button
                     type="button"
-                    hlmBtn
-                    variant="ghost"
-                    size="icon-sm"
-                    class="text-faint hover:text-foreground size-7 shrink-0"
+                    class="text-faint hover:text-foreground relative flex size-[14px] shrink-0 items-center justify-center before:absolute before:-inset-2 before:content-[''] disabled:opacity-50"
                     [attr.aria-label]="'Remove ' + providerLabel(item.provider) + ' login ' + item.login"
                     title="Remove"
                     [disabled]="removing() === item.id"
@@ -149,19 +147,19 @@ const COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)_min
             </ul>
           </div>
         } @else {
-          <p class="text-muted-foreground border-border border-b px-1 py-4 text-[12.5px] leading-snug">
+          <p class="bg-card border-border text-muted-foreground border px-4 py-3.5 text-[12.5px] leading-[19px]">
             No logins yet. They are added when you connect an account of your own, or you can add one by hand.
           </p>
         }
       } @else if (loadError()) {
-        <div class="border-border flex flex-wrap items-center gap-3 border-b px-1 py-4">
+        <div class="bg-card border-border flex flex-wrap items-center gap-3 border px-4 py-3.5">
           <p class="text-red font-mono text-[11.5px]" role="alert">{{ loadError() }}</p>
           <button type="button" hlmBtn variant="outline" size="sm" (click)="load()">Try again</button>
         </div>
       } @else {
-        <p class="text-faint border-border border-b px-1 py-4 font-mono text-[11.5px]" aria-live="polite">Loading…</p>
+        <p class="bg-card border-border text-faint border px-4 py-3.5 font-mono text-[11.5px]" aria-live="polite">Loading…</p>
       }
-    </app-settings-group>
+    </app-settings-block>
   `,
 })
 export class ExternalIdentitiesSection {

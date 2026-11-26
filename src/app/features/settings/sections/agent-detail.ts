@@ -43,30 +43,32 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
   host: { class: 'flex flex-col gap-9' },
   template: `
     @if (agent(); as a) {
-      <div class="flex flex-col gap-3.5">
-        <button type="button" class="text-faint hover:text-foreground inline-flex w-fit items-center gap-1.5 font-mono text-[10.5px]" (click)="back.emit()">
+      <div class="relative flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          class="text-faint hover:text-foreground absolute -top-5 left-0 inline-flex items-center gap-1.5 font-mono text-[10.5px] leading-[normal]"
+          (click)="back.emit()"
+        >
           <svg [lucideIcon]="backIcon" [size]="12"></svg> Agents
         </button>
-        <div class="flex flex-wrap items-center gap-4">
-          <span class="bg-secondary text-muted-foreground flex size-[52px] shrink-0 items-center justify-center">
-            <app-provider-icon [provider]="a.provider" [size]="24" />
-          </span>
-          <div class="flex min-w-0 flex-1 flex-col gap-[5px]">
-            <div class="flex min-w-0 items-center gap-2.5">
-              <h2 class="font-title text-foreground truncate text-[32px] leading-normal">{{ a.name }}</h2>
-              <span class="border-border text-text-2 inline-flex shrink-0 items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px]">
-                <span class="size-1.5" [class]="tokens().length ? 'bg-green' : 'bg-faint'"></span>
-                {{ tokens().length ? 'Connected' : 'No token' }}
-              </span>
-            </div>
-            <p class="text-muted-foreground truncate font-mono text-[10.5px]">
-              {{ providerName(a.provider) }} agent{{ a.ownerUserId ? ' · acts as ' + userName(a.ownerUserId) : ' · no owner' }} · added {{ a.createdAt | relativeTime }}
-            </p>
+        <span class="bg-secondary border-border text-muted-foreground flex size-[52px] shrink-0 items-center justify-center border">
+          <app-provider-icon [provider]="a.provider" [size]="24" />
+        </span>
+        <div class="flex min-w-0 flex-1 flex-col gap-[5px]">
+          <div class="flex min-w-0 items-center gap-2.5">
+            <h2 class="font-title text-foreground truncate text-[32px] leading-[normal]">{{ a.name }}</h2>
+            <span class="border-border text-text-2 inline-flex shrink-0 items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
+              <span class="size-1.5" [class]="tokens().length ? 'bg-green' : 'bg-faint'"></span>
+              {{ tokens().length ? 'Connected' : 'No token' }}
+            </span>
           </div>
-          @if (canManage()) {
-            <button hlmBtn variant="outline" (click)="edit.emit(a)"><svg [lucideIcon]="settingsIcon" [size]="13"></svg> Settings</button>
-          }
+          <p class="text-muted-foreground truncate font-mono text-[10.5px] leading-[normal]">
+            {{ providerName(a.provider) }} agent{{ a.ownerUserId ? ' · acts as ' + userName(a.ownerUserId) : ' · no owner' }} · added {{ a.createdAt | relativeTime }}
+          </p>
         </div>
+        @if (canManage()) {
+          <button hlmBtn variant="outline" (click)="edit.emit(a)"><svg [lucideIcon]="settingsIcon" [size]="13"></svg> Settings</button>
+        }
       </div>
 
       <app-stat-strip large [cells]="stats()" />
@@ -83,43 +85,40 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
             </div>
           </app-settings-block>
 
-          <app-settings-block
-            title="Connect"
-            [description]="'Give your agent runtime a token and it reads and updates Trama as ' + a.name + '. Actions show up with its name and an agent badge.'"
-          >
+          <app-settings-block title="Connect">
             <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
           </app-settings-block>
         </div>
 
-        <aside class="flex w-full shrink-0 flex-col gap-4 lg:w-[300px]">
+        <aside class="flex w-full shrink-0 flex-col gap-6 lg:w-[300px]">
           <div class="bg-card border-border flex flex-col gap-2.5 border p-3.5">
-            <span class="text-faint font-mono text-[10.5px] leading-normal">ACTS AS</span>
+            <span class="text-faint font-mono text-[10.5px] leading-[normal]">ACTS AS</span>
             @if (a.ownerUserId) {
               <div class="flex items-center gap-2.5">
                 <app-actor-avatar [actor]="{ type: 'user', id: a.ownerUserId }" [size]="28" />
-                <div class="flex min-w-0 flex-col">
-                  <span class="text-foreground truncate text-[13.5px]">{{ userName(a.ownerUserId) }}</span>
-                  <span class="text-faint font-mono text-[10.5px]">{{ ownerRole(a.ownerUserId) }}</span>
+                <div class="flex min-w-0 flex-col gap-0.5">
+                  <span class="text-foreground truncate text-[13px] leading-[normal]">{{ userName(a.ownerUserId) }}</span>
+                  <span class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">{{ ownerRole(a.ownerUserId) }}</span>
                 </div>
               </div>
-              <p class="text-muted-foreground text-[12.5px] leading-[18px]">
+              <p class="text-muted-foreground text-[12px] leading-[18px]">
                 {{ a.name }} can do anything {{ firstName(a.ownerUserId) }} can, except transfer or delete the workspace.
               </p>
             } @else {
-              <p class="text-muted-foreground text-[12.5px] leading-[18px]">No owner. Edit the agent to pick the person it acts as.</p>
+              <p class="text-muted-foreground text-[12px] leading-[18px]">No owner. Edit the agent to pick the person it acts as.</p>
             }
             @if (a.description) {
-              <p class="text-text-2 border-border border-t pt-2.5 text-[12.5px] leading-[18px]">{{ a.description }}</p>
+              <p class="text-text-2 border-border border-t pt-2.5 text-[12px] leading-[18px]">{{ a.description }}</p>
             }
           </div>
 
           <div class="bg-card border-border border">
-            <div class="flex items-center gap-2 px-3.5 py-2.5">
-              <span class="text-faint font-mono text-[10.5px] leading-normal">TOKENS · {{ tokens().length }}</span>
+            <div class="flex items-center gap-2 px-3 py-2.5">
+              <span class="text-faint font-mono text-[10.5px] leading-[normal]">TOKENS · {{ tokens().length }}</span>
               <span class="flex-1"></span>
               @if (canTokens() && !creating() && !secret()) {
-                <button type="button" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-mono text-[10.5px]" (click)="startCreate(a)">
-                  <svg [lucideIcon]="plus" [size]="12"></svg> New
+                <button type="button" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-mono text-[10.5px] leading-[normal]" (click)="startCreate(a)">
+                  <svg [lucideIcon]="plus" [size]="11"></svg> New
                 </button>
               }
             </div>
@@ -153,14 +152,14 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
               </form>
             }
             @for (t of tokens(); track t.id) {
-              <div class="border-border flex items-start gap-2 border-t px-3.5 py-2.5">
-                <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <span class="text-foreground truncate font-mono text-[12.5px]">{{ t.name }} <span class="text-faint">{{ t.prefix }}</span></span>
-                  <span class="text-faint font-mono text-[10.5px] leading-snug">
+              <div class="border-border flex items-start gap-2 border-t px-3 py-2.5">
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <span class="text-foreground truncate font-mono text-[12px] leading-[normal]">{{ t.name }} <span class="text-faint">{{ t.prefix }}</span></span>
+                  <span class="text-faint font-mono text-[10.5px] leading-[normal]">
                     {{ t.expiresAt ? 'Expires ' + (t.expiresAt | fullDate) : 'No expiry' }} · {{ t.lastUsedAt ? 'used ' + (t.lastUsedAt | relativeTime) : 'never used' }}
                   </span>
                 </div>
-                <span class="border-border text-text-2 shrink-0 border px-1.5 py-px font-mono text-[11px]">{{ scopeLabel(t) }}</span>
+                <span class="bg-secondary border-border text-text-2 shrink-0 border px-[7px] py-0.5 font-mono text-[11px] leading-[normal]">{{ scopeLabel(t) }}</span>
                 @if (canManage()) {
                   <button type="button" class="text-muted-foreground hover:text-red shrink-0 font-mono text-[10.5px]" [attr.aria-label]="'Revoke ' + t.name" (click)="revoke(t)">Revoke</button>
                 }

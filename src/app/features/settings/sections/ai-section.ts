@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { LucideBot, LucideDynamicIcon, LucideSparkles, LucideZap } from '@lucide/angular';
+import { LucideBot, LucideCopy, LucideDynamicIcon, LucideMessageCircle, LucideServer, LucideSparkles } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../../core/ai/assistant.store';
 import { UiStore } from '../../../core/stores/ui.store';
@@ -25,7 +25,7 @@ const ENV_LINES: readonly string[] = [
   selector: 'app-ai-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, Kbd, LucideDynamicIcon, NgTemplateOutlet, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
@@ -72,7 +72,7 @@ const ENV_LINES: readonly string[] = [
         <div class="bg-bg-deep flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="bot" [size]="15"></svg>
+              <svg [lucideIcon]="server" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
@@ -87,30 +87,30 @@ const ENV_LINES: readonly string[] = [
                 }
               </span>
             </div>
-            <button hlmBtn size="sm" variant="outline" [disabled]="ai.loadingStatus()" (click)="ai.refreshStatus()">Refresh status</button>
+            <button hlmBtn size="sm" variant="ghost" [disabled]="ai.loadingStatus()" (click)="ai.refreshStatus()">Refresh status</button>
+            @if (!ai.ready()) {
+              <button hlmBtn size="sm" variant="outline" (click)="copyEnv()">
+                <svg [lucideIcon]="copy" [size]="13"></svg>
+                {{ copied() ? 'Copied' : 'Copy env' }}
+              </button>
+            }
           </div>
           @if (!ai.ready()) {
             <div class="pl-[42px]">
               <div class="bg-bg-deep border-border flex flex-col gap-1 border px-3.5 py-3">
                 @for (line of envLines; track line) {
-                  <code class="font-mono text-[11.5px] leading-[17px]" [class]="line.startsWith('#') ? 'text-faint' : 'text-foreground/80'">{{ line }}</code>
+                  <code class="font-mono text-[11.5px] leading-[17px]" [class]="line.startsWith('#') ? 'text-faint' : 'text-text-2'">{{ line }}</code>
                 }
-                <div class="mt-1 flex justify-end">
-                  <button hlmBtn size="sm" variant="ghost" (click)="copyEnv()">{{ copied() ? 'Copied' : 'Copy env' }}</button>
-                </div>
               </div>
             </div>
           }
-          <p class="text-faint pl-[42px] font-mono text-[10.5px] leading-snug">
-            Configured means the server has credentials; the provider is contacted only when you request a suggestion or send a message.
-          </p>
         </div>
 
         <!-- SuperGrok -->
         <div class="flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="zap" [size]="15"></svg>
+              <svg [lucideIcon]="bot" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
@@ -146,16 +146,13 @@ const ENV_LINES: readonly string[] = [
               <code class="font-mono">GROK_HOME_DIR</code> to a persistent private volume.
             </p>
           }
-          <p class="text-faint pl-[42px] font-mono text-[10.5px] leading-snug">
-            Each Trama account gets a separate Grok home directory. The official CLI stores its own credentials there; protect the configured volume and its backups.
-          </p>
         </div>
 
         <!-- ChatGPT -->
         <div class="flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="sparkles" [size]="15"></svg>
+              <svg [lucideIcon]="chat" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
@@ -203,7 +200,9 @@ export class AiSection {
 
   protected readonly sparkles = LucideSparkles;
   protected readonly bot = LucideBot;
-  protected readonly zap = LucideZap;
+  protected readonly server = LucideServer;
+  protected readonly copy = LucideCopy;
+  protected readonly chat = LucideMessageCircle;
   protected readonly envLines = ENV_LINES;
   protected readonly copied = signal(false);
 
