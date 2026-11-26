@@ -22,6 +22,7 @@ fn routes() -> Routes {
     Routes::new()
         .merge(trama_auth::router())
         .merge(trama_events::router())
+        .merge(trama_milestones::router())
         .merge(trama_sharing::router())
         .merge(trama_system::router())
         .merge(trama_uploads::router())
