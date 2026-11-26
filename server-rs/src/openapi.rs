@@ -21,6 +21,7 @@ use utoipa::openapi::OpenApi as Document;
         (name = "external-identities", description = "A person's logins in other tools"),
         (name = "favorites", description = "What a person pins in a workspace"),
         (name = "insights", description = "Health signals, flow metrics and contributors"),
+        (name = "integrations", description = "Connections to git hosts, workspace-wide and personal"),
         (name = "milestones", description = "Project milestones"),
         (name = "notifications", description = "The inbox, notification settings and Web Push"),
         (name = "search", description = "Search across projects, issues and artifacts"),
@@ -46,6 +47,7 @@ pub fn api_doc() -> Document {
     doc.merge(trama_external_identities::ApiDoc::openapi());
     doc.merge(trama_favorites::ApiDoc::openapi());
     doc.merge(trama_insights::ApiDoc::openapi());
+    doc.merge(trama_integrations::ApiDoc::openapi());
     doc.merge(trama_milestones::ApiDoc::openapi());
     doc.merge(trama_notifications::ApiDoc::openapi());
     doc.merge(trama_search::ApiDoc::openapi());
