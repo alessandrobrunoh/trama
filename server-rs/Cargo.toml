@@ -68,6 +68,7 @@ trama-integrations = { path = "crates/integrations" }
 trama-migration = { path = "crates/migration" }
 trama-milestones = { path = "crates/milestones" }
 trama-notifications = { path = "crates/notifications" }
+trama-outgoing-webhooks = { path = "crates/outgoing-webhooks" }
 trama-search = { path = "crates/search" }
 trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
@@ -131,6 +132,7 @@ trama-integrations.workspace = true
 trama-migration.workspace = true
 trama-milestones.workspace = true
 trama-notifications.workspace = true
+trama-outgoing-webhooks.workspace = true
 trama-search.workspace = true
 trama-sharing.workspace = true
 trama-system.workspace = true

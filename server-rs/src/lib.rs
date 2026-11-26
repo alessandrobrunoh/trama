@@ -32,6 +32,7 @@ fn routes() -> Routes {
         .merge(trama_integrations::router())
         .merge(trama_milestones::router())
         .merge(trama_notifications::router())
+        .merge(trama_outgoing_webhooks::router())
         .merge(trama_search::router())
         .merge(trama_sharing::router())
         .merge(trama_system::router())
@@ -89,6 +90,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let state = trama_notifications::with_services(state);
     // notifications are produced from the domain events this instance records
     let notifications = trama_notifications::spawn(&state);
+    // outgoing webhooks are delivered from the same recorded events
+    let state = trama_outgoing_webhooks::with_services(state);
+    let outgoing_webhooks = trama_outgoing_webhooks::spawn(&state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("Trama API listening on http://localhost:{port}/api");
@@ -98,6 +102,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     notifications.abort();
+    outgoing_webhooks.abort();
     events.shutdown().await;
     db.close().await?;
     Ok(())
