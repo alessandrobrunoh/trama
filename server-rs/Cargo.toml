@@ -57,6 +57,7 @@ trama-migration = { path = "crates/migration" }
 trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
 trama-uploads = { path = "crates/uploads" }
+trama-views = { path = "crates/views" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -108,6 +109,7 @@ trama-migration.workspace = true
 trama-sharing.workspace = true
 trama-system.workspace = true
 trama-uploads.workspace = true
+trama-views.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
