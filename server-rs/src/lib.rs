@@ -29,6 +29,7 @@ fn routes() -> Routes {
         .merge(trama_external_identities::router())
         .merge(trama_favorites::router())
         .merge(trama_insights::router())
+        .merge(trama_issues::router())
         .merge(trama_milestones::router())
         .merge(trama_notifications::router())
         .merge(trama_search::router())
