@@ -9,11 +9,12 @@ which server answered.
 | Crate | Path | Holds |
 | --- | --- | --- |
 | `trama-api` | `src/` | The binary: wires every module router under `/api`, the OpenAPI document, startup and shutdown |
-| `trama-core` | `crates/core` | Config, Nest-compatible errors, ids, ISO dates, the `ApiJson` body extractor, HTTP layers, test databases |
+| `trama-core` | `crates/core` | Config (every NestJS environment variable), Nest-compatible errors, ids, ISO dates, the `ApiJson` body extractor, HTTP layers, test databases |
+| `trama-common` | `crates/common` | Secrets at rest, SSRF-safe outgoing HTTP, mail, rate limits, client address, `X-Client-Id` context, counters, reference checks |
 | `trama-contracts` | `crates/contracts` | `contracts/domain.ts` in Rust: wire types, roles and capabilities, member access, settings, status and label catalogs |
 | `trama-entities` | `crates/entities` | SeaORM entities, one module per table (generated, see `lib.rs`) |
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
-| `trama-system` | `crates/system` | `GET /api/health` |
+| `trama-system` | `crates/system` | `GET /api/health`, `GET /api/config` |
 
 Each domain gets its own crate as it moves over (`auth`, `users`, `members`, `invites`,
 `workspaces`, `tasks`, `comments`, `projects`, `time`, …). A module crate exposes:
@@ -23,8 +24,8 @@ Each domain gets its own crate as it moves over (`auth`, `users`, `members`, `in
 - `schemas.rs` for request and response bodies (camelCase on the wire, dates via
   `trama_core::time::to_iso`), separate from the storage entities.
 
-Module crates depend on `trama-core` and `trama-entities`, and on each other only when a domain
-really needs another (`tasks` on `auth`, not the reverse).
+Module crates depend on `trama-core`, `trama-common`, `trama-contracts` and `trama-entities`, and on each other
+only when a domain really needs another (`tasks` on `auth`, not the reverse). See `PORTING.md`.
 
 ## Running
 

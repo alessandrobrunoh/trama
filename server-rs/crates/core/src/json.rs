@@ -3,6 +3,7 @@
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequest, Request};
+use axum::http::StatusCode;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
@@ -39,6 +40,13 @@ where
         let value = match Json::<Value>::from_request(req, state).await {
             Ok(Json(value)) => value,
             Err(JsonRejection::MissingJsonContentType(_)) => Value::Object(serde_json::Map::new()),
+            // body-parser's wording, which NestJS passes through
+            Err(rejection) if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE => {
+                return Err(AppError::new(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "request entity too large",
+                ));
+            }
             Err(rejection) => {
                 return Err(AppError::new(rejection.status(), rejection.body_text()));
             }
@@ -140,6 +148,30 @@ mod tests {
     async fn wrong_types_are_a_400() {
         let err = extract(Some("application/json"), r#"{"name":3}"#).await.unwrap_err();
         assert_eq!(err.status_code(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn oversized_bodies_are_a_413() {
+        use axum::Router;
+        use axum::extract::DefaultBodyLimit;
+        use axum::routing::post;
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/", post(|ApiJson(_): ApiJson<Value>| async { "ok" }))
+            .layer(DefaultBodyLimit::max(16));
+        let req = Request::post("/")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(format!(r#"{{"name":"{}"}}"#, "x".repeat(64))))
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = http_body_util::BodyExt::collect(res.into_body()).await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            body,
+            json!({"statusCode": 413, "message": "request entity too large", "error": "Payload Too Large"})
+        );
     }
 
     #[tokio::test]

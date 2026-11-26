@@ -41,6 +41,45 @@ async fn health_is_mounted_under_api() {
 }
 
 #[tokio::test]
+async fn public_config_is_mounted_under_api() {
+    let req = Request::get("/api/config").body(Body::empty()).unwrap();
+    let (status, _, body) = send(app(false), req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        json!({"demoLogin": true, "roadmapViewToken": null, "changelogViewToken": null})
+    );
+}
+
+#[tokio::test]
+async fn rate_limited_answers_carry_cors_and_security_headers() {
+    let config = Config::from_vars(&[("TRAMA_RATE_LIMIT_LOGIN_PER_15MIN", "1")]);
+    let app = trama_api::app(AppState::new(sea_orm::DatabaseConnection::default(), config));
+    let login = || {
+        Request::post("/api/auth/login")
+            .header(header::ORIGIN, "http://localhost:4300")
+            .body(Body::empty())
+            .unwrap()
+    };
+    // no auth module here: the first login is a 404, the second is refused before routing
+    assert_eq!(send(app.clone(), login()).await.0, StatusCode::NOT_FOUND);
+    let (status, headers, body) = send(app, login()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(headers.contains_key(header::RETRY_AFTER));
+    assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "http://localhost:4300");
+    assert_eq!(headers[header::X_FRAME_OPTIONS], "DENY");
+    assert_eq!(body["statusCode"], 429);
+}
+
+#[tokio::test]
+async fn nul_in_the_query_is_a_400() {
+    let req = Request::get("/api/config?q=%00").body(Body::empty()).unwrap();
+    let (status, _, body) = send(app(false), req).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Text must not contain NUL characters");
+}
+
+#[tokio::test]
 async fn openapi_lists_module_paths_outside_production() {
     let req = Request::get("/api/openapi.json").body(Body::empty()).unwrap();
     let (status, _, body) = send(app(false), req).await;

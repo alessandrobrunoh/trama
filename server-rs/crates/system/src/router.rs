@@ -9,16 +9,32 @@ use trama_core::time::now_iso;
 use trama_core::{AppError, AppState};
 use utoipa::OpenApi;
 
-use crate::schemas::{HealthDown, HealthUp};
+use crate::schemas::{HealthDown, HealthUp, PublicConfig};
 
 /// OpenAPI document of this module.
 #[derive(OpenApi)]
-#[openapi(paths(health), components(schemas(HealthUp, HealthDown)))]
+#[openapi(paths(health, public_config), components(schemas(HealthUp, HealthDown, PublicConfig)))]
 pub struct ApiDoc;
 
 /// Routes of this module.
 pub fn router() -> Router<AppState> {
-    Router::new().route("/health", get(health))
+    Router::new().route("/health", get(health)).route("/config", get(public_config))
+}
+
+/// Unauthenticated settings the sign-in page needs before a session exists. Public.
+#[utoipa::path(
+    get,
+    path = "/api/config",
+    tag = "system",
+    responses((status = 200, description = "Public settings", body = PublicConfig))
+)]
+async fn public_config(State(state): State<AppState>) -> Json<PublicConfig> {
+    let views = &state.config.public_views;
+    Json(PublicConfig {
+        demo_login: state.config.demo_login,
+        roadmap_view_token: views.roadmap_view_token.clone(),
+        changelog_view_token: views.changelog_view_token.clone(),
+    })
 }
 
 /// Liveness and database check (Docker healthcheck). Public.
@@ -77,6 +93,41 @@ mod tests {
         let time = body["time"].as_str().unwrap();
         assert!(time.ends_with('Z') && time.len() == 24, "{time}");
         test.drop().await;
+    }
+
+    async fn get_config(vars: &[(&str, &str)]) -> Value {
+        let state = AppState::new(sea_orm::DatabaseConnection::default(), Config::from_vars(vars));
+        let res = router()
+            .with_state(state)
+            .oneshot(Request::get("/config").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn public_config_reports_demo_login_and_view_tokens() {
+        assert_eq!(
+            get_config(&[]).await,
+            json!({"demoLogin": true, "roadmapViewToken": null, "changelogViewToken": null})
+        );
+        assert_eq!(
+            get_config(&[
+                ("NODE_ENV", "production"),
+                ("PUBLIC_ROADMAP_VIEW_TOKEN", " roadmap-token "),
+                ("PUBLIC_CHANGELOG_VIEW_TOKEN", "changelog-token"),
+            ])
+            .await,
+            json!({
+                "demoLogin": false,
+                "roadmapViewToken": "roadmap-token",
+                "changelogViewToken": "changelog-token"
+            })
+        );
+        let shown = get_config(&[("NODE_ENV", "production"), ("DEMO_LOGIN", "on")]).await;
+        assert_eq!(shown["demoLogin"], true);
     }
 
     #[tokio::test]
