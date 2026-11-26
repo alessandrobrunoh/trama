@@ -35,6 +35,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1.54", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tokio-stream = "0.1.19"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7", features = ["cors", "limit", "set-header", "trace"] }
 tracing = "0.1"
@@ -49,6 +50,7 @@ trama-common = { path = "crates/common" }
 trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
+trama-events = { path = "crates/events" }
 trama-migration = { path = "crates/migration" }
 trama-system = { path = "crates/system" }
 
@@ -96,6 +98,7 @@ utoipa-scalar.workspace = true
 trama-auth.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
+trama-events.workspace = true
 trama-migration.workspace = true
 trama-system.workspace = true
 

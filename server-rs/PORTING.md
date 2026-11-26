@@ -130,6 +130,70 @@ reads `AsyncLocalStorage`:
 Both task-locals are lost across `tokio::spawn`: capture `current_access()` first and re-enter
 with `with_access` (same for `with_upload_caller`).
 
+### Recording and publishing events (`trama-events`)
+
+`EventsService` is `trama_events::Events`: one process-wide, cheap-to-clone value registered on
+the `AppState` at startup. In a handler or service that has the state, `let events =
+Events::of(&state);` (a bare test state falls back to a shared process-local instance, so a
+test sees its own events; to isolate a test, register `Events::local()` with
+`with_extension`). Add `trama-events` to the crate's `[dependencies]`.
+
+`events.record(...)` takes the connection to write with, so the transaction version needs no
+extra parameter: pass `&txn` to write atomically with the mutation (NestJS `manager`), else
+`&state.db`. It returns the stored `domain_events::Model`.
+
+```rust
+use trama_events::{Events, LiveChange, RecordEvent};
+use trama_contracts::activity::LiveEventEntity;
+use trama_contracts::common::{SubjectRef, SubjectType};
+
+let events = Events::of(&state);
+let subject = SubjectRef { kind: SubjectType::Issue, id: issue.id.clone() };
+
+// events.record({ workspaceId, actor, type: 'issue.created', subject, data }, <live>)
+events.record(&txn, RecordEvent::new(&ws.id, actor.clone(), "issue.created", subject.clone())
+    .data(json!({ "title": issue.title, "projectId": issue.project_id }))).await?;
+// live: false
+events.record(&txn, RecordEvent::new(..).without_live()).await?;
+// a custom LiveEvent (still scoped by `subject`): { type: 'created', entity: 'comment', id }
+events.record(&txn, RecordEvent::new(..).live(LiveChange::created(LiveEventEntity::Comment, &c.id))).await?;
+// `at` (seed only): backdates the row and keeps it off `subscribe_recorded`
+RecordEvent::new(..).at(when)
+```
+
+- The default live event is `<x>.created` → `created`, `<x>.deleted` → `deleted`, anything else
+  → `updated`, with `entity` = the subject type and `id` = the subject id. `data` must be a JSON
+  object (anything else stores `{}`). Keep the payloads of the NestJS call: `projectId`,
+  `issueId`, `issueIds`, `projectIds` in `data` are what the visibility rules read for deleted
+  records.
+- Call `record` in the same cases and at the same point as NestJS (inside the transaction when
+  NestJS passed `manager`). The live event goes out right after the insert, as in NestJS; it
+  does not wait for the commit.
+- `events.publish(ws, LiveChange::updated(LiveEventEntity::Workspace, id))` is
+  `events.publish(ws, { type, entity, id })`. With a recipient: `publish_to_user(ws, change,
+  user_id)` (notifications, favorites: only that person's streams, whatever their project
+  access). With the owning record, so a narrowed member's project access decides:
+  `publish_with(ws, change, None, Some(subject.into()))` (e.g. a comment event about its issue).
+  `LiveChange::{created, updated, deleted, new}` build the change.
+- `publish` is synchronous and returns at once. It stamps `at` and the request's `X-Client-Id`
+  (`trama_common::client_id()`, a task-local like NestJS's `requestStore`): call it inside the
+  request, or wrap work moved to `tokio::spawn` in `trama_common::request_context::scope(id, fut)`
+  with the id read before spawning.
+- Events travel as JSON on the Postgres channel `trama_live` (`NOTIFY`), byte-compatible with
+  NestJS, so every API instance (also a NestJS one) pushes them to its streams. One `LISTEN`
+  connection per process reconnects with a 1 s..30 s backoff; while it is down, events reach
+  this instance's streams only.
+- Subscribers: `events.subscribe()` is `stream$` (every `PublishedEvent` of every workspace)
+  and `events.subscribe_recorded()` is `recorded$` (every `domain_events` row this instance
+  wrote, not backdated ones). Both are `tokio::sync::broadcast` receivers: spawn a task that
+  loops on `recv()`, and treat `RecvError::Lagged` as "resynchronise". Outgoing webhooks,
+  notifications and two-way sync consume `recorded`.
+- Project visibility of events: `trama_events::visibility::filter_events(&db, ws_id, events,
+  ctx.access.as_ref())` (`EventVisibilityService.filterEvents`; works on `domain_events::Model`,
+  `trama_contracts::activity::DomainEvent` and `visibility::ScopedRef`) and
+  `visibility::is_live_visible(..)` (`isLiveVisible`). Use them for snapshots and any other
+  place that returns events.
+
 Test a module's routes with `router().into_app(state)` and real sessions or tokens
 (`trama_auth::service::create_session`, `trama_auth::tokens::create_token`); the guard runs as
 in production.

@@ -86,6 +86,8 @@ async fn openapi_lists_module_paths_outside_production() {
     let (status, _, body) = send(app(false), req).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body["paths"]["/api/health"]["get"].is_object(), "{body}");
+    assert!(body["paths"]["/api/w/{slug}/events"]["get"].is_object(), "{body}");
+    assert!(body["paths"]["/api/w/{slug}/events/stream"]["get"].is_object(), "{body}");
 
     let req = Request::get("/api/docs").body(Body::empty()).unwrap();
     assert_eq!(send(app(false), req).await.0, StatusCode::OK);

@@ -3191,6 +3191,7 @@ dependencies = [
  "trama-auth",
  "trama-common",
  "trama-core",
+ "trama-events",
  "trama-migration",
  "trama-system",
  "utoipa",
@@ -3299,6 +3300,32 @@ name = "trama-entities"
 version = "0.1.0"
 dependencies = [
  "sea-orm",
+]
+
+[[package]]
+name = "trama-events"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "regex",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tracing",
+ "trama-auth",
+ "trama-common",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-migration",
+ "url",
+ "utoipa",
 ]
 
 [[package]]

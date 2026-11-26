@@ -19,7 +19,10 @@ pub use openapi::api_doc;
 
 /// Every module's routes, each behind its `trama_auth::Gate`. Keep sorted by crate name.
 fn routes() -> Routes {
-    Routes::new().merge(trama_auth::router()).merge(trama_system::router())
+    Routes::new()
+        .merge(trama_auth::router())
+        .merge(trama_events::router())
+        .merge(trama_system::router())
 }
 
 /// The whole application over `state`.
@@ -63,7 +66,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     trama_migration::Migrator::up(&db, None).await?;
 
     let port = config.port;
-    let state = trama_common::with_platform_services(AppState::new(db.clone(), config))?;
+    // live events reach every instance's streams through Postgres NOTIFY / LISTEN
+    let events = trama_events::Events::start(db.clone(), config.database_url.clone());
+    let state = trama_common::with_platform_services(AppState::new(db.clone(), config))?
+        .with_extension(events.clone());
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("Trama API listening on http://localhost:{port}/api");
@@ -72,6 +78,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app(state).into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+    events.shutdown().await;
     db.close().await?;
     Ok(())
 }
