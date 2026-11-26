@@ -25,6 +25,7 @@ import type {
   ViewLayout,
 } from '../../contracts/domain.js';
 import { uid, unique } from '../../common/util.js';
+import type { TaskDecisionEntity, ThreadRecordEntity } from '../../threads/thread.entity.js';
 import type {
   AgentEntity,
   ArtifactEntity,
@@ -59,6 +60,9 @@ export interface SeedData {
   milestones: Rows<MilestoneEntity>;
   issues: Rows<IssueEntity>;
   artifacts: Rows<ArtifactEntity>;
+  /** Thread records and the decisions of tasks (`trama sync`). */
+  threadRecords: Rows<ThreadRecordEntity>;
+  decisions: Rows<TaskDecisionEntity>;
   dependencies: Rows<DependencyEntity>;
   comments: Rows<CommentEntity>;
   events: Rows<DomainEventEntity>;
@@ -116,7 +120,7 @@ export class SeedBuilder {
     this.workspaceId = workspaceId;
     this.data = {
       users: [], workspace: {}, memberships: [], agents: [], projects: [], legacyWorkstreams: [], milestones: [],
-      issues: [], artifacts: [], dependencies: [], comments: [],
+      issues: [], artifacts: [], threadRecords: [], decisions: [], dependencies: [], comments: [],
       events: [], views: [], integrations: [], counters: {},
     };
   }

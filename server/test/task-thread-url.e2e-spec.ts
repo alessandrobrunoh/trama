@@ -23,7 +23,12 @@ describe('task thread link', () => {
     const other = (await c.post(`${w}/tasks`, { kind: 'bug', title: 'No thread' }).expect(201)).body;
     expect(other.threadUrl).toBeUndefined();
 
+    // a task links one thread: another URL needs an unlink first, the same URL is a no-op
     const next = 'http://localhost:4300/t/abc?x=1#top';
+    const refused = await c.patch(`${w}/tasks/${task.key}`, { threadUrl: next }).expect(409);
+    expect(refused.body).toMatchObject({ code: 'thread_already_linked', threadUrl: url });
+    expect((await c.patch(`${w}/tasks/${task.key}`, { threadUrl: url }).expect(200)).body.threadUrl).toBe(url);
+    await c.patch(`${w}/tasks/${task.key}`, { threadUrl: null }).expect(200);
     expect((await c.patch(`${w}/tasks/${task.key}`, { threadUrl: next }).expect(200)).body.threadUrl).toBe(next);
     expect((await c.get(`${w}/tasks/${task.key}`).expect(200)).body.threadUrl).toBe(next);
     expect((await c.get(`${w}/snapshot`).expect(200)).body.issues.find((i: { id: string }) => i.id === task.id).threadUrl).toBe(next);

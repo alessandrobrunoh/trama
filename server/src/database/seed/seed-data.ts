@@ -1,3 +1,4 @@
+import { uid } from '../../common/util.js';
 import { addMockHistoryToSeed } from '../mock-history.js';
 import { SeedBuilder, SYSTEM, agent, user, type SeedData } from './builder.js';
 
@@ -307,6 +308,33 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.issue({ kind: 'security', number: 6, title: 'Outdated lodash in api (CVE-2026-1182)', source: 'github', team: SEC, priority: 'high', status: 'in_review', workstreams: [sec9], created: 9, moved: 9, movedBy: tomas });
   b.issue({ kind: 'security', number: 7, title: 'No rate limit on password reset endpoint', source: 'agent', team: SEC, priority: 'high', status: 'done', workstreams: [api58], created: 10, moved: 9, movedBy: tomas });
   b.comment({ type: 'issue', id: bug142 }, null, user(maya), 'Linking this and AUTH-143 to AUTH-42; same root cause (non-deterministic refresh).', 21);
+
+  // the thread of AUTH-142 kept a record: a summary, the files it touched and two decisions
+  const bug142Thread = S('login-redirect-5d2e');
+  b.data.threadRecords.push({
+    issueId: bug142,
+    workspaceId: ws,
+    threadUrl: bug142Thread,
+    summary: 'Found the logout loop: two tabs refresh the session at once and the second refresh is treated as a replay. Serialised the refresh per session and added a regression test.',
+    files: ['src/auth/session.ts', 'src/auth/refresh.ts', 'src/auth/session.spec.ts'],
+    turns: 14,
+    syncCount: 3,
+    createdAt: b.at(20),
+    lastSyncAt: b.at(1),
+    lastSyncBy: agent(delta),
+  });
+  b.data.decisions.push(
+    {
+      id: uid('dc'), workspaceId: ws, issueId: bug142, threadUrl: bug142Thread, createdBy: agent(delta), createdAt: b.at(19),
+      text: 'Refresh tokens stay server side; the client never reads them.',
+      paths: ['src/auth/*'],
+    },
+    {
+      id: uid('dc'), workspaceId: ws, issueId: bug142, threadUrl: bug142Thread, createdBy: agent(delta), createdAt: b.at(2),
+      text: 'Serialise refreshes per session with a short lock instead of retrying on replay.',
+      paths: ['src/auth/refresh.ts', 'src/auth/session.ts'],
+    },
+  );
 
   b.comment({ type: 'artifact', id: b.data.artifacts.find((a) => a.externalId === '#889')!.id! }, api57, user(jonas), 'Please rebase on the queue refactor before the next review round.', 1);
 

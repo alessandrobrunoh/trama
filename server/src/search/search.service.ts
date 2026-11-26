@@ -3,16 +3,19 @@ import { DataSource } from 'typeorm';
 import type { MemberResource } from '../contracts/domain.js';
 import { canView, currentAccess, projectHidden } from '../auth/member-access.js';
 
-export const SEARCH_TYPES = ['project', 'issue', 'artifact'] as const;
+export const SEARCH_TYPES = ['project', 'issue', 'artifact', 'decision', 'record'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
   type: SearchType;
   id: string;
+  /** Task key for `issue`, `decision` and `record` hits. */
   key?: string;
   title: string;
   subtitle: string;
   legacyWorkstreamKey?: string;
+  /** The task a `decision` or `record` hit belongs to. */
+  issueId?: string;
   score: number;
 }
 
@@ -49,6 +52,22 @@ const SPECS: Spec[] = [
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
     rank: 4,
   },
+  {
+    // title = the decision, subtitle = its task's title
+    type: 'decision',
+    from: `"task_decisions" x JOIN "issues" i ON i."id" = x."issueId"`,
+    select: `x."id", i."key", x."text" AS title, i."title" AS subtitle, NULL AS "legacyWorkstreamKey", x."paths"::text AS body, i."projectId" AS "projectId", x."issueId" AS "issueId"`,
+    fields: [['i."key"', 'key'], ['x."text"', 'title'], ['x."paths"::text', 'body']],
+    rank: 5,
+  },
+  {
+    // title = the task's title, subtitle = the start of the summary; the hit id is the task id
+    type: 'record',
+    from: `"task_thread_records" x JOIN "issues" i ON i."id" = x."issueId"`,
+    select: `x."issueId" AS id, i."key", i."title", left(COALESCE(x."summary", ''), 160) AS subtitle, NULL AS "legacyWorkstreamKey", x."summary" AS body, i."projectId" AS "projectId", x."issueId" AS "issueId"`,
+    fields: [['i."key"', 'key'], ['i."title"', 'title'], ['x."summary"', 'body']],
+    rank: 6,
+  },
 ];
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -61,14 +80,17 @@ interface Row {
   legacyWorkstreamKey: string | null;
   body: string | null;
   projectId?: string | null;
+  issueId?: string | null;
 }
 
 const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
   project: 'projects',
   issue: 'issues',
   artifact: 'artifacts',
+  decision: 'issues',
+  record: 'issues',
 };
-const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'artifact']);
+const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'artifact', 'decision', 'record']);
 
 /** Scores a row: exact key 100, key prefix 80, key contains 60, title exact 70, prefix 55, contains 40, body 20. */
 export function scoreRow(q: string, row: Pick<Row, 'key' | 'title' | 'body'>): number {
@@ -121,6 +143,7 @@ export class SearchService {
           title: r.title,
           subtitle: r.subtitle,
           ...(r.legacyWorkstreamKey ? { legacyWorkstreamKey: r.legacyWorkstreamKey } : {}),
+          ...(r.issueId ? { issueId: r.issueId } : {}),
           score: scoreRow(query, r),
           rank: spec.rank,
         }));
