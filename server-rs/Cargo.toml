@@ -19,6 +19,8 @@ async-trait = "0.1"
 axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA time zone names (workspace `timeZone` setting), matched case-insensitively like `Intl`.
+chrono-tz = { version = "0.10", features = ["case-insensitive"] }
 dotenvy = "0.15"
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 hex = "0.4"
@@ -64,6 +66,7 @@ trama-sharing = { path = "crates/sharing" }
 trama-system = { path = "crates/system" }
 trama-uploads = { path = "crates/uploads" }
 trama-views = { path = "crates/views" }
+trama-workspaces = { path = "crates/workspaces" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -119,6 +122,7 @@ trama-sharing.workspace = true
 trama-system.workspace = true
 trama-uploads.workspace = true
 trama-views.workspace = true
+trama-workspaces.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true

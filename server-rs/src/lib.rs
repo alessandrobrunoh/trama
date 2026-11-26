@@ -30,6 +30,7 @@ fn routes() -> Routes {
         .merge(trama_system::router())
         .merge(trama_uploads::router())
         .merge(trama_views::router())
+        .merge(trama_workspaces::router())
 }
 
 /// The whole application over `state`.
