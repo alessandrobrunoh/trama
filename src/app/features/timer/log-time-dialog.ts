@@ -118,7 +118,7 @@ export function formatDuration(minutes: number): string {
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="service.close()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[600px]"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:-top-[8.5svh] sm:w-[600px] sm:max-w-[600px]"
         [showCloseButton]="false"
         (keydown.meta.enter)="submit($event)"
         (keydown.control.enter)="submit($event)"

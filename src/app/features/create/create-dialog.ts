@@ -148,7 +148,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
         data-variant="fullscreen"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[620px]"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:-top-[8.5svh] sm:w-[620px] sm:max-w-[620px]"
         [showCloseButton]="false"
         (keydown.meta.enter)="submit($event)"
         (keydown.control.enter)="submit($event)"

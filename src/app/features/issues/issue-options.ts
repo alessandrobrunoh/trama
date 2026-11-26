@@ -25,6 +25,7 @@ import { EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon, type AnyStatus } from '../../shared/status';
 import type { IssueActions, IssuePromptField } from './issue-actions';
+import { isClosedIssue } from './issue-model';
 
 export interface IssueOption {
   /** '' = none (unassign, no project). */
@@ -72,12 +73,20 @@ export function promptOptions(
       const users = [...store.users()].sort(
         (a, b) => Number(b.id === me) - Number(a.id === me) || a.name.localeCompare(b.name),
       );
+      const entries = store.settings().statuses.issue;
+      const open = new Map<string, number>();
+      for (const i of store.issues()) {
+        if (i.assigneeId && !isClosedIssue(i, entries)) {
+          open.set(i.assigneeId, (open.get(i.assigneeId) ?? 0) + 1);
+        }
+      }
       return [
-        { value: '', label: 'No assignee', glyph: 'none', search: 'no assignee unassign' },
+        { value: '', label: 'Unassign', glyph: 'none', search: 'no assignee unassign' },
         ...users.map((u) => ({
           value: u.id,
           label: u.id === me ? `${u.name} (you)` : u.name,
           glyph: 'user' as const,
+          hint: `${open.get(u.id) ?? 0} open`,
           search: `${u.name} ${u.email}${u.id === me ? ' me' : ''}`,
         })),
       ];

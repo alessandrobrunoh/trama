@@ -45,7 +45,7 @@ const SPLIT_ABOVE = 8;
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="actions.closePrompt()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
-        class="gap-0 p-0 sm:max-w-[680px]"
+        class="gap-0 p-0 sm:-top-[8.5svh] sm:w-[680px] sm:max-w-[680px]"
         [showCloseButton]="false"
         (keydown)="onKey($event)"
       >
@@ -67,7 +67,7 @@ const SPLIT_ABOVE = 8;
                 class="bg-background hover:border-border-strong flex min-w-0 flex-1 flex-col items-center gap-[3px] border py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 [class]="
                   selected() === c.value
-                    ? 'border-primary bg-primary/10 shadow-[inset_0_0_0_1px_var(--primary)]'
+                    ? 'border-red bg-red/10 shadow-[inset_0_0_0_1px_var(--red)]'
                     : 'border-border'
                 "
                 [class.opacity-45]="c.split && selected() !== c.value"

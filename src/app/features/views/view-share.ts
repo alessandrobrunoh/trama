@@ -156,6 +156,7 @@ const ROW_ON = 'bg-primary/10 border-primary/40';
                   >
                     <span class="group-data-[checked=true]:bg-primary size-1.5 bg-transparent"></span>
                   </span>
+                  <svg [lucideIcon]="o.icon" [size]="14" class="text-faint shrink-0" aria-hidden="true"></svg>
                   <span class="flex flex-col gap-px">
                     <span class="text-foreground text-[13px] leading-[16px]">{{ o.title }}</span>
                     <span class="text-faint font-mono text-[10.5px] leading-[13px]">{{ o.hint }}</span>
@@ -228,10 +229,10 @@ export class ViewShare {
   protected readonly emails = signal('');
   protected readonly busy = signal(false);
 
-  protected readonly options: { value: ShareVisibility; title: string; hint: string }[] = [
-    { value: 'private', title: 'Private', hint: 'Only people invited' },
-    { value: 'workspace', title: 'Everyone in the workspace', hint: 'Every member can view it' },
-    { value: 'link', title: 'Anyone with the link', hint: 'Public, read-only, no sign-in needed' },
+  protected readonly options: { value: ShareVisibility; title: string; hint: string; icon: typeof LucideLock }[] = [
+    { value: 'private', title: 'Private', hint: 'Only people invited', icon: LucideLock },
+    { value: 'workspace', title: 'Everyone in the workspace', hint: 'Every member can view it', icon: LucideUsers },
+    { value: 'link', title: 'Anyone with the link', hint: 'Public, read-only, no sign-in needed', icon: LucideGlobe },
   ];
 
   protected readonly visibility = computed(() => this.view().sharing.visibility);
