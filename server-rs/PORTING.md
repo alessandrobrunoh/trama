@@ -10,12 +10,12 @@ status codes, bodies and side effects.
   `[workspace.dependencies]` in the root `Cargo.toml` as `trama-<name> = { path = "crates/<name>" }`.
   Use `version.workspace = true` (and edition, rust-version, publish) and `[lints] workspace = true`.
 - Files: `lib.rs` (crate docs, `pub use router::{router, ApiDoc}`), `router.rs` (handlers, a
-  `pub fn router() -> Router<AppState>` with paths relative to `/api`, and
+  `pub fn router() -> trama_auth::Routes` with paths relative to `/api`, and
   `#[derive(OpenApi)] pub struct ApiDoc`), `schemas.rs` (request/response bodies),
   `service.rs` (database work, callable from other crates). Split further when a file grows.
 - Handlers are private `async fn`s annotated with `#[utoipa::path(...)]` (full path including
   `/api`, a `tag` named after the crate, every response status).
-- Wire your crate in yourself: merge its `router()` in `app()` in `src/lib.rs`, add its
+- Wire your crate in yourself: merge its `router()` in `routes()` in `src/lib.rs`, add its
   `ApiDoc` to `api_doc()` in `src/openapi.rs` (and a tag there), and add it to the root
   package's `[dependencies]`. Keep those lists sorted by crate name so parallel merges conflict
   only on adjacent lines.
@@ -94,6 +94,45 @@ Use the `trama-auth` extractors and the `trama-events` API exactly as their crat
 Every permission check, role check and project scope in the NestJS controller or service must
 have its Rust equivalent; every `events.record(...)`/`publish(...)` call must happen in the same
 cases with the same payload.
+
+Routes and gates (`trama_auth::{Routes, Gate}`):
+
+- Register every handler with `Routes::new().get(path, gate, handler)` (`post`, `put`,
+  `patch`, `delete`; `route_with` to layer one method router, e.g. a body limit). There is no
+  gateless registration, and the guard treats anything without an entry as
+  `Gate::authenticated()`.
+- Translate the decorators: none → `Gate::authenticated()`, `@Public()` → `Gate::public()`,
+  `@Roles('admin')` → `.roles(LegacyRole::Admin)`, `@Can(c)` → `.can(Capability::…)`,
+  `@AllowCustomToken()`, `@SessionOnly()`, `@RequireUser()`, `@Multipart()`, `@NoGuests()` →
+  the method of the same name. Class decorators become a `const` gate that the handlers extend
+  (`const ADMIN: Gate = Gate::authenticated().roles(LegacyRole::Admin);`).
+- Name the workspace segment `{slug}`: the guard resolves `/w/{slug}` (404 `Workspace "<slug>"
+  not found` also for non-members, then the guest, token scope, role and capability 403s)
+  before the handler runs. The guard derives the custom-token permission, the upload-bytes rule and the member
+  grant from the path, so the path must be the NestJS one.
+
+In handlers:
+
+- `Ctx` (`@Ctx()`) is the `WorkspaceContext`: `ctx.workspace`, `ctx.settings`, `ctx.role`,
+  `ctx.access`, `ctx.can_do(..)`, `ctx.is_owner()`, `ctx.has_admin_power()`.
+- `Auth` (`@Auth()`) is the `AuthInfo` (`auth.user`, `auth.token`, `auth.require_user()?`);
+  take `Option<Auth>` on a public route.
+- `Actor` (`@Actor()`) is the acting `ActorRef`.
+
+In services, project scoping reads the request's member access from a task-local, as NestJS
+reads `AsyncLocalStorage`:
+
+- `member_access::project_hidden`, `assert_can_use_project` for one record;
+- `apply_project_scope(query, column)` or `project_scope_condition(column)` for lists;
+- `can_view`, `scope_snapshot`;
+- `upload_caller::current_upload_caller()`.
+
+Both task-locals are lost across `tokio::spawn`: capture `current_access()` first and re-enter
+with `with_access` (same for `with_upload_caller`).
+
+Test a module's routes with `router().into_app(state)` and real sessions or tokens
+(`trama_auth::service::create_session`, `trama_auth::tokens::create_token`); the guard runs as
+in production.
 
 ## Tests
 

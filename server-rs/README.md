@@ -9,6 +9,7 @@ which server answered.
 | Crate | Path | Holds |
 | --- | --- | --- |
 | `trama-api` | `src/` | The binary: wires every module router under `/api`, the OpenAPI document, startup and shutdown |
+| `trama-auth` | `crates/auth` | The access guard and route gates (`Routes`, `Gate`), sessions, API tokens and their limits, member access scoping, `/api/auth/*` |
 | `trama-core` | `crates/core` | Config (every NestJS environment variable), Nest-compatible errors, ids, ISO dates, the `ApiJson` body extractor, HTTP layers, test databases |
 | `trama-common` | `crates/common` | Secrets at rest, SSRF-safe outgoing HTTP, mail, rate limits, client address, `X-Client-Id` context, counters, reference checks |
 | `trama-contracts` | `crates/contracts` | `contracts/domain.ts` in Rust: wire types, roles and capabilities, member access, settings, status and label catalogs |
@@ -16,15 +17,16 @@ which server answered.
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
 | `trama-system` | `crates/system` | `GET /api/health`, `GET /api/config` |
 
-Each domain gets its own crate as it moves over (`auth`, `users`, `members`, `invites`,
+Each domain gets its own crate as it moves over (`users`, `members`, `invites`,
 `workspaces`, `tasks`, `comments`, `projects`, `time`, …). A module crate exposes:
 
-- `router() -> Router<AppState>`, merged in `src/lib.rs`;
+- `router() -> trama_auth::Routes`, every handler with its access `Gate`, merged in `routes()`
+  in `src/lib.rs`;
 - `ApiDoc`, its OpenAPI document, merged in `src/openapi.rs`;
 - `schemas.rs` for request and response bodies (camelCase on the wire, dates via
   `trama_core::time::to_iso`), separate from the storage entities.
 
-Module crates depend on `trama-core`, `trama-common`, `trama-contracts` and `trama-entities`, and on each other
+Module crates depend on `trama-core`, `trama-common`, `trama-contracts`, `trama-entities` and `trama-auth`, and on each other
 only when a domain really needs another (`tasks` on `auth`, not the reverse). See `PORTING.md`.
 
 ## Running
