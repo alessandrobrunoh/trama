@@ -3267,19 +3267,45 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "trama-ai",
+ "trama-attention",
  "trama-auth",
  "trama-comments",
  "trama-common",
  "trama-core",
  "trama-events",
+ "trama-insights",
  "trama-migration",
  "trama-notifications",
+ "trama-search",
  "trama-sharing",
  "trama-system",
  "trama-uploads",
  "trama-views",
  "utoipa",
  "utoipa-scalar",
+]
+
+[[package]]
+name = "trama-attention"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "regex",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "trama-auth",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-events",
+ "trama-migration",
+ "utoipa",
 ]
 
 [[package]]
@@ -3440,6 +3466,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "trama-insights"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "trama-auth",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-migration",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "trama-migration"
 version = "0.1.0"
 dependencies = [
@@ -3473,6 +3521,28 @@ dependencies = [
  "trama-entities",
  "trama-events",
  "trama-migration",
+ "url",
+ "utoipa",
+]
+
+[[package]]
+name = "trama-search"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "trama-auth",
+ "trama-contracts",
+ "trama-core",
+ "trama-entities",
+ "trama-migration",
+ "unicode-normalization",
  "url",
  "utoipa",
 ]
