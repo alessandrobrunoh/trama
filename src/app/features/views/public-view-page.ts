@@ -145,12 +145,12 @@ const DONE_LIMIT = 5;
                   <svg [lucideIcon]="isBoard() ? boardIcon : listIcon" [size]="16"></svg>
                 </span>
                 <h1
-                  class="font-title text-foreground min-w-0 text-[30px] leading-[1.1] tracking-[-0.5px] md:text-[44px] md:tracking-[-0.8px]"
+                  class="font-title text-foreground min-w-0 text-[30px] leading-[normal] tracking-[-0.5px] md:text-[44px] md:tracking-[-0.8px]"
                 >
                   {{ v.name }}
                 </h1>
               </div>
-              <p class="text-muted-foreground text-[15px] leading-[1.4]">
+              <p class="text-muted-foreground text-[15px] leading-[normal]">
                 {{ v.total }} {{ entityLabel().toLowerCase() }}
                 @if (v.truncated) {
                   (showing the first {{ shown() }})
@@ -160,16 +160,16 @@ const DONE_LIMIT = 5;
             </div>
             <dl class="flex shrink-0 items-end gap-8 max-md:hidden">
               <div class="flex flex-col items-end gap-1">
-                <dt class="text-faint font-mono text-[10px] leading-[12px] tracking-[1px]">
+                <dt class="text-faint font-mono text-[10px] leading-[normal] tracking-[1px]">
                   {{ entityLabel().toUpperCase() }}
                 </dt>
-                <dd class="text-foreground font-mono text-[15px] leading-[18px]">{{ v.total }}</dd>
+                <dd class="text-foreground font-mono text-[15px] leading-[normal]">{{ v.total }}</dd>
               </div>
               <div class="flex flex-col items-end gap-1">
-                <dt class="text-faint font-mono text-[10px] leading-[12px] tracking-[1px]">
+                <dt class="text-faint font-mono text-[10px] leading-[normal] tracking-[1px]">
                   UPDATED
                 </dt>
-                <dd class="text-foreground font-mono text-[15px] leading-[18px]">
+                <dd class="text-foreground font-mono text-[15px] leading-[normal]">
                   {{ updated() }}
                 </dd>
               </div>

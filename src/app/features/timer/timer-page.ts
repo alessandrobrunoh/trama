@@ -105,7 +105,7 @@ type Composer = 'closed' | 'start' | 'log';
             <span class="bg-red size-2.5 shrink-0" aria-hidden="true"></span>
             <div class="flex flex-col gap-0.5">
               <span class="text-red font-mono text-[10px] leading-[13px]">RUNNING · SINCE {{ run.start | date: 'HH:mm' }}</span>
-              <span class="text-foreground font-mono text-[30px] leading-[38px] tabular-nums" role="timer">{{ elapsed() }}</span>
+              <span class="text-foreground font-mono text-[30px] leading-[normal] tabular-nums" role="timer">{{ elapsed() }}</span>
             </div>
             <div class="flex min-w-0 flex-1 basis-60 flex-col gap-[3px]">
               <span class="text-faint truncate font-mono text-[10.5px] leading-[13px]">{{ runningMeta() }}</span>
@@ -119,7 +119,7 @@ type Composer = 'closed' | 'start' | 'log';
             <span class="border-faint size-2.5 shrink-0 border" aria-hidden="true"></span>
             <div class="flex flex-col gap-0.5">
               <span class="text-faint font-mono text-[10px] leading-[13px]">NOT TRACKING</span>
-              <span class="text-muted-foreground font-mono text-[30px] leading-[38px] tabular-nums" role="timer">00:00:00</span>
+              <span class="text-muted-foreground font-mono text-[30px] leading-[normal] tabular-nums" role="timer">00:00:00</span>
             </div>
             <div class="flex min-w-0 flex-1 basis-60 flex-col gap-[3px]">
               <span class="text-faint truncate font-mono text-[10.5px] leading-[13px]">no timer running</span>
@@ -198,7 +198,7 @@ type Composer = 'closed' | 'start' | 'log';
 
         <!-- week -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div class="border-border flex border">
+          <div class="outline-border flex outline-1 -outline-offset-1">
             <button
               type="button"
               class="text-muted-foreground hover:text-foreground flex h-[26px] w-7 items-center justify-center"
@@ -242,8 +242,8 @@ type Composer = 'closed' | 'start' | 'log';
                   type="button"
                   class="border-border flex items-center justify-center border-l font-mono text-[9.5px]"
                   [class]="d.today ? 'text-red bg-red/8' : d.weekend ? 'text-faint' : 'text-muted-foreground'"
-                  [class.underline]="railDay().from === d.from"
-                  [class.underline-offset-4]="railDay().from === d.from"
+                  [class.underline]="railDay().from === d.from && !d.today"
+                  [class.underline-offset-4]="railDay().from === d.from && !d.today"
                   role="columnheader"
                   [attr.aria-pressed]="railDay().from === d.from"
                   (click)="selected.set(d.from)"
