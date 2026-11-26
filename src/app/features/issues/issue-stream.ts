@@ -120,9 +120,10 @@ import { TaskSectionHead } from './task-section-head';
               }
             </div>
           }
-        </section>
 
-        <ng-content select="[composer]" />
+          <!-- The frame keeps the comment box inside Activity, one section gap under the last entry. -->
+          <ng-content select="[composer]" />
+        </section>
       </div>
     </div>
 

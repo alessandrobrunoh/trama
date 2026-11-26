@@ -38,7 +38,7 @@ const REPORT_MAX = 420;
     @let i = issue();
     <app-task-section-head title="Delta thread" [caption]="caption()">
       @if (linked(); as who) {
-        <span class="text-faint font-mono text-[10.5px] leading-[13px] whitespace-nowrap">{{ who }}</span>
+        <span class="text-faint font-mono text-[10.5px] leading-[14px] whitespace-nowrap">{{ who }}</span>
       }
     </app-task-section-head>
 
@@ -47,11 +47,11 @@ const REPORT_MAX = 420;
         <div class="border-border flex flex-col gap-2.5 border-b px-[18px] py-4">
           <div class="flex items-center gap-2">
             <span class="bg-delta-line size-2 shrink-0" aria-hidden="true"></span>
-            <span class="text-delta font-mono text-[10.5px] leading-[13px]">DELTA THREAD</span>
+            <span class="text-delta font-mono text-[10.5px] leading-[14px]">DELTA THREAD</span>
             <span class="flex-1"></span>
-            <span class="text-faint font-mono text-[10.5px] leading-[13px]">read-only</span>
+            <span class="text-faint font-mono text-[10.5px] leading-[14px]">read-only</span>
           </div>
-          <h3 class="font-title text-foreground text-[22px] leading-[26px] break-words">{{ i.title }}</h3>
+          <h3 class="font-title text-foreground text-[22px] leading-[22px] tracking-normal! break-words">{{ i.title }}</h3>
           <div class="flex flex-wrap items-center gap-x-3.5 gap-y-1 font-mono text-[11px] leading-[14px]">
             <span class="text-muted-foreground">{{ id() }}</span>
             @if (by(); as name) {
@@ -72,9 +72,9 @@ const REPORT_MAX = 420;
         @if (report(); as r) {
           <div class="border-border flex flex-col gap-2 border-b px-[18px] py-3.5">
             <div class="flex items-baseline gap-2">
-              <span class="text-faint font-mono text-[10px] leading-[12px]">LATEST REPORT</span>
+              <span class="text-faint font-mono text-[10px] leading-[13px]">LATEST REPORT</span>
               <span class="flex-1"></span>
-              <span class="text-faint font-mono text-[10.5px] leading-[13px]">{{ r.by }} · {{ r.at | ago }} ago</span>
+              <span class="text-faint font-mono text-[10.5px] leading-[14px]">{{ r.by }} · {{ r.at | ago }} ago</span>
             </div>
             <p class="text-text-2 text-[13.5px] leading-[21px] break-words">{{ r.text }}</p>
           </div>
@@ -82,18 +82,18 @@ const REPORT_MAX = 420;
 
         @if (events().length) {
           <div class="border-border flex flex-col gap-[7px] border-b px-[18px] py-3.5">
-            <span class="text-faint font-mono text-[10px] leading-[12px]">KEY EVENTS</span>
+            <span class="text-faint font-mono text-[10px] leading-[13px]">KEY EVENTS</span>
             @for (e of events(); track e.id) {
               <div class="flex items-baseline gap-3">
-                <span class="text-faint w-24 shrink-0 font-mono text-[10.5px] leading-[13px]">{{ when(e.at) }}</span>
-                <span class="text-text-2 min-w-0 text-[13px] leading-[16px] break-words">{{ e.text }}</span>
+                <span class="text-faint w-24 shrink-0 font-mono text-[10.5px] leading-[14px]">{{ when(e.at) }}</span>
+                <span class="text-text-2 min-w-0 text-[13px] leading-[17px] break-words">{{ e.text }}</span>
               </div>
             }
           </div>
         }
 
         <div class="flex flex-col gap-1.5 px-[18px] py-3.5">
-          <span class="text-faint font-mono text-[10px] leading-[12px]">{{ requests().length ? 'PULL REQUESTS' : 'ARTIFACTS' }}</span>
+          <span class="text-faint font-mono text-[10px] leading-[13px]">{{ requests().length ? 'PULL REQUESTS' : 'ARTIFACTS' }}</span>
           @for (a of artifacts(); track a.id) {
             <div class="flex items-center gap-2 py-px">
               <svg
@@ -115,7 +115,7 @@ const REPORT_MAX = 420;
                 <span class="text-foreground min-w-0 truncate font-mono text-[11px] leading-[14px]">{{ line(a) }}</span>
               }
               <span class="flex-1"></span>
-              <span class="text-faint font-mono text-[10.5px] leading-[13px] whitespace-nowrap">{{ a.updatedAt | ago }} ago</span>
+              <span class="text-faint font-mono text-[10.5px] leading-[14px] whitespace-nowrap">{{ a.updatedAt | ago }} ago</span>
             </div>
           } @empty {
             <div class="flex items-center gap-2 py-px">
@@ -129,9 +129,9 @@ const REPORT_MAX = 420;
       <article class="border-border flex flex-col gap-2.5 border p-[18px]" aria-label="No Delta thread linked">
         <div class="flex items-center gap-2">
           <span class="border-faint size-2 shrink-0 border" aria-hidden="true"></span>
-          <span class="text-faint font-mono text-[10.5px] leading-[13px]">DELTA THREAD</span>
+          <span class="text-faint font-mono text-[10.5px] leading-[14px]">DELTA THREAD</span>
         </div>
-        <h3 class="font-title text-foreground text-[20px] leading-[24px]">No thread linked</h3>
+        <h3 class="font-title text-foreground text-[20px] leading-[24px] tracking-normal!">No thread linked</h3>
         <p class="text-muted-foreground max-w-[560px] text-[13px] leading-5">
           Open a thread in Delta and type
           <span class="text-foreground font-mono text-[12px]">/trama {{ i.key }}</span> — the agent links it here. One

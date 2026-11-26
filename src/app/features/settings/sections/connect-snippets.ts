@@ -1,39 +1,67 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { LucideCheck, LucideCopy, LucideDynamicIcon } from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { API_BASE_URL, MCP_URL } from '../../../core/config';
 import type { TokenScope } from '../../../core/contracts/domain';
 import { Clipboard } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 
-/** Monospace block with a header strip (v3 "Code"): deep fill, hairline, label left and copy right. */
+export interface CodeTab {
+  id: string;
+  label: string;
+}
+
+/**
+ * Monospace block (v4 "Code"): deep fill and hairline, a tab strip on top (underlined active tab, or the single
+ * `label` when there are no `tabs`) and a mono "Copy" action on its right.
+ */
 @Component({
   selector: 'app-code-block',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon],
+  imports: [LucideDynamicIcon],
   host: { class: 'bg-bg-deep border-border block min-w-0 border' },
   template: `
-    <div class="border-border flex h-[26px] items-center gap-2 border-b pr-1 pl-3">
-      <span class="text-muted-foreground font-mono text-[10px] leading-none uppercase">{{ label() || 'code' }}</span>
-      <span class="flex-1"></span>
+    <div class="border-border flex items-stretch border-b">
+      <div class="flex min-w-0 flex-1 overflow-x-auto" [attr.role]="tabs().length ? 'tablist' : null" aria-label="Examples">
+        @for (t of tabs(); track t.id) {
+          <button
+            type="button"
+            role="tab"
+            class="-mb-px border-b-2 px-3 py-2 font-mono text-[11.5px] leading-[normal] whitespace-nowrap transition-colors"
+            [class]="
+              activeTab() === t.id ? 'border-primary text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'
+            "
+            [attr.aria-selected]="activeTab() === t.id"
+            (click)="tabChange.emit(t.id)"
+          >
+            {{ t.label }}
+          </button>
+        } @empty {
+          <span class="border-primary text-foreground -mb-px border-b-2 px-3 py-2 font-mono text-[11.5px] leading-[normal] whitespace-nowrap">
+            {{ label() || 'Code' }}
+          </span>
+        }
+      </div>
       <button
-        hlmBtn
-        variant="ghost"
-        size="icon-sm"
-        class="text-muted-foreground size-5"
+        type="button"
+        class="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-[5px] px-3 font-mono text-[10.5px] leading-[normal] transition-colors"
         [attr.aria-label]="'Copy ' + (label() || 'code')"
         (click)="copy()"
       >
         <svg [lucideIcon]="copied() ? checkIcon : copyIcon" [size]="12"></svg>
+        {{ copied() ? 'Copied' : 'Copy' }}
       </button>
     </div>
-    <pre class="text-text-2 overflow-x-auto px-3.5 py-3 font-mono text-[11.5px] leading-[1.7] whitespace-pre select-all" tabindex="0"><code>{{ code() }}</code></pre>
+    <pre class="text-text-2 overflow-x-auto px-3.5 py-3 font-mono text-[11.5px] leading-[21px] whitespace-pre select-all" tabindex="0"><code>{{ code() }}</code></pre>
   `,
 })
 export class CodeBlock {
   private readonly clipboard = inject(Clipboard);
   readonly code = input.required<string>();
   readonly label = input('');
+  /** Optional tab strip; the owner keeps the selected id and listens to `tabChange`. */
+  readonly tabs = input<readonly CodeTab[]>([]);
+  readonly activeTab = input<string>('');
+  readonly tabChange = output<string>();
   protected readonly copied = signal(false);
   protected readonly copyIcon = LucideCopy;
   protected readonly checkIcon = LucideCheck;
@@ -60,24 +88,10 @@ type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'wri
   imports: [CodeBlock],
   host: { class: 'flex flex-col gap-3' },
   template: `
-    <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Examples">
-      @for (t of tabs(); track t.id) {
-        <button
-          type="button"
-          role="tab"
-          class="border-border h-[22px] border px-2.5 font-mono text-[11px] transition-colors"
-          [class]="tab() === t.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
-          [attr.aria-selected]="tab() === t.id"
-          (click)="tab.set(t.id)"
-        >
-          {{ t.label }}
-        </button>
-      }
-    </div>
-    <app-code-block [code]="code()" [label]="current().label" />
-    <p class="text-muted-foreground text-xs leading-snug">{{ current().hint }}</p>
+    <app-code-block [code]="code()" [label]="current().label" [tabs]="tabs()" [activeTab]="tab()" (tabChange)="setTab($event)" />
+    <p class="text-muted-foreground text-[12px] leading-[18px]">{{ current().hint }}</p>
     @if (!token()) {
-      <p class="text-muted-foreground text-xs leading-snug">
+      <p class="text-muted-foreground text-[12px] leading-[18px]">
         <code class="font-mono">trm_YOUR_TOKEN</code> is a placeholder: the real secret is only shown once, when the token is created.
       </p>
     }
@@ -98,6 +112,10 @@ export class ConnectSnippets {
   protected readonly slug = computed(() => this.store.slug() ?? 'my-workspace');
   private readonly secret = computed(() => this.token() ?? 'trm_YOUR_TOKEN');
   private readonly exampleKey = computed(() => this.store.issues()[0]?.key ?? 'CORA-142');
+
+  protected setTab(id: string): void {
+    this.tab.set(id as Tab);
+  }
 
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [
     { id: 'mcp-cli', label: 'MCP · Claude Code' },

@@ -16,7 +16,8 @@ import {
   type SidebarVisibility,
 } from '../core/stores/ui.store';
 import { AppSelect, type Option } from '../shared/app-select';
-import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
+import { V3DialogFoot, V3DialogHead } from '../shared/v3';
+import { SIDEBAR_MAIN_NAV, SIDEBAR_WORKSPACE_NAV, orderNav, type NavItem } from './nav';
 
 const BADGE_OPTIONS: Option[] = [
   { value: 'count', label: 'Count' },
@@ -44,25 +45,28 @@ const VISIBILITY_BADGED: Option[] = [
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
+    V3DialogHead,
+    V3DialogFoot,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="ui.closeModal()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
         class="flex max-h-[85svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+        [showCloseButton]="false"
       >
-        <hlm-dialog-header class="px-5 pt-4 pb-3">
-          <h2 hlmDialogTitle class="text-sm font-semibold">Customize sidebar</h2>
-          <p hlmDialogDescription class="sr-only">
-            Choose which entries the sidebar shows, in what order, and how badges look.
-          </p>
-        </hlm-dialog-header>
+        <v3-dialog-head kicker="SIDEBAR" (dismiss)="ui.closeModal()">
+          <h2 hlmDialogTitle>Customize sidebar</h2>
+        </v3-dialog-head>
+        <p hlmDialogDescription class="sr-only">
+          Choose which entries the sidebar shows, in what order, and how badges look.
+        </p>
 
-        <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-4">
+        <div class="min-h-0 flex-1 space-y-5 overflow-y-auto p-[18px]">
           <div
-            class="bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2 text-[13px]"
+            class="bg-background border-border flex items-center justify-between border px-3 py-2 text-[13px]"
           >
-            <label for="sidebar-badge-style" class="font-medium">Default badge style</label>
+            <label for="sidebar-badge-style">Default badge style</label>
             <app-select
               class="w-28"
               size="sm"
@@ -75,9 +79,9 @@ const VISIBILITY_BADGED: Option[] = [
 
           @for (group of groups(); track group.section) {
             <section>
-              <h3 class="text-muted-foreground mb-1.5 text-xs font-medium">{{ group.title }}</h3>
+              <h3 class="text-faint mb-1.5 font-mono text-[10.5px] uppercase">{{ group.title }}</h3>
               <ul
-                class="bg-muted/50 rounded-lg p-1"
+                class="bg-background border-border border p-1"
                 cdkDropList
                 [attr.aria-label]="group.title + ' entries'"
                 (cdkDropListDropped)="drop(group.section, $event)"
@@ -86,7 +90,7 @@ const VISIBILITY_BADGED: Option[] = [
                   <li
                     cdkDrag
                     cdkDragLockAxis="y"
-                    class="bg-background/0 flex h-9 items-center gap-2 rounded-md px-1.5 text-[13px]"
+                    class="flex h-9 items-center gap-2 px-1.5 text-[13px]"
                   >
                     <span
                       cdkDragHandle
@@ -116,18 +120,19 @@ const VISIBILITY_BADGED: Option[] = [
           }
         </div>
 
-        <div class="flex h-12 shrink-0 items-center justify-between px-5">
+        <v3-dialog-foot>
           <button
+            v3-hint
             hlmBtn
             variant="ghost"
             size="sm"
-            class="text-muted-foreground"
+            class="text-muted-foreground -ms-2.5"
             (click)="ui.resetSidebarLayout()"
           >
             Reset to default
           </button>
           <button hlmBtn size="sm" (click)="ui.closeModal()">Done</button>
-        </div>
+        </v3-dialog-foot>
       </hlm-dialog-content>
     </hlm-dialog>
   `,
@@ -145,9 +150,13 @@ export class CustomizeSidebarDialog {
   >(() => {
     const order = this.ui.sidebarOrder();
     return [
-      // The stored section ids predate the Inbox: `personal` is the main list, `workspace` is "More".
-      { section: 'personal', title: 'Main', items: orderNav(PRIMARY_NAV, order.personal) },
-      { section: 'workspace', title: 'More', items: orderNav(MORE_NAV, order.workspace) },
+      // Only the rows the sidebar draws: `personal` is the top list, `workspace` the WORKSPACE section.
+      { section: 'personal', title: 'Main', items: orderNav(SIDEBAR_MAIN_NAV, order.personal) },
+      {
+        section: 'workspace',
+        title: 'Workspace',
+        items: orderNav(SIDEBAR_WORKSPACE_NAV, order.workspace),
+      },
     ];
   });
 

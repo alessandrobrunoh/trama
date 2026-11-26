@@ -17,6 +17,16 @@ export const labelEdge = (color: string): string => `color-mix(in srgb, ${color}
   host: { class: 'inline-flex min-w-0 max-w-full' },
   template: `
     @if (view(); as v) {
+      @if (variant() === 'hairline') {
+        <!-- v3 property column: a hairline box, mono 10.5, no color dot. -->
+        <span
+          class="border-border text-muted-foreground inline-flex max-w-full min-w-0 items-center border px-1.5 font-mono text-[10.5px] leading-[14px]"
+          [class.opacity-70]="v.archived"
+          [attr.title]="v.archived ? v.name + ' (archived)' : v.name"
+        >
+          <span class="truncate">{{ v.name }}</span>
+        </span>
+      } @else {
       <span
         class="text-foreground inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full leading-none"
         [class]="size() === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]'"
@@ -27,11 +37,14 @@ export const labelEdge = (color: string): string => `color-mix(in srgb, ${color}
         <span class="size-1.5 shrink-0 rounded-full" [style.background]="v.color"></span>
         <span class="truncate">{{ v.name }}</span>
       </span>
+      }
     }
   `,
 })
 export class LabelChip {
   private readonly catalog = inject(LabelCatalog);
+  /** `pill`: the tinted pill with a color dot everywhere; `hairline`: the plain box of the task's property column. */
+  readonly variant = input<'pill' | 'hairline'>('pill');
   readonly labelId = input<string>();
   readonly name = input<string>();
   readonly color = input<string>();
@@ -58,7 +71,7 @@ export class LabelChip {
   host: { class: 'inline-flex min-w-0 max-w-full flex-wrap items-center gap-1' },
   template: `
     @for (id of shown(); track id) {
-      <app-label-chip [labelId]="id" [size]="size()" />
+      <app-label-chip [labelId]="id" [size]="size()" [variant]="variant()" />
     }
     @if (rest().length) {
       <span
@@ -73,6 +86,7 @@ export class LabelChips {
   readonly ids = input.required<readonly string[]>();
   readonly max = input(3);
   readonly size = input<'sm' | 'md'>('sm');
+  readonly variant = input<'pill' | 'hairline'>('pill');
 
   private readonly known = computed(() => this.ids().filter((id) => this.catalog.byId().has(id)));
   protected readonly shown = computed(() => this.known().slice(0, this.max()));

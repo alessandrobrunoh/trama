@@ -1,10 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { LucideDynamicIcon, LucideSearch } from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { SHORTCUT_GROUPS, type ShortcutGroup } from '../../../core/keyboard/shortcuts';
-import { UiStore } from '../../../core/stores/ui.store';
 import { Kbd } from '../../../shared/kbd';
-import { SECTION_KIT, SETTINGS_FIELD, type SegmentedOption } from './section-kit';
+import { SECTION_KIT, type SegmentedOption } from './section-kit';
 
 type Platform = 'mac' | 'windows';
 
@@ -18,34 +16,30 @@ const DETECTED: Platform =
 @Component({
   selector: 'app-shortcuts-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon, Kbd, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  imports: [LucideDynamicIcon, Kbd, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
       title="Shortcuts"
-      description="Everything you can do without the mouse. Single-key shortcuts are ignored while you type in a field. Press ? anywhere to see this list."
+      description="Everything you can do without the mouse. Press ? anywhere to see this list."
     >
-      <span actions class="flex items-center gap-2">
-        <button hlmBtn size="sm" variant="outline" (click)="ui.openModal('shortcuts')">
-          Cheat sheet <app-kbd keys="?" class="opacity-70" />
-        </button>
-        <app-segmented aria-label="Platform" [options]="platforms" [value]="platform()" (valueChange)="platform.set($any($event))" />
-      </span>
+      <app-segmented actions aria-label="Platform" [options]="platforms" [value]="platform()" (valueChange)="platform.set($any($event))" />
     </app-section-header>
 
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="flex items-center gap-2">
       <div class="relative w-full sm:w-80">
-        <svg [lucideIcon]="searchIcon" [size]="13" class="text-faint pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
+        <svg [lucideIcon]="searchIcon" [size]="14" class="text-faint pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
         <input
-          [class]="field + ' pl-8'"
+          [class]="field"
           placeholder="Search shortcuts"
           aria-label="Search shortcuts"
           [value]="query()"
           (input)="query.set($any($event.target).value)"
         />
       </div>
-      <span class="text-faint font-mono text-[10.5px]">{{ total() }} {{ total() === 1 ? 'shortcut' : 'shortcuts' }}</span>
+      <span class="flex-1"></span>
+      <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ total() }} {{ total() === 1 ? 'shortcut' : 'shortcuts' }}</span>
     </div>
 
     @if (columns()[0].length || columns()[1].length) {
@@ -54,12 +48,12 @@ const DETECTED: Platform =
           <div class="flex min-w-0 flex-col gap-6">
             @for (g of col; track g.title) {
               <section class="flex flex-col gap-2">
-                <h3 class="text-muted-foreground font-mono text-[10.5px] uppercase">{{ g.title }}</h3>
+                <h3 class="text-muted-foreground font-mono text-[10.5px] leading-[normal] uppercase">{{ g.title }}</h3>
                 <app-settings-card>
                   @for (i of g.items; track i.label) {
-                    <div class="flex min-h-[34px] items-center gap-3 px-3 py-1.5">
-                      <span class="text-foreground/80 min-w-0 flex-1 truncate text-[12.5px]">{{ i.label }}</span>
-                      <span class="flex shrink-0 items-center gap-1.5">
+                    <div class="flex items-center gap-3 px-3 py-2 [&_kbd]:bg-secondary [&_kbd]:text-text-2 [&_kbd]:h-4" [class]="i.keys === 'mod+j' ? 'bg-primary/10' : ''">
+                      <span class="text-text-2 min-w-0 flex-1 truncate text-[12.5px] leading-[normal]">{{ i.label }}</span>
+                      <span class="flex shrink-0 items-center gap-[3px]">
                         <app-kbd [keys]="i.keys" [chord]="isChord(i.keys)" [platform]="platform()" />
                         @if (i.alt) {
                           <span class="text-faint font-mono text-[10.5px]">or</span>
@@ -80,8 +74,8 @@ const DETECTED: Platform =
   `,
 })
 export class ShortcutsSection {
-  protected readonly ui = inject(UiStore);
-  protected readonly field = SETTINGS_FIELD;
+  protected readonly field =
+    'bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary w-full min-w-0 border py-1.5 pr-[9px] pl-8 font-sans text-[13px] leading-[normal] outline-none transition-colors';
   protected readonly searchIcon = LucideSearch;
   protected readonly query = signal('');
   protected readonly platform = signal<Platform>(DETECTED);

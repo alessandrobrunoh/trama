@@ -90,7 +90,7 @@ interface PointsRow {
         <!-- filters -->
         <div class="flex flex-wrap items-center gap-2.5">
           <label
-            class="bg-delta-line/8 border-delta-line/40 focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-1 font-mono text-[11px] leading-[13px] focus-within:outline-2"
+            class="bg-delta-line/8 border-delta-line/40 focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-[3px] font-mono text-[11px] leading-[normal] focus-within:outline-2"
           >
             <span class="text-muted-foreground">Range</span>
             <span class="text-foreground">{{ rangeLabel() }}</span>
@@ -126,12 +126,12 @@ interface PointsRow {
           @for (k of tiles(); track k.label) {
             <div class="border-border flex min-w-0 flex-col gap-1 px-[18px] py-3.5 not-first:border-l">
               <div class="flex items-end gap-2">
-                <span class="font-title text-foreground text-[28px] leading-8">{{ k.value }}</span>
+                <span class="font-title text-foreground text-[28px] leading-[normal]">{{ k.value }}</span>
                 @if (k.note) {
-                  <span class="text-faint pb-1 font-mono text-[10.5px] leading-[13px]">{{ k.note }}</span>
+                  <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ k.note }}</span>
                 }
               </div>
-              <span class="text-faint font-mono text-[10.5px] leading-[13px]">{{ k.label }}</span>
+              <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ k.label }}</span>
             </div>
           }
         </div>
@@ -139,7 +139,7 @@ interface PointsRow {
         <!-- chart -->
         <section class="flex flex-col gap-3" aria-label="Hours per day">
           <div class="flex flex-wrap items-end gap-x-4 gap-y-1">
-            <h2 class="font-title text-foreground text-[20px] leading-[26px]">Hours per day, by {{ group() }}</h2>
+            <h2 class="font-title text-foreground text-[20px] leading-[normal]">Hours per day, by {{ group() }}</h2>
             <span class="flex-1"></span>
             @for (s of series(); track s.key) {
               <span class="text-muted-foreground flex items-center gap-1.5 font-mono text-[11px]">
@@ -169,7 +169,7 @@ interface PointsRow {
                       @for (s of series(); track s.key) {
                         @if (d.parts.get(s.key); as ms) {
                           <span
-                            class="block"
+                            class="block last:rounded-t-[4px]"
                             [class.opacity-55]="d.day.today"
                             [style.height.%]="(ms * 100) / axis().top"
                             [style.background]="s.color"
@@ -200,7 +200,7 @@ interface PointsRow {
                 }
               </div>
             </div>
-            <div class="flex ps-10 pt-1" aria-hidden="true">
+            <div class="flex ps-10 pt-2 pb-1.5" aria-hidden="true">
               @for (w of weekSpans(); track $index) {
                 <span class="text-faint font-mono text-[10px] leading-4" [style.flex]="w.count + ' 1 0'">{{ w.label }}</span>
               }
@@ -223,26 +223,33 @@ interface PointsRow {
         @if (series().length) {
           <section class="flex flex-col" aria-label="By {{ group() }}">
             <div class="flex items-end gap-2.5 pb-2">
-              <h2 class="font-title text-foreground text-[20px] leading-[26px]">By {{ group() }}</h2>
+              <h2 class="font-title text-foreground text-[20px] leading-[normal]">By {{ group() }}</h2>
               <span class="text-faint pb-0.5 font-mono text-[10.5px]">{{ rangeLabel().toLowerCase() }}</span>
             </div>
             @for (s of series(); track s.key) {
-              <div class="border-border flex min-h-[37px] items-center gap-3 border-t py-2">
-                <span class="size-2.5 shrink-0" [style.background]="s.color" aria-hidden="true"></span>
+              <div class="border-border flex min-h-[37.5px] items-center gap-3 border-t py-2 last:border-b">
+                <span class="flex size-[22px] shrink-0 items-center justify-center" aria-hidden="true">
+                  <span class="size-2.5" [style.background]="s.color"></span>
+                </span>
                 @if (s.link; as key) {
                   <a
-                    class="text-foreground w-[220px] min-w-0 shrink truncate text-[13px] hover:underline hover:underline-offset-4"
+                    class="text-foreground min-w-0 shrink truncate text-[13px] leading-[normal] hover:underline hover:underline-offset-4"
+                    [class]="group() === 'task' ? 'w-[220px]' : 'w-[120px]'"
                     [routerLink]="['/', slug(), 'tasks', key]"
                     >{{ s.label }}</a
                   >
                 } @else {
-                  <span class="text-foreground w-[220px] min-w-0 shrink truncate text-[13px]">{{ s.label }}</span>
+                  <span
+                    class="text-foreground min-w-0 shrink truncate text-[13px] leading-[normal]"
+                    [class]="group() === 'task' ? 'w-[220px]' : 'w-[120px]'"
+                    >{{ s.label }}</span
+                  >
                 }
                 <span class="bg-secondary hidden h-1.5 flex-1 sm:block" aria-hidden="true">
-                  <span class="bg-foreground block h-1.5" [style.width.%]="(s.ms * 100) / topSeries()"></span>
+                  <span class="bg-foreground block h-1.5 rounded-r-[3px]" [style.width.%]="(s.ms * 100) / topSeries()"></span>
                 </span>
                 <span class="text-foreground w-16 shrink-0 text-end font-mono text-[11px]">{{ hours(s.ms) }}</span>
-                <span class="text-faint w-[84px] shrink-0 text-end font-mono text-[10.5px]">{{ share(s.ms) }}% of total</span>
+                <span class="text-faint w-[90px] shrink-0 text-end font-mono text-[10.5px]">{{ share(s.ms) }}% of total</span>
               </div>
             }
           </section>
@@ -255,7 +262,7 @@ interface PointsRow {
         aria-label="Points vs actual"
       >
         <div class="flex flex-col gap-1 px-5 pt-[18px] pb-3">
-          <h2 class="font-title text-foreground text-[20px] leading-[26px]">Points vs actual</h2>
+          <h2 class="font-title text-foreground text-[20px] leading-[normal]">Points vs actual</h2>
           <p class="text-faint font-mono text-[10.5px] leading-[13px]">expected hours come from your history</p>
           <div class="flex gap-3.5 pt-1.5 font-mono text-[10.5px]">
             <span class="text-faint flex items-center gap-1.5"><span class="bg-foreground h-1.5 w-3" aria-hidden="true"></span>actual</span>

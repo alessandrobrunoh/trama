@@ -122,11 +122,11 @@ function savedAt(time: number, now = Date.now()): string {
               (click)="openChat(chat)"
             >
               <span
-                class="w-full truncate text-[13px] leading-4"
+                class="w-full truncate text-[13px] leading-[normal]"
                 [class]="chat.id === ai.activeId() ? 'text-foreground' : 'text-muted-foreground'"
                 >{{ chat.title }}</span
               >
-              <span class="text-faint flex items-center gap-1.5 font-mono text-[10px] leading-3">
+              <span class="text-faint flex items-center gap-1.5 font-mono text-[10px] leading-[normal]">
                 @if (chat.unread) {
                   <span class="bg-primary size-1.5" role="img" aria-label="Unread"></span>
                 }
@@ -163,9 +163,9 @@ function savedAt(time: number, now = Date.now()): string {
                 class="text-muted-foreground shrink-0"
                 aria-hidden="true"
               ></svg>
-              <p class="text-faint m-0 font-mono text-[11px] leading-4">
-                Answers are built from your tasks and their linked threads. They are saved in this
-                browser, per workspace. Answers can be wrong: check the sources.
+              <p class="text-faint m-0 font-mono text-[11px] leading-[normal]">
+                Built from your tasks and their threads, saved in this browser. Answers can be wrong:
+                check the sources.
               </p>
             </div>
 
@@ -243,7 +243,7 @@ function savedAt(time: number, now = Date.now()): string {
                 rows="1"
                 maxlength="8000"
                 name="message"
-                class="placeholder:text-faint text-foreground field-sizing-content max-h-40 min-h-5 w-full resize-none bg-transparent text-[14px] leading-5 outline-none"
+                class="placeholder:text-faint text-foreground field-sizing-content max-h-40 min-h-[18px] w-full resize-none bg-transparent text-[14px] leading-[normal] outline-none"
                 placeholder="Ask anything about your tasks and their linked threads…"
                 [ngModel]="ai.draft()"
                 (ngModelChange)="ai.draft.set($event)"

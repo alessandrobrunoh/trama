@@ -13,9 +13,9 @@ import { Clipboard } from '../../../core/notify/notifier';
   host: { class: 'flex flex-wrap items-end justify-between gap-x-6 gap-y-3', '[class.mb-7]': '!flush()' },
   template: `
     <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-      <h2 class="font-title text-foreground text-[32px] leading-normal">{{ title() }}</h2>
+      <h2 class="font-title text-foreground text-[32px] leading-[normal]">{{ title() }}</h2>
       @if (description()) {
-        <p class="text-muted-foreground max-w-[720px] text-[13.5px] leading-[21px]">{{ description() }}</p>
+        <p class="text-muted-foreground text-[13.5px] leading-[21px]">{{ description() }}</p>
       }
     </div>
     <div class="flex shrink-0 items-center gap-2 empty:hidden">
@@ -31,17 +31,17 @@ export class SectionHeader {
 }
 
 /**
- * Flat section (v3 "SH"): Newsreader 20px title, an optional mono caption beside it and an optional
- * `[aside]` slot on the right, all over a 1px hairline. The content is projected as is.
+ * Flat section (v4 "Sec"): Newsreader 20px title, an optional mono caption beside it and an optional
+ * `[aside]` slot on the right, a 12px gap, then the content as is (no rule under the title).
  *   <app-settings-section title="Statuses" caption="drag to reorder"> … </app-settings-section>
  */
 @Component({
   selector: 'app-settings-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'block' },
+  host: { class: 'flex flex-col gap-3' },
   template: `
-    <div class="border-border flex items-end gap-2.5 border-b pb-2">
-      <h3 class="font-title text-foreground text-[20px] leading-normal">{{ title() }}</h3>
+    <div class="flex items-end gap-2.5">
+      <h3 class="font-title text-foreground text-[20px] leading-[normal]">{{ title() }}</h3>
       @if (caption()) {
         <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
       }
@@ -71,7 +71,7 @@ export class SettingsSection {
     @if (title()) {
       <div class="border-border border-b pb-2">
         <div class="flex min-h-6 items-end gap-2.5">
-          <h3 class="font-title text-foreground text-[20px] leading-normal">{{ title() }}</h3>
+          <h3 class="font-title text-foreground text-[20px] leading-[normal]">{{ title() }}</h3>
           @if (caption()) {
             <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
           }
@@ -79,7 +79,7 @@ export class SettingsSection {
           <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
         </div>
         @if (description()) {
-          <p class="text-muted-foreground mt-0.5 max-w-[720px] text-[12.5px] leading-snug">{{ description() }}</p>
+          <p class="text-muted-foreground mt-0.5 text-[12.5px] leading-snug">{{ description() }}</p>
         }
       </div>
     }
@@ -165,9 +165,19 @@ export class CopyField {
 
 // ───────────────────────── v4 settings frames: blocks, cards, rows, switches ─────────────────────────
 
-/** Field edge + fill of the v4 settings frames: 34px, `bg-background`, hairline, accent edge on focus. */
+/**
+ * Field edge + fill of the v4 settings frames: 7/10 padding (1px of it is the hairline), 13px text,
+ * `bg-background`, accent edge on focus.
+ */
 export const SETTINGS_FIELD =
-  'bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary w-full min-w-0 border px-2.5 py-[7px] font-sans text-[13px] leading-[18px] outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+  'bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary w-full min-w-0 border px-[9px] py-1.5 font-sans text-[13px] leading-[normal] outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+
+/**
+ * Makes a `<app-select>` inside the element look like a field of the v4 frames (13px sans text, 7/10 padding,
+ * background fill) instead of the 26px mono combobox default. Put it on the container of the selects.
+ */
+export const SETTINGS_SELECT =
+  '[&_[data-slot=combobox-trigger]]:bg-background [&_[data-slot=combobox-trigger]]:border-border [&_[data-slot=combobox-trigger]]:text-foreground [&_[data-slot=combobox-trigger]]:h-auto [&_[data-slot=combobox-trigger]]:px-[9px] [&_[data-slot=combobox-trigger]]:py-1.5 [&_[data-slot=combobox-trigger]]:font-sans [&_[data-slot=combobox-trigger]]:text-[13px] [&_[data-slot=combobox-trigger]]:leading-[normal]';
 
 /**
  * Block of a settings page (v4 "Sec"): Newsreader 20 title, an optional mono caption, an optional `[aside]`
@@ -179,7 +189,7 @@ export const SETTINGS_FIELD =
   host: { class: 'flex flex-col gap-3' },
   template: `
     <div class="flex items-end gap-2.5">
-      <h3 class="font-title text-foreground text-[20px] leading-normal" [class.text-red]="danger()">{{ title() }}</h3>
+      <h3 class="font-title text-foreground text-[20px] leading-[normal]" [class.text-red]="danger()">{{ title() }}</h3>
       @if (caption()) {
         <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
       }
@@ -187,7 +197,7 @@ export const SETTINGS_FIELD =
       <div class="flex shrink-0 items-center gap-2 pb-0.5 empty:hidden"><ng-content select="[aside]" /></div>
     </div>
     @if (description()) {
-      <p class="text-muted-foreground -mt-1.5 max-w-[720px] text-[12.5px] leading-[19px]">{{ description() }}</p>
+      <p class="text-muted-foreground text-[12.5px] leading-[normal]">{{ description() }}</p>
     }
     <ng-content />
   `,
@@ -222,10 +232,10 @@ export class SettingsCard {
 @Component({
   selector: 'app-card-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6' },
+  host: { class: 'flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6', '[class]': 'selectField' },
   template: `
     <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
-      <span class="text-[13.5px] leading-normal" [class]="danger() ? 'text-red' : 'text-foreground'">{{ label() }}</span>
+      <span class="text-[13.5px] leading-[normal]" [class]="danger() ? 'text-red' : 'text-foreground'">{{ label() }}</span>
       @if (description()) {
         <span class="text-muted-foreground text-[12.5px] leading-[18px]">{{ description() }}</span>
       }
@@ -244,6 +254,7 @@ export class CardRow {
   readonly description = input<string>();
   readonly wide = input(false, { transform: booleanAttribute });
   readonly danger = input(false, { transform: booleanAttribute });
+  protected readonly selectField = SETTINGS_SELECT;
 }
 
 /**
@@ -327,7 +338,7 @@ export interface StatCell {
 
 /**
  * Strip of stats (v4 "Stats"): equal cells in a card edge, a hairline between them; mono 10.5 label, Newsreader
- * value (18 by default, 24 with `large`), optional mono note.
+ * value (18 by default, 22 with `large`), optional mono note.
  */
 @Component({
   selector: 'app-stat-strip',
@@ -336,12 +347,13 @@ export interface StatCell {
   template: `
     @for (c of cells(); track c.label) {
       <div
-        class="border-border flex min-w-0 flex-1 flex-col gap-1 px-4 py-3.5 [&:nth-child(even)]:border-l [&:nth-child(n+3)]:border-t sm:[&:nth-child(n+3)]:border-t-0 sm:[&:not(:first-child)]:border-l"
+        class="border-border flex min-w-0 flex-1 gap-1 px-4 py-3.5 [&:nth-child(even)]:border-l [&:nth-child(n+3)]:border-t sm:[&:nth-child(n+3)]:border-t-0 sm:[&:not(:first-child)]:border-l"
+        [class]="valueFirst() ? 'flex-col-reverse' : 'flex-col'"
       >
-        <span class="text-faint font-mono text-[10.5px] leading-normal uppercase">{{ c.label }}</span>
-        <span class="font-title text-foreground truncate leading-normal" [class]="large() ? 'text-[24px]' : 'text-[18px]'">{{ c.value }}</span>
+        <span class="text-faint font-mono text-[10.5px] leading-[normal] uppercase">{{ c.label }}</span>
+        <span class="font-title text-foreground truncate leading-[normal]" [class]="large() ? 'text-[22px]' : 'text-[18px]'">{{ c.value }}</span>
         @if (c.note) {
-          <span class="text-faint truncate font-mono text-[10.5px] leading-normal">{{ c.note }}</span>
+          <span class="text-faint truncate font-mono text-[10.5px] leading-[normal]">{{ c.note }}</span>
         }
       </div>
     }
@@ -350,6 +362,8 @@ export interface StatCell {
 export class StatStrip {
   readonly cells = input.required<readonly StatCell[]>();
   readonly large = input(false, { transform: booleanAttribute });
+  /** Value above the label (the Import counts) instead of the label above the value. */
+  readonly valueFirst = input(false, { transform: booleanAttribute });
 }
 
 export const SECTION_KIT = [

@@ -141,6 +141,9 @@ export class HlmToaster {
       '--normal-border': 'var(--border)',
       '--border-radius': 'var(--radius)',
       '--width': '380px',
+      '--offset': '20px',
+      // v3 · 18: the stack sits 72px above the bottom edge, clear of the status bar.
+      bottom: '72px',
     },
     { alias: 'style' },
   );

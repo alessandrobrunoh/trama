@@ -274,7 +274,7 @@ abstract class IssueItemBase {
       @if (subtask()) {
         <svg
           [lucideIcon]="subtaskIcon"
-          [size]="14"
+          [size]="13"
           class="text-faint pointer-events-none shrink-0"
           aria-hidden="true"
         ></svg>
@@ -289,7 +289,7 @@ abstract class IssueItemBase {
           [class]="checkTone()"
           (click)="onCheck($event)"
         >
-          @if (selected() || (subtask() && quiet())) {
+          @if (selected()) {
             <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
           }
         </button>
@@ -392,7 +392,7 @@ abstract class IssueItemBase {
       }
       @if (s.date && !subtask()) {
         <span
-          class="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums max-sm:hidden"
+          class="min-w-12 shrink-0 text-right font-mono text-[11px] tabular-nums max-sm:hidden"
           [class]="overdue() ? 'text-red' : 'text-muted-foreground'"
           [attr.aria-label]="dateTitle()"
           [attr.title]="dateTitle()"
@@ -534,7 +534,7 @@ export class IssueRow extends IssueItemBase {
     @let s = show();
     <div
       [attr.data-row-id]="i.id"
-      class="group/card relative flex flex-col gap-2.5 border p-3 transition-colors"
+      class="group/card relative flex flex-col gap-2.5 border p-[11px] transition-colors"
       [class]="
         selected()
           ? 'border-delta-line/60 bg-delta-line/8'
@@ -550,29 +550,30 @@ export class IssueRow extends IssueItemBase {
         [attr.aria-label]="i.key + ' ' + i.title"
         (click)="onLinkClick($event)"
       ></a>
+      @if (selectable()) {
+        <!-- sits on the card's corner so the key keeps the design's left edge -->
+        <button
+          type="button"
+          role="checkbox"
+          [attr.aria-checked]="selected()"
+          [attr.aria-label]="'Select ' + i.key"
+          class="focus-visible:ring-ring absolute -top-[5px] -left-[5px] z-[1] flex size-3.5 items-center justify-center border outline-none focus-visible:opacity-100 focus-visible:ring-1"
+          [class]="
+            selected()
+              ? 'border-delta-line bg-delta-line text-white opacity-100'
+              : selecting()
+                ? 'border-faint bg-background opacity-100'
+                : 'border-faint bg-background opacity-0 group-hover/card:opacity-100'
+          "
+          (click)="onCheck($event)"
+        >
+          @if (selected()) {
+            <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
+          }
+        </button>
+      }
       <div class="flex min-h-[14px] items-center gap-2">
-        @if (selectable()) {
-          <button
-            type="button"
-            role="checkbox"
-            [attr.aria-checked]="selected()"
-            [attr.aria-label]="'Select ' + i.key"
-            class="focus-visible:ring-ring relative flex size-3.5 shrink-0 items-center justify-center border outline-none focus-visible:opacity-100 focus-visible:ring-1"
-            [class]="
-              selected()
-                ? 'border-delta-line bg-delta-line text-white opacity-100'
-                : selecting()
-                  ? 'border-faint opacity-100'
-                  : 'border-faint opacity-0 group-hover/card:opacity-100'
-            "
-            (click)="onCheck($event)"
-          >
-            @if (selected()) {
-              <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
-            }
-          </button>
-        }
-        <span class="text-faint font-mono text-[10.5px]">{{ i.key }}</span>
+        <span class="text-faint font-mono text-[10.5px] leading-[14px]">{{ i.key }}</span>
         @if (s.kind) {
           <app-issue-kind [kind]="i.kind" [size]="13" />
         }
@@ -604,7 +605,7 @@ export class IssueRow extends IssueItemBase {
         }
         @if (subTotal() > 0) {
           <span
-            class="text-faint flex items-center gap-1 font-mono text-[11px] tabular-nums"
+            class="text-faint flex items-center gap-1 font-mono text-[10.5px] tabular-nums"
             [attr.aria-label]="subDone() + ' of ' + subTotal() + ' sub-tasks done'"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

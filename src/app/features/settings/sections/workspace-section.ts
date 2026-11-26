@@ -1,13 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LucideArrowRightLeft, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { WEEK_STARTS, type WeekStart } from '../../../core/contracts/domain';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
+import { WEEK_STARTS, type Project, type WeekStart } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe } from '../../../shared/pipes';
 import { AppSelect, type Option } from '../../create/form-kit';
+import { ProjectTransferDialog } from '../../projects/project-transfer-dialog';
 import { SECTION_KIT, SETTINGS_FIELD, type SegmentedOption, type StatCell } from './section-kit';
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
@@ -39,7 +42,15 @@ interface WorkspacePrefs {
 @Component({
   selector: 'app-workspace-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, AppSelect, ...SECTION_KIT],
+  imports: [
+    RouterLink,
+    LucideDynamicIcon,
+    HlmButtonImports,
+    HlmDropdownMenuImports,
+    AppSelect,
+    ProjectTransferDialog,
+    ...SECTION_KIT,
+  ],
   host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
@@ -57,21 +68,20 @@ interface WorkspacePrefs {
         <app-settings-card>
           <app-card-row label="Icon" description="Shown in the sidebar and the workspace switcher.">
             <span
-              class="bg-primary text-primary-foreground font-title flex size-10 shrink-0 items-center justify-center text-[22px] leading-none"
+              class="bg-primary text-primary-foreground font-title focus-within:ring-ring/50 relative flex size-10 shrink-0 items-center justify-center text-[22px] leading-[normal] focus-within:ring-2"
               [style.background]="prefs().iconColor || null"
               [style.color]="prefs().iconColor ? 'var(--primary-foreground)' : null"
-              aria-hidden="true"
-              >{{ iconLetter() }}</span
             >
-            <input
-              class="bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary h-9 w-16 border px-2 text-center text-[13px] uppercase outline-none disabled:opacity-50"
-              maxlength="2"
-              [placeholder]="(name().trim().slice(0, 1) || 'N').toUpperCase()"
-              [value]="prefs().iconInitial"
-              [disabled]="!canAdmin()"
-              (change)="patchPrefs({ iconInitial: $any($event.target).value.trim() })"
-              aria-label="Icon letters"
-            />
+              <input
+                class="font-title absolute inset-0 size-full cursor-text bg-transparent text-center text-[22px] leading-[normal] uppercase outline-none placeholder:text-current disabled:cursor-default"
+                maxlength="2"
+                [placeholder]="iconLetter()"
+                [value]="prefs().iconInitial"
+                [disabled]="!canAdmin()"
+                (change)="patchPrefs({ iconInitial: $any($event.target).value.trim() })"
+                aria-label="Icon letters"
+              />
+            </span>
           </app-card-row>
           <app-card-row label="Name" description="Shown in the sidebar and in invitations." wide>
             <input
@@ -166,6 +176,21 @@ interface WorkspacePrefs {
           <a hlmBtn variant="outline" [class.pointer-events-none]="!canOwner()" [class.opacity-50]="!canOwner()" [routerLink]="['/', store.slug(), 'settings', 'members']">Transfer…</a>
         </app-card-row>
         <app-card-row
+          label="Transfer a project"
+          [description]="canAdmin() ? 'Move one project to another workspace you admin. Statuses and labels are mapped, task keys kept, guests carried over.' : 'Only admins and owners can move a project.'"
+        >
+          <button
+            hlmBtn
+            type="button"
+            variant="outline"
+            [disabled]="!canAdmin() || !projects().length"
+            [hlmDropdownMenuTrigger]="projectMenu"
+            aria-label="Choose the project to transfer"
+          >
+            <svg [lucideIcon]="transferIcon" [size]="13"></svg> Transfer project…
+          </button>
+        </app-card-row>
+        <app-card-row
           danger
           label="Delete workspace"
           [description]="canOwner() ? 'Removes ' + (store.slug() ?? 'this workspace') + ' and all of its data. Type the workspace name to confirm.' : 'Only an owner can delete the workspace.'"
@@ -174,6 +199,18 @@ interface WorkspacePrefs {
         </app-card-row>
       </app-settings-card>
     </app-settings-block>
+
+    <ng-template #projectMenu>
+      <hlm-dropdown-menu class="max-h-72 w-60 overflow-y-auto">
+        @for (p of projects(); track p.id) {
+          <button hlmDropdownMenuItem (triggered)="startTransfer(p)">{{ p.name }}</button>
+        }
+      </hlm-dropdown-menu>
+    </ng-template>
+
+    @if (transferring(); as p) {
+      <app-project-transfer-dialog [project]="p" [open]="true" (openChange)="$event || transferring.set(null)" />
+    }
   `,
 })
 export class WorkspaceSection {
@@ -189,6 +226,9 @@ export class WorkspaceSection {
   protected readonly busy = signal(false);
   protected readonly canAdmin = computed(() => this.store.can('admin'));
   protected readonly canOwner = computed(() => this.store.can('owner'));
+  protected readonly transferIcon = LucideArrowRightLeft;
+  protected readonly projects = computed(() => this.store.projects());
+  protected readonly transferring = signal<Project | null>(null);
   protected readonly dirty = computed(() => {
     const ws = this.session.workspace() ?? this.store.workspace();
     return !!ws && (this.name().trim() !== ws.name || this.slugValue().trim() !== ws.slug);
@@ -268,6 +308,10 @@ export class WorkspaceSection {
       timeZone: next.timeZone.trim() || 'auto',
     });
     this.busy.set(false);
+  }
+
+  protected startTransfer(project: Project): void {
+    this.transferring.set(project);
   }
 
   protected resetForm(): void {

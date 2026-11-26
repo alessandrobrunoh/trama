@@ -5,6 +5,7 @@ import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
 import { SHORTCUT_GROUPS, type ShortcutGroup } from '../core/keyboard/shortcuts';
 import { UiStore } from '../core/stores/ui.store';
 import { Kbd } from '../shared/kbd';
+import { V3_FIELD, V3DialogHead } from '../shared/v3';
 
 /** Words people type for a key, so "cmd", "enter" or "arrow" find the right rows. */
 const KEY_WORDS: Record<string, string> = {
@@ -33,36 +34,34 @@ function searchText(label: string, keys: string, alt?: string): string {
 @Component({
   selector: 'app-shortcuts-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, Kbd, LucideDynamicIcon],
+  imports: [HlmDialogImports, Kbd, LucideDynamicIcon, V3DialogHead],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="ui.closeModal()">
-      <hlm-dialog-content *hlmDialogPortal="let ctx" class="flex max-h-[85svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <hlm-dialog-header class="px-5 pt-4 pb-3">
-          <h2 hlmDialogTitle class="flex items-center gap-2 text-sm font-semibold">
-            <svg [lucideIcon]="keyboard" [size]="15" class="text-muted-foreground"></svg>
-            Keyboard shortcuts
-          </h2>
-          <p hlmDialogDescription class="sr-only">Single-key shortcuts are ignored while you type in a field.</p>
-          <div class="relative mt-3">
-            <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-            <input
-              class="bg-secondary focus-visible:ring-ring/50 h-8 w-full rounded-md pr-2 pl-8 text-[13px] outline-none focus-visible:ring-2"
-              placeholder="Search shortcuts…"
-              aria-label="Search shortcuts"
-              autocomplete="off"
-              spellcheck="false"
-              [value]="query()"
-              (input)="query.set($any($event.target).value)"
-            />
-          </div>
-        </hlm-dialog-header>
+      <hlm-dialog-content *hlmDialogPortal="let ctx" class="flex max-h-[85svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl" [showCloseButton]="false">
+        <v3-dialog-head kicker="HELP" (dismiss)="ui.closeModal()">
+          <h2 hlmDialogTitle>Keyboard shortcuts</h2>
+        </v3-dialog-head>
+        <p hlmDialogDescription class="sr-only">Single-key shortcuts are ignored while you type in a field.</p>
+        <div class="border-border relative border-b px-[18px] py-3">
+          <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-[30px] -translate-y-1/2"></svg>
+          <input
+            [class]="fieldClass"
+            class="pl-8"
+            placeholder="Search shortcuts…"
+            aria-label="Search shortcuts"
+            autocomplete="off"
+            spellcheck="false"
+            [value]="query()"
+            (input)="query.set($any($event.target).value)"
+          />
+        </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div class="min-h-0 flex-1 overflow-y-auto px-[18px] py-4">
           @if (groups().length) {
             <div class="columns-1 gap-x-8 sm:columns-2">
               @for (g of groups(); track g.title) {
                 <section class="mb-5 break-inside-avoid">
-                  <h3 class="text-muted-foreground mb-1 text-xs font-medium">{{ g.title }}</h3>
+                  <h3 class="text-faint mb-1 font-mono text-[10.5px] uppercase">{{ g.title }}</h3>
                   <ul>
                     @for (i of g.items; track i.label + i.keys) {
                       <li class="flex min-h-8 items-center justify-between gap-3 text-[13px]">
@@ -88,7 +87,7 @@ function searchText(label: string, keys: string, alt?: string): string {
           }
         </div>
 
-        <div class="text-muted-foreground flex h-9 shrink-0 items-center gap-3 px-5 text-xs">
+        <div class="border-border text-faint flex h-9 shrink-0 items-center gap-3 border-t px-[18px] font-mono text-[10.5px]">
           <span>Single-key shortcuts are ignored while you type in a field.</span>
           <span class="ml-auto flex items-center gap-1 max-sm:hidden"><app-kbd keys="mod+k" /> command palette</span>
         </div>
@@ -97,6 +96,7 @@ function searchText(label: string, keys: string, alt?: string): string {
   `,
 })
 export class ShortcutsDialog {
+  protected readonly fieldClass = V3_FIELD;
   protected readonly ui = inject(UiStore);
   private readonly kb = inject(KeyboardShortcuts);
 

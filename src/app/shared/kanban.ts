@@ -162,14 +162,14 @@ export class KanbanLabelDirective {
       >
         @for (g of listView(); track g.key) {
           <section>
-            <div class="group/gh bg-card border-border sticky top-0 z-[2] flex h-[30.5px] items-center border-b pr-3 sm:pr-4">
+            <div class="group/gh bg-card border-border sticky top-0 z-[2] flex h-[30.5px] items-center border-b pr-[10px]">
               <button
                 type="button"
                 class="flex h-full min-w-0 flex-1 items-center gap-2.5 px-4 text-left outline-none focus-visible:underline"
                 [attr.aria-expanded]="!collapsed().has(g.key)"
                 (click)="toggle(g.key)"
               >
-                <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="12" class="text-faint shrink-0"></svg>
+                <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="13" class="text-faint shrink-0"></svg>
                 <span class="text-foreground flex min-w-0 items-center gap-2.5 font-mono text-[11.5px]">
                   <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
                 </span>
@@ -183,7 +183,7 @@ export class KanbanLabelDirective {
                   [title]="addLabel()"
                   (click)="add.emit(g.key)"
                 >
-                  <svg [lucideIcon]="plus" [size]="14"></svg>
+                  <svg [lucideIcon]="plus" [size]="13"></svg>
                 </button>
               }
             </div>
@@ -226,20 +226,20 @@ export class KanbanLabelDirective {
           @for (g of boardView(); track g.key) {
             <section class="board-column group/col flex h-full min-w-[13.75rem] flex-1 basis-0 flex-col gap-2 max-md:w-[calc(100vw-3rem)] max-md:flex-none max-md:snap-start">
               <header class="flex shrink-0 items-center gap-2 px-0.5 pt-1 pb-2">
-                <span class="text-foreground flex min-w-0 items-center gap-2 font-mono text-[11.5px]">
+                <span class="text-foreground flex min-w-0 items-center gap-2 font-mono text-[11.5px] leading-[15px]">
                   <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
                 </span>
-                <span class="text-faint font-mono text-[11px] tabular-nums">{{ g.count }}</span>
+                <span class="text-faint font-mono text-[11px] leading-[15px] tabular-nums">{{ g.count }}</span>
                 <span class="flex-1"></span>
                 @if (addable()) {
                   <button
                     type="button"
-                    class="text-faint hover:text-foreground hover:bg-hover flex size-5 items-center justify-center outline-none focus-visible:text-foreground"
+                    class="text-faint hover:text-foreground hover:bg-hover -mr-[3.5px] -my-[3px] flex size-5 items-center justify-center outline-none focus-visible:text-foreground"
                     [attr.aria-label]="addLabel()"
                     [title]="addLabel()"
                     (click)="add.emit(g.key)"
                   >
-                    <svg [lucideIcon]="plus" [size]="14"></svg>
+                    <svg [lucideIcon]="plus" [size]="13"></svg>
                   </button>
                 }
               </header>

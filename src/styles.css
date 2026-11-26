@@ -743,7 +743,7 @@ html[data-keyboard='open'] .mobile-fab {
   --primary-soft: #fbf2df;
   --primary-text: #b47a12;
   --primary-foreground: #1a1206;
-  --brand: var(--primary);
+  --brand: #c98a1e; /* the Trama mark: always amber, whatever the workspace accent */
   --red: #c2412d;
   --yellow: #b47a12;
   --green: #3e8e55;
@@ -831,7 +831,7 @@ html[data-keyboard='open'] .mobile-fab {
   --primary-soft: #2c2416;
   --primary-text: #e2a93b;
   --primary-foreground: #1a1206;
-  --brand: var(--primary);
+  --brand: #e2a93b; /* the Trama mark: always amber, whatever the workspace accent */
   --red: #cc4b30;
   --yellow: #e2a93b;
   --green: #6fae73;

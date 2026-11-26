@@ -83,7 +83,7 @@ const OPEN = new Set(['in_progress', 'in_review']);
         <!-- filters -->
         <div class="flex flex-wrap items-center gap-2.5">
           <label
-            class="bg-delta-line/8 border-delta-line/40 focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-1 font-mono text-[11px] leading-[13px] focus-within:outline-2"
+            class="bg-delta-line/8 border-delta-line/40 focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-[3px] font-mono text-[11px] leading-[normal] focus-within:outline-2"
           >
             <span class="text-muted-foreground">Range</span>
             <span class="text-foreground">{{ rangeLabel() }}</span>
@@ -95,7 +95,7 @@ const OPEN = new Set(['in_progress', 'in_review']);
             </select>
           </label>
           <label
-            class="border-border focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-1 font-mono text-[11px] leading-[13px] focus-within:outline-2"
+            class="border-border focus-within:outline-ring relative flex cursor-pointer items-center gap-1.5 border px-[9px] py-[3px] font-mono text-[11px] leading-[normal] focus-within:outline-2"
           >
             <span class="text-muted-foreground">Project</span>
             <span class="text-foreground">{{ projectLabel() }}</span>
@@ -116,45 +116,45 @@ const OPEN = new Set(['in_progress', 'in_review']);
           <div class="flex min-w-0 flex-col gap-1 px-4 py-3.5">
             <span class="text-faint font-mono text-[10px] leading-[13px]">WITHIN RANGE</span>
             <div class="flex items-end gap-2">
-              <span class="font-title text-foreground text-[30px] leading-9">{{ summary().within === null ? '—' : summary().within + '%' }}</span>
+              <span class="font-title text-foreground text-[30px] leading-[normal]">{{ summary().within === null ? '—' : summary().within + '%' }}</span>
               @if (withinDelta(); as d) {
-                <span class="pb-1 font-mono text-[10.5px]" [class]="d > 0 ? 'text-status-done' : 'text-muted-foreground'">
+                <span class="font-mono text-[10.5px]" [class]="d > 0 ? 'text-status-done' : 'text-muted-foreground'">
                   {{ d > 0 ? '+' : '' }}{{ d }} vs prev
                 </span>
               }
             </div>
-            <span class="text-muted-foreground text-[11.5px] leading-4">of tasks landed inside their value's range</span>
+            <span class="text-muted-foreground text-[11.5px] leading-[normal]">of tasks landed inside their value's range</span>
           </div>
           <div class="border-border flex min-w-0 flex-col gap-1 border-l px-4 py-3.5">
             <span class="text-faint font-mono text-[10px] leading-[13px]">DRIFT</span>
             <div class="flex items-end gap-2">
-              <span class="font-title text-foreground text-[30px] leading-9">{{ driftText() }}</span>
+              <span class="font-title text-foreground text-[30px] leading-[normal]">{{ driftText() }}</span>
             </div>
-            <span class="text-muted-foreground text-[11.5px] leading-4">actual hours {{ (summary().drift ?? 0) < 0 ? 'below' : 'above' }} the median, on average</span>
+            <span class="text-muted-foreground text-[11.5px] leading-[normal]">actual hours {{ (summary().drift ?? 0) < 0 ? 'below' : 'above' }} the median, on average</span>
           </div>
           <div class="border-border flex min-w-0 flex-col gap-1 border-t px-4 py-3.5 max-lg:border-l-0 lg:border-t-0 lg:border-l">
             <span class="text-faint font-mono text-[10px] leading-[13px]">POINTS DONE</span>
             <div class="flex items-end gap-2">
-              <span class="font-title text-foreground text-[30px] leading-9">{{ summary().points }}</span>
+              <span class="font-title text-foreground text-[30px] leading-[normal]">{{ summary().points }}</span>
             </div>
-            <span class="text-muted-foreground text-[11.5px] leading-4">in {{ days() }} days · ≈ {{ perWeek() }} pts a week</span>
+            <span class="text-muted-foreground text-[11.5px] leading-[normal]">in {{ days() }} days · ≈ {{ perWeek() }} pts a week</span>
           </div>
           <div class="border-border flex min-w-0 flex-col gap-1 border-t border-l px-4 py-3.5 lg:border-t-0">
             <span class="text-faint font-mono text-[10px] leading-[13px]">UNESTIMATED</span>
             <div class="flex items-end gap-2">
-              <span class="font-title text-foreground text-[30px] leading-9">{{ unestimated() }}</span>
+              <span class="font-title text-foreground text-[30px] leading-[normal]">{{ unestimated() }}</span>
               @if (unestimated()) {
-                <span class="text-status-in-progress pb-1 font-mono text-[10.5px]">needs you</span>
+                <span class="text-status-in-progress font-mono text-[10.5px]">needs you</span>
               }
             </div>
-            <span class="text-muted-foreground text-[11.5px] leading-4">open tasks with no value yet</span>
+            <span class="text-muted-foreground text-[11.5px] leading-[normal]">open tasks with no value yet</span>
           </div>
         </div>
 
         <!-- the curve -->
         <section class="flex flex-col gap-2.5" aria-label="Actual hours per value">
           <div class="border-border flex flex-wrap items-end gap-x-2.5 gap-y-1 border-b pb-2">
-            <h2 class="font-title text-foreground text-[20px] leading-[26px]">Actual hours per value</h2>
+            <h2 class="font-title text-foreground text-[20px] leading-[normal]">Actual hours per value</h2>
             <span class="text-faint pb-0.5 font-mono text-[10.5px]">each mark is a Done task</span>
             <span class="flex-1"></span>
             <span class="text-muted-foreground flex items-center gap-[5px] font-mono text-[10.5px]"><span class="bg-delta-line size-2" aria-hidden="true"></span>task</span>
@@ -164,7 +164,7 @@ const OPEN = new Set(['in_progress', 'in_review']);
           @for (r of rows(); track r.points) {
             <div class="flex items-center gap-4 py-1.5">
               <span class="flex w-[70px] shrink-0 items-end gap-2">
-                <span class="font-title text-foreground text-[22px] leading-7">{{ r.points }}</span>
+                <span class="font-title text-foreground text-[22px] leading-[normal]">{{ r.points }}</span>
                 <span class="text-faint pb-0.5 font-mono text-[10px]">pts</span>
               </span>
               <div class="relative h-[26px] min-w-0 flex-1">
@@ -236,8 +236,8 @@ const OPEN = new Set(['in_progress', 'in_review']);
             <span class="text-faint">{{ weekLabel() }}</span>
           </div>
           <div class="flex items-end gap-2">
-            <span class="font-title text-foreground text-[40px] leading-[46px]">{{ plan().total }}</span>
-            <span class="text-muted-foreground pb-1.5 font-mono text-[11px]">pts planned</span>
+            <span class="font-title text-foreground text-[40px] leading-[normal]">{{ plan().total }}</span>
+            <span class="text-muted-foreground font-mono text-[11px]">pts planned</span>
           </div>
           <p class="text-muted-foreground text-[12px] leading-[18px]">
             @if (plan().capacity; as cap) {

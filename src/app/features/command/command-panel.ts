@@ -201,7 +201,8 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
  */
 export const COMMAND_DIALOG_CLASS =
   // Widths use viewport units: the CDK pane shrink-wraps its content, so a `%` width collapses to the content width.
-  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(640px,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] sm:top-[15.5svh] translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
+  // Pinned to the viewport (frame 01: top 140 of 900) so the panel stays put while the list grows.
+  'fixed top-[min(12vh,5rem)] sm:top-[15.5svh] left-[max(0.75rem,calc(50vw-16rem))] sm:left-[max(1rem,calc(50vw-320px))] w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(640px,calc(100vw-2rem))] max-w-none sm:max-w-none mx-0 translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.

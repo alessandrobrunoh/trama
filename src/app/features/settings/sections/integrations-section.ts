@@ -74,8 +74,9 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
   ],
   host: { class: 'block h-full min-h-0 overflow-y-auto' },
   template: `
-    <div class="w-full max-w-[1240px] px-5 py-6 sm:px-10 sm:py-8 lg:px-14">
+    <div class="flex w-full max-w-[1072px] flex-col gap-9 px-5 pt-6 pb-12 sm:px-10 sm:pt-8 sm:pb-14 lg:px-14">
       <app-section-header
+        flush
         title="Integrations"
         [description]="
           'Workspace connections, installed by admins. They belong to ' +
@@ -96,71 +97,71 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
       }
 
       <!-- summary -->
-      <div class="border-border text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-1 border px-4 py-2.5 font-mono text-[10.5px]">
-        <span class="flex items-center gap-1.5"><span class="bg-green size-1.5" aria-hidden="true"></span>{{ rows().length }} {{ rows().length === 1 ? 'connection' : 'connections' }}</span>
+      <div class="bg-card border-border text-text-2 flex flex-wrap items-center gap-x-5 gap-y-1 border px-3.5 py-2.5 font-mono text-[10.5px] leading-[normal]">
+        <span class="flex items-center gap-1.5"><span class="bg-green size-[7px]" aria-hidden="true"></span>{{ rows().length }} {{ rows().length === 1 ? 'connection' : 'connections' }}</span>
         @if (attention() > 0) {
-          <span class="text-foreground flex items-center gap-1.5"><span class="bg-red size-1.5" aria-hidden="true"></span>{{ attention() }} {{ attention() === 1 ? 'needs' : 'need' }} attention</span>
+          <span class="flex items-center gap-1.5"><span class="bg-red size-[7px]" aria-hidden="true"></span>{{ attention() }} {{ attention() === 1 ? 'needs' : 'need' }} attention</span>
         }
       </div>
 
-      <div class="mt-7 flex flex-col gap-8 lg:flex-row lg:gap-0">
+      <div class="flex flex-col gap-8 lg:flex-row lg:gap-0">
         <!-- master: connections by provider -->
-        <nav class="flex shrink-0 flex-col gap-5 lg:w-[290px] lg:pr-6" aria-label="Connections">
+        <nav class="flex shrink-0 flex-col gap-3 lg:w-[270px] lg:pr-5" aria-label="Connections">
           @for (g of groups(); track g.provider) {
-            <div class="flex flex-col">
-              <div class="flex h-6 items-center justify-between px-1">
-                <span class="text-faint font-mono text-[10px] leading-none tracking-wide">{{ g.title }}</span>
+            <div class="flex flex-col gap-0.5">
+              <div class="flex items-center justify-between px-3">
+                <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ g.title }}</span>
                 @if (canAdmin()) {
                   <button
                     type="button"
-                    class="text-muted-foreground hover:text-foreground flex size-6 items-center justify-center"
+                    class="text-muted-foreground hover:text-foreground -m-1.5 flex items-center justify-center p-1.5"
                     [attr.aria-label]="'Add a ' + g.label + ' connection'"
                     (click)="openConnect(g.provider)"
                   >
-                    <svg [lucideIcon]="plus" [size]="13"></svg>
+                    <svg [lucideIcon]="plus" [size]="11"></svg>
                   </button>
                 }
               </div>
               @for (c of g.rows; track c.id) {
                 <button
                   type="button"
-                  class="hover:bg-hover/60 flex min-h-[50px] items-center gap-2.5 border-l-2 px-2.5 py-2 text-left"
-                  [class]="isSelected(c.id) ? 'bg-hover border-primary' : 'border-transparent'"
+                  class="hover:bg-hover/60 flex items-center gap-2.5 border-l-2 px-3 py-2 text-left"
+                  [class]="isSelected(c.id) ? 'bg-selected border-primary' : 'border-transparent'"
                   [attr.aria-current]="isSelected(c.id) ? 'true' : null"
                   (click)="select({ kind: 'conn', id: c.id })"
                 >
-                  <span class="bg-secondary text-foreground flex size-[30px] shrink-0 items-center justify-center">
-                    <app-provider-icon [provider]="c.provider" [size]="15" />
+                  <span class="bg-secondary border-border text-foreground flex size-[26px] shrink-0 items-center justify-center border">
+                    <app-provider-icon [provider]="c.provider" [size]="13" />
                   </span>
-                  <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
-                    <span class="text-foreground truncate text-[13px] leading-none">{{ c.label }}</span>
-                    <span class="text-faint truncate font-mono text-[10px] leading-none">{{ line(c) }}</span>
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="text-foreground truncate text-[13px] leading-[normal]">{{ c.label }}</span>
+                    <span class="text-faint truncate font-mono text-[10px] leading-[normal]">{{ line(c) }}</span>
                   </span>
-                  <span class="size-1.5 shrink-0" [class]="dot(c.status)" [attr.title]="statusText(c.status)" aria-hidden="true"></span>
+                  <span class="size-[7px] shrink-0" [class]="dot(c.status)" [attr.title]="statusText(c.status)" aria-hidden="true"></span>
                   <span class="sr-only">{{ statusText(c.status) }}</span>
                 </button>
               } @empty {
-                <span class="text-faint px-2.5 py-2 font-mono text-[10.5px]">None connected</span>
+                <span class="text-faint px-3 py-2 font-mono text-[10.5px]">None connected</span>
               }
             </div>
           }
-          <div class="flex flex-col">
-            <div class="flex h-6 items-center px-1">
-              <span class="text-faint font-mono text-[10px] leading-none tracking-wide">OTHER</span>
+          <div class="flex flex-col gap-0.5">
+            <div class="flex items-center px-3">
+              <span class="text-faint font-mono text-[10.5px] leading-[normal]">OTHER</span>
             </div>
             <button
               type="button"
-              class="hover:bg-hover/60 flex min-h-[50px] items-center gap-2.5 border-l-2 px-2.5 py-2 text-left"
-              [class]="selection().kind === 'webhooks' ? 'bg-hover border-primary' : 'border-transparent'"
+              class="hover:bg-hover/60 flex items-center gap-2.5 border-l-2 px-3 py-2 text-left"
+              [class]="selection().kind === 'webhooks' ? 'bg-selected border-primary' : 'border-transparent'"
               [attr.aria-current]="selection().kind === 'webhooks' ? 'true' : null"
               (click)="select({ kind: 'webhooks' })"
             >
-              <span class="bg-secondary text-foreground flex size-[30px] shrink-0 items-center justify-center">
-                <svg [lucideIcon]="hook" [size]="15"></svg>
+              <span class="bg-secondary border-border text-foreground flex size-[26px] shrink-0 items-center justify-center border">
+                <svg [lucideIcon]="hook" [size]="13"></svg>
               </span>
-              <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <span class="text-foreground truncate text-[13px] leading-none">REST &amp; webhooks</span>
-                <span class="text-faint truncate font-mono text-[10px] leading-none">{{ hooksLine() }}</span>
+              <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span class="text-foreground truncate text-[13px] leading-[normal]">REST &amp; webhooks</span>
+                <span class="text-faint truncate font-mono text-[10px] leading-[normal]">{{ hooksLine() }}</span>
               </span>
             </button>
           </div>
@@ -170,7 +171,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
         <div class="border-border min-w-0 flex-1 lg:border-l lg:pl-8">
           @switch (selection().kind) {
             @case ('connect') {
-              <h3 class="font-title text-foreground text-[24px] leading-normal">Add connection</h3>
+              <h3 class="font-title text-foreground text-[20px] leading-[normal]">Add connection</h3>
               <p class="text-muted-foreground mt-1 mb-5 max-w-[640px] text-[13px] leading-snug">
                 Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects. You can add several
                 accounts per provider. Secrets are encrypted and never shown again.
@@ -194,10 +195,10 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
               @if (current(); as c) {
                 <!-- head: tile, name, chips, sub line, actions -->
                 <div class="flex flex-wrap items-start gap-3.5">
-                  <span class="bg-secondary text-foreground flex size-11 shrink-0 items-center justify-center">
+                  <span class="bg-secondary border-border text-foreground flex size-11 shrink-0 items-center justify-center border">
                     <app-provider-icon [provider]="c.provider" [size]="22" />
                   </span>
-                  <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div class="flex min-w-0 flex-1 flex-col gap-1">
                     @if (renaming() === c.id) {
                       <form class="flex max-w-[460px] items-center gap-2" (submit)="saveName($event, c)">
                         <input
@@ -213,15 +214,15 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                         <button hlmBtn type="button" size="sm" variant="ghost" (click)="renaming.set(null)">Cancel</button>
                       </form>
                     } @else {
-                      <div class="flex flex-wrap items-center gap-2.5">
-                        <h3 class="font-title text-foreground min-w-0 truncate text-[24px] leading-normal">{{ c.label }}</h3>
-                        <span class="border-border text-muted-foreground flex items-center gap-[5px] border px-1.5 py-[3px] font-mono text-[10px] leading-none">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-title text-foreground min-w-0 truncate text-[20px] leading-[normal]">{{ c.label }}</h3>
+                        <span class="border-border text-text-2 flex items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
                           <span class="size-1.5" [class]="dot(c.status)" aria-hidden="true"></span>{{ statusText(c.status) }}
                         </span>
-                        <span class="border-border text-muted-foreground border px-1.5 py-[3px] font-mono text-[10px] leading-none">workspace</span>
+                        <span class="bg-secondary border-border text-text-2 border px-[7px] py-0.5 font-mono text-[11px] leading-[normal]">workspace</span>
                       </div>
                     }
-                    <p class="text-faint font-mono text-[10.5px] leading-[15px]">
+                    <p class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">
                       {{ line(c) }} · added {{ c.createdAt | relativeTime }}@if (c.lastWebhookAt) { · last event {{ c.lastWebhookAt | relativeTime }} }
                     </p>
                   </div>
@@ -253,7 +254,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                 </div>
 
                 @if (needsAttention(c)) {
-                  <div class="border-red/40 bg-red/5 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3" role="alert">
+                  <div class="border-red/40 bg-red/5 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3" role="alert">
                     <svg [lucideIcon]="warn" [size]="16" class="text-red shrink-0"></svg>
                     <div class="min-w-0 flex-1">
                       <p class="text-foreground text-[13px]">
@@ -286,10 +287,10 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                   </div>
                 }
 
-                <div class="mt-7">
+                <div class="mt-6">
                   @if (c.provider === 'delta') {
                     <app-settings-section title="Delta" caption="stored for agent sessions">
-                      <p class="text-muted-foreground pt-3 text-[13px] leading-snug">
+                      <p class="text-muted-foreground text-[13px] leading-snug">
                         Delta has no repository or webhook API yet, so there is nothing else to set up.
                         @if (c.baseUrl) {
                           <span class="text-foreground font-mono text-xs">{{ c.host }}</span>
@@ -307,7 +308,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                             : 'details are visible to admins'
                       "
                     >
-                      <div class="flex max-w-[720px] flex-col gap-2 pt-3">
+                      <div class="flex flex-col gap-2">
                         @if (c.webhookUrl) {
                           <app-copy-field [value]="c.webhookUrl" label="Webhook URL" />
                           @if (!c.lastWebhookAt) {
@@ -322,7 +323,7 @@ const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
                 </div>
               } @else {
                 <div class="flex max-w-md flex-col gap-2 pt-2">
-                  <h3 class="font-title text-foreground text-[20px] leading-normal">Nothing connected yet</h3>
+                  <h3 class="font-title text-foreground text-[20px] leading-[normal]">Nothing connected yet</h3>
                   <p class="text-muted-foreground text-[13px] leading-snug">
                     Connect GitHub, GitLab or Bitbucket to see pull requests and CI on tasks and projects. Add as many accounts as you need: each one has its own name.
                   </p>

@@ -23,7 +23,7 @@ const KEY: Record<CellField, string> = { status: 'S', priority: 'P', assignee: '
   host: { class: 'inline-flex shrink-0' },
   template: `
     @let i = issue();
-    <hlm-popover align="start" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
+    <hlm-popover class="flex" align="start" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
       <button
         hlmPopoverTrigger
         type="button"

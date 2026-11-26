@@ -4,8 +4,15 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import {
+  LucideArrowUpRight,
   LucideBell,
+  LucideChartGantt,
+  LucideBuilding2,
   LucideChevronDown,
+  LucideEyeOff,
+  LucideList,
+  LucideLogIn,
+  LucideSquareKanban,
   LucideChevronsUpDown,
   LucideCheck,
   LucideCircleDot,
@@ -57,12 +64,22 @@ import { ProjectGlyph } from '../features/projects/project-glyph';
 import { SettingsSidebar } from '../features/settings/settings-sidebar';
 import { settingsSectionOfUrl } from '../features/settings/settings-nav';
 import { ago } from '../shared/ago';
-import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav';
+import { queryItems } from '../core/query';
+import type { Project, SavedView } from '../core/contracts/domain';
+import {
+  SIDEBAR_ALSO_ACTIVE,
+  SIDEBAR_MAIN_NAV,
+  SIDEBAR_WORKSPACE_NAV,
+  navForRole,
+  orderNav,
+  type NavItem,
+} from './nav';
 
 /**
- * Sidebar content: icon row (toggle, search, inbox, create), workspace switcher, Inbox / Tasks,
- * Pinned, the Projects tree, Views, a "More" group and the user menu. Light-gray pane, no row
- * dividers, flat gray selected row, sentence-case muted section labels.
+ * Sidebar content (App · 14 Sidebar): workspace row with the switcher and the collapse button, "Search or
+ * jump…", Home / Inbox / Time / Ask, a WORKSPACE group (Tasks, Projects, Views), Shared with me, then the
+ * agent connector card and the user row (bell, settings gear). Mono uppercase section labels, 30px rows,
+ * flat raised selected row.
  * Rendered inside <hlm-sidebar> by AppShell. On phones the shell shows <app-mobile-nav> instead.
  */
 @Component({
@@ -91,7 +108,7 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
       <app-settings-sidebar class="min-h-0 flex-1" />
     } @else {
     <div hlmSidebarHeader class="gap-0 p-0">
-      <!-- workspace row (44px): logo, "Trama" in serif, mono "acme · 6 members", switcher chevrons, panel toggle -->
+      <!-- workspace row (44px): logo, workspace name in serif, mono "acme · 6 members", switcher chevrons, panel toggle -->
       <div class="border-sidebar-border flex h-11 items-center gap-2.5 border-b px-3.5">
         @if (canSwitch()) {
           <button
@@ -128,7 +145,7 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
       </div>
 
       <!-- search or jump (opens the command palette) -->
-      <div class="px-3 pt-2.5 pb-2.5">
+      <div class="px-3 py-2.5">
         <button
           type="button"
           class="bg-background border-border text-faint hover:text-muted-foreground hover:border-border-strong focus-visible:ring-sidebar-ring flex h-[30px] w-full items-center gap-2 border px-2 text-start outline-hidden focus-visible:ring-2"
@@ -137,34 +154,45 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
         >
           <svg [lucideIcon]="search" [size]="13" class="shrink-0"></svg>
           <span class="min-w-0 flex-1 truncate font-mono text-[11.5px]">Search or jump…</span>
-          <app-kbd keys="mod+k" />
+          <kbd class="bg-secondary border-border text-muted-foreground shrink-0 border px-[5px] font-mono text-[10.5px] leading-[1.3]">{{ searchKeys }}</kbd>
         </button>
       </div>
     </div>
 
-    <div hlmSidebarContent class="gap-0 px-2 pb-2">
-      <ul hlmSidebarMenu class="gap-px py-1.5">
-        @for (item of primary(); track item.segment) {
-          <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
+    <div hlmSidebarContent class="gap-0 p-0">
+      <!-- Home, Inbox, Time, Ask -->
+      <ul class="flex flex-col gap-px px-2 py-1.5">
+        @for (item of mainNav(); track item.segment) {
+          <ng-container *ngTemplateOutlet="navRow; context: { $implicit: item }" />
         }
       </ul>
 
-      <!-- Pinned: only once something is pinned -->
-      @if (favorites.entries().length) {
-        <div class="mt-4">
-          <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'favorites', label: 'Pinned' }" />
+      <!-- WORKSPACE: Tasks, then Projects and Views -->
+      <div class="border-sidebar-border flex flex-col gap-px border-t px-2 pt-1 pb-1.5">
+        <div class="flex items-center gap-2 px-2 pt-3 pb-1.5">
+          <span class="text-muted-foreground font-mono text-[10px] leading-[1.3] tracking-[0.6px]">WORKSPACE</span>
+          <span class="bg-border h-px flex-1" aria-hidden="true"></span>
+        </div>
+        @for (item of workspaceNav(); track item.segment) {
+          <ul class="flex flex-col gap-px">
+            <ng-container *ngTemplateOutlet="navRow; context: { $implicit: item }" />
+          </ul>
+        }
+
+        <!-- Pinned: only once something is pinned -->
+        @if (favorites.entries().length) {
+          <ng-container *ngTemplateOutlet="subLabel; context: { $implicit: 'favorites', label: 'PINNED' }" />
           @if (!ui.isFolded('favorites')) {
-            <ul hlmSidebarMenu class="mt-px gap-px">
+            <ul class="flex flex-col gap-px">
               @for (e of favorites.entries(); track e.favorite.id) {
-                <li hlmSidebarMenuItem class="group/fav relative">
+                <li class="group/fav relative">
                   <a
-                    hlmSidebarMenuButton
                     [routerLink]="['/', slug(), ...e.link]"
                     routerLinkActive
                     #fla="routerLinkActive"
-                    [isActive]="fla.isActive"
-                    [tooltip]="e.key ? e.key + ' · ' + e.label : e.label"
-                    closeMobileSidebarOnClick
+                    [class]="fla.isActive ? rowOn : rowOff"
+                    [attr.title]="e.key ? e.key + ' · ' + e.label : e.label"
+                    (click)="closeMobile()"
                   >
                     @switch (e.type) {
                       @case ('issue') {
@@ -172,24 +200,16 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
                       }
                       @case ('project') {
                         @if (store.getProject(e.subjectId); as pj) {
-                          <app-project-glyph [project]="pj" [size]="14" />
+                          <app-project-glyph [project]="pj" [size]="15" />
                         } @else {
-                          <svg
-                            [lucideIcon]="projectIcon"
-                            [size]="14"
-                            class="text-muted-foreground shrink-0"
-                          ></svg>
+                          <svg [lucideIcon]="projectIcon" [size]="15" class="shrink-0"></svg>
                         }
                       }
                       @case ('view') {
-                        <svg
-                          [lucideIcon]="layers"
-                          [size]="14"
-                          class="text-muted-foreground shrink-0"
-                        ></svg>
+                        <svg [lucideIcon]="layers" [size]="15" class="shrink-0"></svg>
                       }
                     }
-                    <span class="truncate-fade flex-1">{{ e.label }}</span>
+                    <span class="truncate-fade min-w-0 flex-1">{{ e.label }}</span>
                   </a>
                   <button
                     type="button"
@@ -204,39 +224,46 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
               }
             </ul>
           }
-        </div>
-      }
+        }
 
-      <!-- Projects: flat list, open task count on the right -->
-      <div class="py-1.5">
+        <!-- Projects: glyph in the project colour, open task count on the right, "shared" for the ones placed here -->
         <ng-container
-          *ngTemplateOutlet="
-            sectionLabel;
-            context: { $implicit: 'projects', label: 'Projects', all: 'projects', allLabel: 'All projects', create: 'project', createLabel: 'New project' }
-          "
+          *ngTemplateOutlet="subLabel; context: { $implicit: 'projects', label: 'PROJECTS', create: 'project', createLabel: 'New project' }"
         />
         @if (!ui.isFolded('projects')) {
-          <ul hlmSidebarMenu class="mt-px gap-px">
-            @for (p of projectRows(); track p.project.id) {
-              <li hlmSidebarMenuItem>
+          <ul class="flex flex-col gap-px">
+            @for (r of projectRowsShown(); track r.key) {
+              <li class="group/proj relative">
                 <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/', slug(), 'projects', p.project.id]"
+                  [routerLink]="r.link"
                   routerLinkActive
                   #pla="routerLinkActive"
-                  [isActive]="pla.isActive"
-                  [tooltip]="p.project.name"
-                  closeMobileSidebarOnClick
+                  [class]="pla.isActive ? rowOn : rowOff"
+                  [attr.title]="r.title"
+                  (click)="closeMobile()"
                 >
-                  <app-project-glyph [project]="p.project" [size]="15" />
-                  <span class="truncate-fade flex-1">{{ p.project.name }}</span>
-                  @if (p.open) {
-                    <span class="text-faint font-mono text-[11px] tabular-nums">{{ p.open }}</span>
+                  <app-project-glyph [project]="r.project" [size]="15" />
+                  <span class="truncate-fade min-w-0 flex-1">{{ r.project.name }}</span>
+                  @if (r.shared) {
+                    <span class="text-faint font-mono text-[11px] group-hover/proj:invisible">shared</span>
+                  } @else if (r.open) {
+                    <span class="text-faint font-mono text-[11px] tabular-nums">{{ r.open }}</span>
                   }
                 </a>
+                @if (r.shared) {
+                  <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/proj:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                    [attr.aria-label]="'Stop showing ' + r.project.name + ' here'"
+                    hlmTooltip="Back to Shared with me"
+                    (click)="shared.clear(r.project.id)"
+                  >
+                    <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+                  </button>
+                }
               </li>
             } @empty {
-              @if (!shared.placedHere().length && !store.isGuest()) {
+              @if (store.can('member')) {
                 <li>
                   <button
                     type="button"
@@ -248,43 +275,62 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
                 </li>
               }
             }
-            <!-- projects of other workspaces the person chose to show here; they open at their own workspace -->
-            @for (s of shared.placedHere(); track s.id) {
-              <li hlmSidebarMenuItem class="group/placed relative">
-                <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/', s.workspace.slug, 'projects', s.id]"
-                  routerLinkActive
-                  #sla="routerLinkActive"
-                  [isActive]="sla.isActive"
-                  [tooltip]="s.name + ' · shared from ' + s.workspace.slug"
-                  closeMobileSidebarOnClick
-                >
-                  <app-project-glyph [project]="$any(s)" [size]="15" />
-                  <span class="truncate-fade flex-1">{{ s.name }}</span>
-                  <span class="text-faint font-mono text-[10px] group-hover/placed:invisible">shared</span>
-                </a>
-                <button
-                  type="button"
-                  class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/placed:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
-                  [attr.aria-label]="'Stop showing ' + s.name + ' here'"
-                  hlmTooltip="Back to Shared with me"
-                  (click)="shared.clear(s.id)"
-                >
-                  <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                </button>
-              </li>
+            @if (projectsHidden() > 0 || projectsExpanded()) {
+              <ng-container
+                *ngTemplateOutlet="viewMore; context: { expanded: projectsExpanded(), hidden: projectsHidden(), toggle: toggleProjects }"
+              />
             }
           </ul>
+        }
+
+        <!-- Views: saved views, icon by layout, matching count on the right -->
+        @if (!store.isGuest()) {
+          <ng-container
+            *ngTemplateOutlet="subLabel; context: { $implicit: 'views', label: 'VIEWS', create: 'view', createLabel: 'New view' }"
+          />
+          @if (!ui.isFolded('views')) {
+            <ul class="flex flex-col gap-px">
+              @for (v of viewRowsShown(); track v.view.id) {
+                <li>
+                  <a
+                    [routerLink]="['/', slug(), 'views', v.view.id]"
+                    routerLinkActive
+                    #vla="routerLinkActive"
+                    [class]="vla.isActive ? rowOn : rowOff"
+                    [attr.title]="v.view.name"
+                    (click)="closeMobile()"
+                  >
+                    <svg [lucideIcon]="v.icon" [size]="15" class="shrink-0"></svg>
+                    <span class="truncate-fade min-w-0 flex-1">{{ v.view.name }}</span>
+                    @if (v.count) {
+                      <span class="text-faint font-mono text-[11px] tabular-nums">{{ v.count }}</span>
+                    }
+                  </a>
+                </li>
+              }
+              @if (viewsHidden() > 0 || viewsExpanded()) {
+                <ng-container
+                  *ngTemplateOutlet="viewMore; context: { expanded: viewsExpanded(), hidden: viewsHidden(), toggle: toggleViews }"
+                />
+              }
+            </ul>
+          }
         }
       </div>
 
       <!-- Shared with me: projects where the person is a guest and has not placed them in a workspace -->
       @if (shared.unplaced().length || hiddenShared().length) {
-        <div class="py-1.5">
-          <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'shared', label: 'Shared with me' }" />
+        <div class="border-sidebar-border flex flex-col gap-px border-t px-2 pt-2.5 pb-1.5">
+          <button
+            type="button"
+            class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex items-center text-start font-mono text-[10px] leading-[1.3] outline-hidden focus-visible:ring-2"
+            [attr.aria-expanded]="!ui.isFolded('shared')"
+            (click)="ui.toggleFolded('shared')"
+          >
+            SHARED WITH ME
+          </button>
           @if (!ui.isFolded('shared')) {
-            <ul hlmSidebarMenu class="mt-px gap-px">
+            <ul class="flex flex-col gap-px">
               @for (s of shared.unplaced(); track s.id) {
                 <ng-container *ngTemplateOutlet="sharedRow; context: { $implicit: s }" />
               }
@@ -309,34 +355,29 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
           }
         </div>
       }
-
-      <!-- Workspace: Settings (everything else stays one keystroke away: ⌘K, G chords) -->
-      <div class="py-1.5">
-        <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'workspace', label: 'Workspace' }" />
-        @if (!ui.isFolded('workspace')) {
-          <ul hlmSidebarMenu class="mt-px gap-px">
-            <ng-container *ngTemplateOutlet="navLink; context: { $implicit: settingsItem }" />
-          </ul>
-        }
-      </div>
     </div>
 
-    <!-- footer: agent connector, then the user row -->
+    <!-- footer: agent connector card, then the user row -->
     <div hlmSidebarFooter class="gap-0 p-0 pb-[env(safe-area-inset-bottom)]">
       @if (!store.isGuest()) {
-        <a
-          [routerLink]="['/', slug(), 'connect']"
-          class="border-sidebar-border hover:bg-sidebar-accent/50 flex flex-col gap-1 border-t px-3.5 py-2.5 outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          hlmTooltip="Connect Delta and your agent: install the /trama skill or the CLI"
-          position="top"
-          closeMobileSidebarOnClick
-        >
+        <div class="border-sidebar-border flex flex-col gap-2 border-t px-3.5 py-2.5">
+          <a
+            [routerLink]="['/', slug(), 'connect']"
+            class="bg-secondary border-border text-foreground hover:border-border-strong focus-visible:ring-sidebar-ring flex items-center gap-2 border px-2 py-1.5 text-[12.5px] leading-[1.3] outline-hidden focus-visible:ring-2"
+            hlmTooltip="Connect Delta and your agent: install the /trama skill or the CLI"
+            position="top"
+            (click)="closeMobile()"
+          >
+            <svg [lucideIcon]="plugIcon" [size]="13" class="text-primary shrink-0"></svg>
+            <span class="min-w-0 flex-1 truncate">Connect your agent</span>
+            <svg [lucideIcon]="arrowUpRight" [size]="12" class="text-faint shrink-0"></svg>
+          </a>
           <span class="flex items-center gap-2">
             <span class="size-[7px] shrink-0" [class]="agentSeen() ? 'bg-status-done' : 'bg-faint'" aria-hidden="true"></span>
-            <span class="text-foreground font-mono text-[10.5px] leading-[15px]">Delta · /trama skill</span>
+            <span class="text-foreground font-mono text-[10.5px] leading-[1.3]">Delta · /trama skill</span>
           </span>
-          <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ agentSub() }}</span>
-        </a>
+          <span class="text-faint truncate font-mono text-[10px] leading-[1.3]">{{ agentSub() }}</span>
+        </div>
       }
       <div class="border-sidebar-border flex items-center gap-2.5 border-t px-3.5 py-2.5">
         <button
@@ -356,48 +397,66 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
           hlmTooltip="Inbox  G then A"
           position="top"
           [attr.aria-label]="inboxCount() ? 'Inbox, ' + inboxCount() + ' need you' : 'Inbox'"
-          closeMobileSidebarOnClick
+          (click)="closeMobile()"
         >
           <svg [lucideIcon]="bellIcon" [size]="14"></svg>
+        </a>
+        <a
+          [routerLink]="settingsLink()"
+          class="text-faint hover:text-foreground flex size-[14px] shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          hlmTooltip="Settings  G then S"
+          position="top"
+          aria-label="Settings"
+          (click)="closeMobile()"
+        >
+          <svg [lucideIcon]="settings" [size]="14"></svg>
         </a>
       </div>
     </div>
 
     }
 
-    <!-- mono uppercase section label ("PROJECTS"); the fold chevron and actions show on hover / focus -->
-    <ng-template #sectionLabel let-id let-label="label" let-all="all" let-allLabel="allLabel" let-create="create" let-createLabel="createLabel">
-      <div class="group/sec flex h-[13px] items-center">
+    <!-- mono section label ("PROJECTS") with its "+" action at the right; the label folds the list -->
+    <ng-template #subLabel let-id let-label="label" let-create="create" let-createLabel="createLabel">
+      <div class="flex items-center px-2 pt-2.5 pb-1">
         <button
           type="button"
-          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex flex-1 items-center font-mono text-[10px] leading-none uppercase outline-hidden focus-visible:ring-2"
+          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex flex-1 items-center text-start font-mono text-[10px] leading-[1.3] outline-hidden focus-visible:ring-2"
           (click)="ui.toggleFolded(id)"
           [attr.aria-expanded]="!ui.isFolded(id)"
         >
           {{ label }}
         </button>
-        @if (all) {
-          <a
-            [routerLink]="['/', slug(), all]"
-            class="text-muted-foreground hover:text-foreground flex size-4 items-center justify-center opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
-            [hlmTooltip]="allLabel"
-            [attr.aria-label]="allLabel"
-            closeMobileSidebarOnClick
-            ><svg [lucideIcon]="more" [size]="13"></svg
-          ></a>
-        }
-        @if (create) {
+        @if (create && store.can('member')) {
           <button
             type="button"
-            class="text-muted-foreground hover:text-foreground flex size-4 items-center justify-center opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
+            class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring flex size-3 items-center justify-center outline-hidden focus-visible:ring-2"
             [attr.aria-label]="createLabel"
             [hlmTooltip]="createLabel"
             (click)="ui.openCreate(create)"
           >
-            <svg [lucideIcon]="plus" [size]="13"></svg>
+            <svg [lucideIcon]="plus" [size]="12"></svg>
           </button>
         }
       </div>
+    </ng-template>
+
+    <!-- "View more +5" / "View less" under a long list -->
+    <ng-template #viewMore let-expanded="expanded" let-hidden="hidden" let-toggle="toggle">
+      <li>
+        <button
+          type="button"
+          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex w-full items-center gap-2 px-2 py-[5px] text-start text-[12.5px] leading-[1.3] outline-hidden focus-visible:ring-2"
+          [attr.aria-expanded]="expanded"
+          (click)="toggle()"
+        >
+          <svg [lucideIcon]="chevronDown" [size]="13" class="shrink-0" [class.rotate-180]="expanded"></svg>
+          <span class="flex-1">{{ expanded ? 'View less' : 'View more' }}</span>
+          @if (!expanded) {
+            <span class="font-mono text-[10.5px]">+{{ hidden }}</span>
+          }
+        </button>
+      </li>
     </ng-template>
 
     <!-- logo, workspace name in serif and the mono line below it; shared by the switcher and the plain header -->
@@ -411,19 +470,18 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
 
     <!-- a project shared with me: glyph, name, the owning workspace's slug in mono, row menu -->
     <ng-template #sharedRow let-s>
-      <li hlmSidebarMenuItem class="group/shared relative">
+      <li class="group/shared relative">
         <a
-          hlmSidebarMenuButton
           [routerLink]="['/', s.workspace.slug, 'projects', s.id]"
           routerLinkActive
           #sha="routerLinkActive"
-          [isActive]="sha.isActive"
-          [tooltip]="s.name + ' · ' + s.workspace.name"
-          closeMobileSidebarOnClick
+          [class]="sha.isActive ? rowOn : rowOff"
+          [attr.title]="s.name + ' · ' + s.workspace.name"
+          (click)="closeMobile()"
         >
           <app-project-glyph [project]="s" [size]="15" />
-          <span class="truncate-fade flex-1">{{ s.name }}</span>
-          <span class="text-faint max-w-[72px] truncate font-mono text-[10px] group-hover/shared:invisible">{{ s.workspace.slug }}</span>
+          <span class="truncate-fade min-w-0 flex-1">{{ s.name }}</span>
+          <span class="text-faint max-w-[88px] truncate font-mono text-[11px] group-hover/shared:invisible">{{ s.workspace.slug }}</span>
         </a>
         <button
           type="button"
@@ -442,11 +500,11 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
       <hlm-dropdown-menu class="w-56">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="go(['/', s.workspace.slug, 'projects', s.id])">
-            <svg [lucideIcon]="externalIcon" [size]="14"></svg>
+            <svg [lucideIcon]="arrowUpRight" [size]="14"></svg>
             Open
           </button>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="showInMenu" [hlmDropdownMenuTriggerData]="{ s: s }">
-            <svg [lucideIcon]="layers" [size]="14"></svg>
+            <svg [lucideIcon]="logInIcon" [size]="14"></svg>
             Show in
             <hlm-dropdown-menu-item-sub-indicator />
           </button>
@@ -457,7 +515,7 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
             </button>
           } @else {
             <button hlmDropdownMenuItem (triggered)="shared.hide(s.id)">
-              <svg [lucideIcon]="closeIcon" [size]="14"></svg>
+              <svg [lucideIcon]="eyeOffIcon" [size]="14"></svg>
               Hide from Shared with me
             </button>
           }
@@ -476,7 +534,8 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
         <hlm-dropdown-menu-group>
           @for (w of session.workspaces(); track w.id) {
             <button hlmDropdownMenuItem (triggered)="shared.place(s.id, w.id)">
-              <span class="flex-1 truncate text-start">{{ w.name }}</span>
+              <svg [lucideIcon]="w.personal ? user : buildingIcon" [size]="14" class="text-muted-foreground"></svg>
+              <span class="flex-1 truncate text-start">{{ w.personal ? w.name + ' · personal' : w.name }}</span>
               @if (s.placement?.workspaceId === w.id) {
                 <svg [lucideIcon]="check" [size]="14" class="text-muted-foreground"></svg>
               }
@@ -490,30 +549,18 @@ import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav
       </hlm-dropdown-menu-sub>
     </ng-template>
 
-    <ng-template #navLink let-item>
-      <li hlmSidebarMenuItem>
+    <!-- one nav row (30px): icon, label, count; the row of the current page is lit -->
+    <ng-template #navRow let-item>
+      <li>
         <a
-          hlmSidebarMenuButton
-          [routerLink]="['/', slug(), ...item.path]"
-          routerLinkActive
-          #rla="routerLinkActive"
-          [routerLinkActiveOptions]="{
-            paths: 'subset',
-            queryParams: 'ignored',
-            fragment: 'ignored',
-            matrixParams: 'ignored',
-          }"
-          [isActive]="rla.isActive"
-          [tooltip]="item.label"
+          [routerLink]="['/', slug(), item.segment]"
+          [class]="isNavActive(item.segment) ? rowOn : rowOff"
+          [attr.aria-current]="isNavActive(item.segment) ? 'page' : null"
           [attr.title]="item.hint ?? null"
-          closeMobileSidebarOnClick
+          (click)="closeMobile()"
         >
-          <svg
-            [lucideIcon]="item.icon"
-            [size]="15"
-            class="text-muted-foreground group-data-active/menu-button:text-foreground"
-          ></svg>
-          <span class="truncate-fade flex-1">{{ item.label }}</span>
+          <svg [lucideIcon]="item.icon" [size]="15" class="shrink-0"></svg>
+          <span class="truncate-fade min-w-0 flex-1">{{ item.label }}</span>
           @if (badge(item.badge, true); as n) {
             @if (ui.sidebarBadgeStyle() === 'dot') {
               <span
@@ -753,30 +800,129 @@ export class AppSidebar {
 
   protected readonly sidebarIcon = LucidePanelLeft;
   protected readonly inboxIcon = LucideInbox;
+  protected readonly logInIcon = LucideLogIn;
+  protected readonly eyeOffIcon = LucideEyeOff;
+  protected readonly buildingIcon = LucideBuilding2;
 
-  /** Top entries (Inbox, Tasks) the user chose to show, in their order. Projects live in the tree below. */
-  protected readonly primary = computed(() =>
-    this.visible(orderNav(navForRole(PRIMARY_NAV, this.store.isGuest()), this.ui.sidebarOrder().personal))
-      .filter((n) => n.segment !== 'projects')
-      .map(withPath),
+  /** Row classes: 30px, 10px gap, 13px label; the current page gets the raised fill. */
+  protected readonly rowOn =
+    'focus-visible:ring-sidebar-ring flex h-[30px] w-full items-center gap-2.5 px-2.5 text-[13px] outline-hidden focus-visible:ring-2 bg-hover text-foreground';
+  protected readonly rowOff =
+    'focus-visible:ring-sidebar-ring flex h-[30px] w-full items-center gap-2.5 px-2.5 text-[13px] outline-hidden focus-visible:ring-2 text-muted-foreground hover:bg-hover/60 hover:text-foreground';
+  protected readonly searchKeys = IS_MAC ? '⌘K' : 'Ctrl K';
+  protected readonly chevronDown = LucideChevronDown;
+  protected readonly arrowUpRight = LucideArrowUpRight;
+
+  /** Home, Inbox, Time, Ask in the user's order; a guest does not get Ask. */
+  protected readonly mainNav = computed(() =>
+    this.visible(
+      orderNav(navForRole(SIDEBAR_MAIN_NAV, this.store.isGuest()), this.ui.sidebarOrder().personal),
+    ),
   );
-  /** "More" entries. "Only when badged" entries drop out while their badge is empty. A guest does not get the workspace-wide ones. */
-  protected readonly moreItems = computed(() =>
-    this.visible(orderNav(navForRole(MORE_NAV, this.store.isGuest()), this.ui.sidebarOrder().workspace)).map(withPath),
+  /** Tasks, under the WORKSPACE rule. */
+  protected readonly workspaceNav = computed(() =>
+    this.visible(
+      orderNav(navForRole(SIDEBAR_WORKSPACE_NAV, this.store.isGuest()), this.ui.sidebarOrder().workspace),
+    ),
   );
-  /** Active projects with their open (not done / canceled) task count. */
-  protected readonly projectRows = computed(() => {
+
+  /** The first path segment of the current URL (`tasks` for `/acme/tasks/UNPR-1`). */
+  private readonly section = computed(() => {
+    const segs = this.url().split(/[?#]/)[0].split('/').filter(Boolean);
+    return segs[1] ?? '';
+  });
+  protected isNavActive(segment: string): boolean {
+    const section = this.section();
+    return section === segment || (SIDEBAR_ALSO_ACTIVE[segment]?.includes(section) ?? false);
+  }
+  /** The project of the current URL (`/acme/projects/pj_1/...`), so a long list never hides the open one. */
+  private readonly openProjectId = computed(() => {
+    const segs = this.url().split(/[?#]/)[0].split('/').filter(Boolean);
+    return segs[1] === 'projects' ? (segs[2] ?? '') : '';
+  });
+  private readonly openViewId = computed(() => {
+    const segs = this.url().split(/[?#]/)[0].split('/').filter(Boolean);
+    return segs[1] === 'views' ? (segs[2] ?? '') : '';
+  });
+
+  /** Own active projects (with their open task count), then the shared ones placed in this workspace. */
+  private readonly projectRows = computed<ProjectRow[]>(() => {
     const byProject = this.store.issuesByProject();
-    return this.store
+    const slug = this.slug();
+    const own = this.store
       .projects()
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
-      .map((project) => ({
+      .map<ProjectRow>((project) => ({
+        key: project.id,
         project,
+        link: ['/', slug, 'projects', project.id],
+        title: project.name,
         open: (byProject.get(project.id) ?? []).filter(
           (i) => i.status !== 'done' && i.status !== 'canceled',
         ).length,
+        shared: false,
       }));
+    const placed = this.shared.placedHere().map<ProjectRow>((s) => ({
+      key: 'shared:' + s.id,
+      project: s as unknown as Project,
+      link: ['/', s.workspace.slug, 'projects', s.id],
+      title: s.name + ' · shared from ' + s.workspace.slug,
+      open: 0,
+      shared: true,
+    }));
+    return [...own, ...placed];
   });
+  protected readonly projectsExpanded = signal(false);
+  protected readonly toggleProjects = (): void => this.projectsExpanded.update((v) => !v);
+  protected readonly projectRowsShown = computed(() => {
+    const rows = this.projectRows();
+    if (this.projectsExpanded()) return rows;
+    const open = this.openProjectId();
+    return rows.filter((r, i) => i < PROJECT_LIMIT || (!!open && r.project.id === open));
+  });
+  protected readonly projectsHidden = computed(
+    () => this.projectRows().length - this.projectRowsShown().length,
+  );
+
+  /** Saved views: icon by layout, count of the tasks (or projects) they match; a timeline has no count. */
+  private readonly viewRows = computed<ViewRow[]>(() => {
+    if (this.store.isGuest()) return [];
+    const issues = this.store.issues();
+    const projects = this.store.projects();
+    return this.store.views().map((view) => {
+      const spec = { filters: view.filters };
+      const count =
+        view.layout === 'timeline'
+          ? 0
+          : view.entity === 'project'
+            ? queryItems('project', projects, spec).length
+            : queryItems('issue', issues, spec).length;
+      const icon =
+        view.layout === 'timeline'
+          ? LucideChartGantt
+          : view.layout === 'board'
+            ? LucideSquareKanban
+            : LucideList;
+      return { view, icon, count };
+    });
+  });
+  protected readonly viewsExpanded = signal(false);
+  protected readonly toggleViews = (): void => this.viewsExpanded.update((v) => !v);
+  protected readonly viewRowsShown = computed(() => {
+    const rows = this.viewRows();
+    if (this.viewsExpanded()) return rows;
+    const open = this.openViewId();
+    return rows.filter((r, i) => i < VIEW_LIMIT || (!!open && r.view.id === open));
+  });
+  protected readonly viewsHidden = computed(() => this.viewRows().length - this.viewRowsShown().length);
+
+  /** The gear in the user row: workspace settings, or the profile for a guest. */
+  protected readonly settingsLink = computed(() => [
+    '/',
+    this.slug(),
+    'settings',
+    this.store.isGuest() ? 'profile' : 'workspace',
+  ]);
   /** Most recent use of any workspace API token: the closest honest signal of "the agent synced". */
   private readonly lastAgentUse = computed(() => {
     let last: string | undefined;
@@ -790,21 +936,7 @@ export class AppSidebar {
     const last = this.lastAgentUse();
     return last ? `last agent sync ${ago(last)}` : 'not connected yet · set up';
   });
-  protected readonly settingsItem = {
-    segment: 'settings',
-    path: ['settings', 'profile'],
-    label: 'Settings',
-    icon: LucideSettings,
-    hint: 'Your profile, workspace, members, integrations and tokens',
-  };
-  /** Open by choice, or because the page you are on lives under More. */
-  protected readonly moreOpen = computed(() => {
-    if (this.ui.isFolded('open:more')) return true;
-    const section = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
-    return section === 'settings' || this.moreItems().some((n) => n.segment === section);
-  });
   protected readonly inboxCount = computed(() => this.badge('inbox'));
-  protected readonly chevronDown = LucideChevronDown;
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
   protected readonly issueIcon = LucideCircleDot;
@@ -903,12 +1035,11 @@ export class AppSidebar {
   private readonly taskCount = computed(
     () => this.store.issues().filter((i) => i.status !== 'draft').length,
   );
-  /** My tracked time since Monday, "6h 20m". */
+  /** My tracked time today, "6h 20m". */
   private readonly weekTime = computed(() => {
     const me = this.session.user()?.id;
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
     const from = start.getTime();
     let ms = 0;
     for (const e of this.timers.entries()) {
@@ -945,9 +1076,30 @@ export class AppSidebar {
     void this.router.navigate(commands);
     this.sidebar.setOpenMobile(false);
   }
+
+  protected closeMobile(): void {
+    this.sidebar.setOpenMobile(false);
+  }
 }
 
-/** A nav entry with its router path below the workspace. */
-function withPath(item: NavItem): NavItem & { path: string[] } {
-  return { ...item, path: [item.segment] };
+const IS_MAC =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+/** Rows shown before "View more": Pen lists four projects and three views. */
+const PROJECT_LIMIT = 4;
+const VIEW_LIMIT = 3;
+
+interface ProjectRow {
+  key: string;
+  project: Project;
+  link: string[];
+  title: string;
+  open: number;
+  shared: boolean;
+}
+
+interface ViewRow {
+  view: SavedView;
+  icon: LucideIcon;
+  count: number;
 }

@@ -5,7 +5,6 @@ import {
   LucideArrowRight,
   LucideCheck,
   LucideCode,
-  LucideCopy,
   LucideDynamicIcon,
   LucideKeyRound,
   LucideMousePointer2,
@@ -22,7 +21,8 @@ import { TOKEN_SCOPES, type ExecutionProvider, type TokenScope } from '../../../
 import { Clipboard } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { AppSelect, type Option } from '../../create/form-kit';
-import { SECTION_KIT, SETTINGS_FIELD } from './section-kit';
+import { CodeBlock } from './connect-snippets';
+import { SECTION_KIT, SETTINGS_FIELD, SETTINGS_SELECT } from './section-kit';
 
 export type AgentClient = 'claude-code' | 'cursor' | 'vscode' | 'cli' | 'mcp';
 
@@ -57,31 +57,29 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
 @Component({
   selector: 'app-agent-connect',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, HlmButtonImports, LucideDynamicIcon, AppSelect, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-7' },
+  imports: [NgTemplateOutlet, HlmButtonImports, LucideDynamicIcon, AppSelect, CodeBlock, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9' },
   template: `
-    <div class="flex flex-col gap-6">
-      <button type="button" class="text-faint hover:text-foreground inline-flex w-fit items-center gap-1.5 font-mono text-[11px]" (click)="leave()">
-        <svg [lucideIcon]="backIcon" [size]="12"></svg> Agents
-      </button>
-      <app-section-header
-        flush
-        title="Connect an agent"
-        description="Four short steps. You'll end with a working connection, not just a token."
-      />
-    </div>
+    <button type="button" class="text-faint hover:text-foreground inline-flex w-fit items-center gap-1.5 font-mono text-[10.5px] leading-[normal]" (click)="leave()">
+      <svg [lucideIcon]="backIcon" [size]="12"></svg> Agents
+    </button>
+    <app-section-header
+      flush
+      title="Connect an agent"
+      description="Four short steps. You'll end with a working connection, not just a token."
+    />
 
     @if (!canConnect()) {
       <app-readonly-note class="mb-0!">Your role cannot add agents or create tokens. Ask an admin to connect one.</app-readonly-note>
     }
 
     <div class="flex flex-col gap-8 lg:flex-row">
-      <ol class="bg-card border-border divide-border min-w-0 flex-1 self-start divide-y border">
+      <ol class="border-border min-w-0 flex-1 self-start border">
         <!-- 1 · name -->
-        <li>
-          <div class="flex items-center gap-3 px-3.5 py-3.5">
+        <li [class]="liClass(1)">
+          <div class="flex items-center gap-3.5">
             <ng-container *ngTemplateOutlet="marker; context: { n: 1 }" />
-            <span class="flex-1 text-[14px]" [class]="step() >= 1 ? 'text-foreground' : 'text-faint'">Name the agent</span>
+            <span class="flex-1 text-[13.5px] leading-[normal]" [class]="step() >= 1 ? 'text-foreground' : 'text-faint'">Name the agent</span>
             @if (step() > 1) {
               <span class="text-muted-foreground min-w-0 truncate font-mono text-[10.5px]">{{ clientDef().label }} · {{ name() }}</span>
               @if (!created()) {
@@ -90,7 +88,7 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
             }
           </div>
           @if (step() === 1) {
-            <form class="flex flex-col gap-3.5 px-3.5 pb-4" (submit)="next1($event)">
+            <form class="flex flex-col gap-4 pl-[38px]" (submit)="next1($event)">
               <label class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
                 NAME
                 <input
@@ -101,7 +99,7 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
                   (input)="name.set($any($event.target).value)"
                 />
               </label>
-              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 ACTS AS
                 <app-select [options]="owners()" [value]="owner()" (valueChange)="owner.set($event)" label="Acts as" [disabled]="!canConnect()" />
                 <span class="text-muted-foreground font-sans text-[12px] normal-case">The agent can never do more than this person can.</span>
@@ -114,10 +112,10 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
         </li>
 
         <!-- 2 · token -->
-        <li>
-          <div class="flex items-center gap-3 px-3.5 py-3.5">
+        <li [class]="liClass(2)">
+          <div class="flex items-center gap-3.5">
             <ng-container *ngTemplateOutlet="marker; context: { n: 2 }" />
-            <span class="flex-1 text-[14px]" [class]="step() >= 2 ? 'text-foreground' : 'text-faint'">Create its token</span>
+            <span class="flex-1 text-[13.5px] leading-[normal]" [class]="step() >= 2 ? 'text-foreground' : 'text-faint'">Create its token</span>
             @if (step() > 2) {
               <span class="text-muted-foreground font-mono text-[10.5px]">{{ scopeLabel() }} · {{ expiryText() }}</span>
             } @else if (step() < 2) {
@@ -125,13 +123,13 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
             }
           </div>
           @if (step() === 2) {
-            <div class="flex flex-col gap-3.5 px-3.5 pb-4">
-              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+            <div class="flex flex-col gap-4 pl-[38px]">
+              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 SCOPE
                 <app-select [options]="scopes" [(value)]="scope" label="Scope" />
                 <span class="text-muted-foreground font-sans text-[12px] leading-snug normal-case">{{ scopeInfo().description }}</span>
               </div>
-              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+              <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]" [class]="selectField">
                 EXPIRATION
                 <app-select [options]="expiry" [(value)]="expiresIn" label="Expiration" />
               </div>
@@ -146,27 +144,27 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
         </li>
 
         <!-- 3 · add to the client -->
-        <li>
-          <div class="flex items-center gap-3 px-3.5 py-3.5">
+        <li [class]="liClass(3)">
+          <div class="flex items-center gap-3.5">
             <ng-container *ngTemplateOutlet="marker; context: { n: 3 }" />
-            <span class="flex-1 text-[14px]" [class]="step() >= 3 ? 'text-foreground' : 'text-faint'">Add Trama to your client</span>
+            <span class="flex-1 text-[13.5px] leading-[normal]" [class]="step() >= 3 ? 'text-foreground' : 'text-faint'">Add Trama to your client</span>
             @if (step() === 3) {
               <span class="text-primary font-mono text-[10.5px]">step 3 of 4</span>
             }
           </div>
           @if (step() >= 3) {
-            <div class="flex flex-col gap-3.5 px-3.5 pb-4" [class.opacity-60]="step() > 3">
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Client">
+            <div class="flex flex-col gap-4 pl-[38px]" [class.opacity-60]="step() > 3">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-5 [&>button]:min-w-0" role="radiogroup" aria-label="Client">
                 @for (c of clients; track c.id) {
                   <button
                     type="button"
                     role="radio"
-                    class="focus-visible:ring-ring/50 flex flex-col items-start gap-2.5 px-3 py-2.5 text-left text-[13px] outline-none focus-visible:ring-2"
-                    [class]="client() === c.id ? 'bg-primary/10 outline-primary outline-2 -outline-offset-1' : 'border-border hover:border-border-strong border'"
+                    class="focus-visible:ring-ring/50 flex flex-col items-start gap-2 border p-3 text-left text-[13px] leading-[normal] outline-none focus-visible:ring-2"
+                    [class]="client() === c.id ? 'bg-primary/10 border-primary' : 'bg-background border-border hover:border-border-strong'"
                     [attr.aria-checked]="client() === c.id"
                     (click)="client.set(c.id)"
                   >
-                    <svg [lucideIcon]="c.icon" [size]="16" class="text-text-2"></svg>
+                    <svg [lucideIcon]="c.icon" [size]="18" class="text-text-2"></svg>
                     <span class="text-foreground">{{ c.label }}</span>
                   </button>
                 }
@@ -174,28 +172,16 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
               <p class="text-muted-foreground text-[12.5px] leading-[19px]">
                 Run this once in your {{ client() === 'claude-code' ? 'terminal' : 'client' }}. The token is filled in and shown only now. Copy it before you leave this page.
               </p>
-              <div class="bg-bg-deep border-border border">
-                <div class="border-border flex items-center border-b">
-                  @for (s of snippets(); track s.id) {
-                    <button
-                      type="button"
-                      class="-mb-px px-3 py-2 font-mono text-[11.5px]"
-                      [class]="snippet().id === s.id ? 'text-foreground border-primary border-b-2' : 'text-muted-foreground hover:text-foreground'"
-                      (click)="tab.set(s.id)"
-                    >
-                      {{ s.label }}
-                    </button>
-                  }
-                  <span class="flex-1"></span>
-                  <button type="button" class="text-muted-foreground hover:text-foreground mr-2 inline-flex items-center gap-1.5 font-mono text-[10.5px]" (click)="copy(snippet().code, 'Snippet')">
-                    <svg [lucideIcon]="copyIcon" [size]="12"></svg> Copy
-                  </button>
-                </div>
-                <pre class="text-text-2 overflow-x-auto px-3.5 py-3 font-mono text-[12px] leading-[21px] whitespace-pre select-all" tabindex="0"><code>{{ snippet().code }}</code></pre>
-              </div>
+              <app-code-block
+                [code]="snippet().code"
+                [label]="snippet().label"
+                [tabs]="snippets()"
+                [activeTab]="snippet().id"
+                (tabChange)="tab.set($event)"
+              />
               @if (step() === 3) {
                 <div class="flex flex-wrap items-center gap-2">
-                  <button type="button" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 font-mono text-[12px]" (click)="copy(secret() ?? '', 'Token')">
+                  <button type="button" class="text-text-2 hover:text-foreground inline-flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[12px] leading-[normal]" (click)="copy(secret() ?? '', 'Token')">
                     <svg [lucideIcon]="keyIcon" [size]="13"></svg> Copy token only
                   </button>
                   <span class="flex-1"></span>
@@ -207,16 +193,16 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
         </li>
 
         <!-- 4 · check -->
-        <li>
-          <div class="flex items-center gap-3 px-3.5 py-3.5">
+        <li [class]="liClass(4)">
+          <div class="flex items-center gap-3.5">
             <ng-container *ngTemplateOutlet="marker; context: { n: 4 }" />
-            <span class="flex-1 text-[14px]" [class]="step() >= 4 ? 'text-foreground' : 'text-faint'">Check the connection</span>
+            <span class="flex-1 text-[13.5px] leading-[normal]" [class]="step() >= 4 ? 'text-foreground' : 'text-faint'">Check the connection</span>
             @if (step() < 4) {
               <span class="text-faint font-mono text-[10.5px]">waits for the first call</span>
             }
           </div>
           @if (step() === 4) {
-            <div class="flex flex-col gap-3 px-3.5 pb-4">
+            <div class="flex flex-col gap-4 pl-[38px]">
               @if (connected()) {
                 <p class="text-green flex items-center gap-2 text-[13px]">
                   <svg [lucideIcon]="checkIcon" [size]="14"></svg> {{ name() }} made its first call. It is connected.
@@ -236,17 +222,17 @@ const SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value
         </li>
       </ol>
 
-      <aside class="flex w-full shrink-0 flex-col gap-3 self-start lg:w-[280px]">
-        <div class="bg-card border-border flex flex-col gap-2 border p-3.5">
-          <span class="text-faint font-mono text-[10.5px] leading-normal">WHAT THE AGENT GETS</span>
-          <ul class="flex flex-col gap-2 text-[12.5px]">
+      <aside class="flex w-full shrink-0 flex-col gap-3.5 self-start lg:w-[280px]">
+        <div class="border-border flex flex-col gap-2.5 border p-3.5">
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">WHAT THE AGENT GETS</span>
+          <ul class="flex flex-col gap-2.5 text-[12.5px] leading-[normal]">
             <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> Acts as {{ ownerName() }}: {{ ownerRole() }}</li>
             <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> {{ scopeLabel() }} scope · {{ expiryText() }}</li>
             <li class="text-text-2 flex items-center gap-2"><svg [lucideIcon]="checkIcon" [size]="13" class="text-green shrink-0"></svg> Every action carries its name and an agent badge</li>
             <li class="text-muted-foreground flex items-center gap-2"><svg [lucideIcon]="xIcon" [size]="13" class="shrink-0"></svg> Can't invite, delete or change roles</li>
           </ul>
         </div>
-        <div class="bg-card border-border flex items-start gap-2.5 border p-3.5">
+        <div class="bg-card border-border flex items-start gap-2.5 border px-3.5 py-2.5">
           <svg [lucideIcon]="shield" [size]="14" class="text-muted-foreground mt-0.5 shrink-0"></svg>
           <p class="text-text-2 text-[12.5px] leading-[19px]">
             Agents never get more access than {{ ownerName() }}. If their role changes, the agent changes with it.
@@ -290,10 +276,10 @@ export class AgentConnect implements OnInit {
   protected readonly scopes = SCOPES;
   protected readonly expiry = EXPIRY;
   protected readonly field = SETTINGS_FIELD;
+  protected readonly selectField = SETTINGS_SELECT;
   protected readonly backIcon = LucideArrowLeft;
   protected readonly arrow = LucideArrowRight;
   protected readonly checkIcon = LucideCheck;
-  protected readonly copyIcon = LucideCopy;
   protected readonly keyIcon = LucideKeyRound;
   protected readonly xIcon = LucideX;
   protected readonly shield = LucideShield;
@@ -364,6 +350,14 @@ export class AgentConnect implements OnInit {
 
   ngOnInit(): void {
     this.client.set(this.initialClient());
+  }
+
+  /** A step is a plain row; the open one is a card with its content indented under the number. */
+  protected liClass(n: number): string {
+    const step = this.step();
+    const base = n > 1 ? 'border-border border-t ' : '';
+    if (step === n) return `${base}bg-card flex flex-col gap-4 px-4 pt-4 pb-5`;
+    return `${base}px-4 py-3.5${step < n && n === 4 ? ' opacity-[0.55]' : ''}`;
   }
 
   protected leave(): void {

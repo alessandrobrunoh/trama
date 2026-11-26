@@ -50,6 +50,7 @@ const repoLabel = (repo: string): string => repo.replace(/^https?:\/\/(www\.)?/i
           <app-picker
             class="min-w-0 flex-1"
             variant="field"
+            triggerClass="-ml-2 min-h-[22px] py-0 font-sans text-[12.5px] leading-[normal]"
             label="Lead"
             placeholder="No lead"
             [clearable]="true"
@@ -97,8 +98,8 @@ const repoLabel = (repo: string): string => repo.replace(/^https?:\/\/(www\.)?/i
         <h3 class="text-foreground font-mono text-[10px] leading-3 uppercase">Thread coverage</h3>
         @if (coverage(); as c) {
           <div class="flex items-end gap-2">
-            <span class="font-title text-foreground text-[28px] leading-8">{{ c.percent }}%</span>
-            <a class="text-faint hover:text-foreground pb-1 font-mono text-[10.5px] leading-[13px] underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="inProgressTasks">of in-progress work</a>
+            <span class="font-title text-foreground text-[28px] leading-[normal]">{{ c.percent }}%</span>
+            <a class="text-faint hover:text-foreground font-mono text-[10.5px] leading-[normal] underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="inProgressTasks">of in-progress work</a>
           </div>
           <div class="bg-line h-1 w-full" role="img" [attr.aria-label]="c.percent + '% of in-progress tasks have a Delta thread'">
             <div class="bg-delta-line h-1" [style.width.%]="c.percent"></div>

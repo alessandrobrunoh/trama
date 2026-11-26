@@ -31,8 +31,8 @@ export interface NavItem {
 }
 
 /**
- * The v3 sidebar ("v3 · 01 UI Kit" → Sidebar): Home, Inbox, My tasks, Tasks, Board, Timeline, Time, Ask.
- * Projects follow as their own list; Settings sits under "Workspace".
+ * Every top-level destination (the command palette and the mobile menu list all of them; the desktop
+ * sidebar shows the subset in `SIDEBAR_MAIN_NAV` / `SIDEBAR_WORKSPACE_NAV`).
  */
 export const PRIMARY_NAV: NavItem[] = [
   {
@@ -148,6 +148,22 @@ export const MORE_NAV: NavItem[] = [
 
 /** Every destination reachable from the sidebar, for the command bar and the mobile menu. */
 export const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...MORE_NAV];
+
+const byKey = (segments: readonly string[]): NavItem[] =>
+  segments.map((s) => ALL_NAV.find((n) => n.segment === s)).filter((n): n is NavItem => !!n);
+
+/**
+ * The desktop sidebar (App · 14 Sidebar): Home, Inbox, Time and Ask on top, then Tasks under WORKSPACE.
+ * Projects, Views and Shared with me are their own lists. My tasks, Board and Timeline are not rows here:
+ * Board and Timeline are tabs inside Tasks, and My tasks stays one ⌘K / G M away.
+ */
+export const SIDEBAR_MAIN_NAV: NavItem[] = byKey(['overview', 'inbox', 'timer', 'assistant']);
+export const SIDEBAR_WORKSPACE_NAV: NavItem[] = byKey(['tasks']);
+
+/** Other first path segments that keep a sidebar row lit (the Tasks row covers its tabs and scopes). */
+export const SIDEBAR_ALSO_ACTIVE: Readonly<Record<string, readonly string[]>> = {
+  tasks: ['issues', 'board', 'timeline', 'my-tasks'],
+};
 
 /**
  * Destinations a guest does not get: saved views and statistics (workspace-wide), Ask and "Connect your

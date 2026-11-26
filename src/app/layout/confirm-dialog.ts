@@ -17,7 +17,7 @@ import { UiStore } from '../core/stores/ui.store';
     <hlm-alert-dialog [state]="open() ? 'open' : 'closed'" (closed)="ui.setConfirmDelete(null)">
       <hlm-alert-dialog-content
         *hlmAlertDialogPortal="let ctx"
-        class="gap-0 p-0"
+        class="gap-0 p-0 sm:relative sm:-top-[8.5svh] sm:w-[540px] sm:max-w-[540px]"
         (keydown.meta.backspace)="shortcut($event)"
         (keydown.control.backspace)="shortcut($event)"
       >
@@ -51,7 +51,7 @@ import { UiStore } from '../core/stores/ui.store';
             <button
               hlmAlertDialogAction
               variant="destructive"
-              class="bg-destructive! hover:bg-destructive/85! border-transparent! text-white! [&_kbd]:bg-white/15 [&_kbd]:text-white"
+              class="bg-destructive! hover:bg-destructive/85! border-transparent! text-[#1a1206]! [&_kbd]:bg-white/15 [&_kbd]:text-[#1a1206]"
               [disabled]="busy() || !matches()"
               (click)="confirm()"
             >

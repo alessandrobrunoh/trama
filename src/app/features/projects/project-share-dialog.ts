@@ -13,7 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideDynamicIcon, LucideX } from '@lucide/angular';
+import { LucideDynamicIcon, LucideEye, LucideLink, LucideMail, LucideUsers, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import {
@@ -29,7 +29,7 @@ import { ProjectShareStore } from '../../core/stores/project-share.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore } from '../../core/stores/ui.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
-import { V3DialogFoot, V3DialogHead } from '../../shared/v3';
+import { V3DialogFoot } from '../../shared/v3';
 import { EmailChips, isEmail } from '../settings/sections/email-chips';
 import { SECTION_KIT } from '../settings/sections/section-kit';
 
@@ -44,7 +44,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     LucideDynamicIcon,
     ActorAvatar,
     EmailChips,
-    V3DialogHead,
     V3DialogFoot,
     ...SECTION_KIT,
   ],
@@ -52,19 +51,33 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="open.set(false)">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[560px]"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:w-[500px] sm:max-w-[500px]"
         [showCloseButton]="false"
         (keydown.meta.enter)="invite($event)"
         (keydown.control.enter)="invite($event)"
       >
-        <v3-dialog-head (dismiss)="open.set(false)">
-          <h2 hlmDialogTitle>Share {{ project().name }}</h2>
-        </v3-dialog-head>
-        <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3 text-[12px]">
-          {{ workspaceName() }} · project
-        </p>
+        <!-- v3 · 08: title over a mono "acme · project" line, a bare close icon, no rule under the head -->
+        <div class="flex items-start px-5 pt-[18px] pb-3.5">
+          <div class="flex min-w-0 flex-col gap-1">
+            <h2 hlmDialogTitle class="font-title text-foreground m-0 truncate text-[20px] leading-[20px] font-normal">
+              Share {{ project().name }}
+            </h2>
+            <p hlmDialogDescription class="text-faint m-0 font-mono text-[10.5px] leading-[14px]">
+              {{ workspaceName() }} · project
+            </p>
+          </div>
+          <span class="min-w-0 flex-1"></span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground mt-1 inline-flex shrink-0 outline-none focus-visible:text-foreground"
+            aria-label="Close"
+            (click)="open.set(false)"
+          >
+            <svg [lucideIcon]="xIcon" [size]="16"></svg>
+          </button>
+        </div>
 
-        <div class="flex flex-col gap-2 px-[18px] pt-3 pb-4">
+        <div class="flex flex-col gap-2 px-5 pb-4">
           <div class="flex items-start gap-2">
             <app-email-chips
               class="min-w-0 flex-1"
@@ -96,31 +109,34 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           }
         </div>
 
-        <div class="border-border border-t">
-          <div class="text-faint px-[18px] pt-3 pb-1.5 font-mono text-[10.5px] tracking-[1px] uppercase">
+        <div class="border-border border-t pt-1.5 pb-2.5">
+          <div class="text-faint px-5 pt-2 pb-1 font-mono text-[10.5px] uppercase">
             Who has access
           </div>
 
           @if (everyone().length) {
-            <div class="flex items-center gap-3 px-[18px] py-2.5">
+            <div class="flex items-center gap-2.5 px-5 py-[9px]">
+              <span class="bg-secondary border-border text-muted-foreground inline-flex size-[26px] shrink-0 items-center justify-center border" aria-hidden="true">
+                <svg [lucideIcon]="everyoneIcon" [size]="14"></svg>
+              </span>
               <div class="min-w-0 flex-1">
                 <div class="text-foreground text-[13px]">Everyone in {{ workspaceName() }} with all projects</div>
                 <div class="text-faint font-mono text-[10.5px]">
                   {{ everyone().length }} {{ everyone().length === 1 ? 'member' : 'members' }} · from the workspace
                 </div>
               </div>
-              <span class="text-muted-foreground font-mono text-[11px]">Workspace</span>
+              <span class="text-muted-foreground font-mono text-[10.5px]">Workspace</span>
             </div>
           }
 
           @for (m of people(); track m.id) {
-            <div class="flex items-center gap-3 px-[18px] py-2.5">
-              <app-actor-avatar [actor]="{ type: 'user', id: m.userId }" [size]="22" />
+            <div class="flex items-center gap-2.5 px-5 py-[9px]">
+              <app-actor-avatar [actor]="{ type: 'user', id: m.userId }" [size]="26" />
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 text-[13px]">
                   <span class="text-foreground truncate">{{ m.user?.name ?? m.userId }}</span>
                   @if (m.role === guestId) {
-                    <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[14px]">guest</span>
+                    <span class="bg-secondary border-border text-text-2 border px-[7px] py-0.5 text-[11px] leading-[14px]">guest</span>
                   }
                 </div>
                 <div class="text-faint truncate font-mono text-[10.5px]">
@@ -128,9 +144,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
                 </div>
               </div>
               @if (m.role === guestId) {
-                <span class="text-muted-foreground font-mono text-[11px]">Can edit</span>
+                <span class="text-muted-foreground font-mono text-[10.5px]">Can edit</span>
               } @else {
-                <span class="text-muted-foreground font-mono text-[11px]">{{ roleName(m.role) }}</span>
+                <span class="text-muted-foreground font-mono text-[10.5px]">{{ roleName(m.role) }}</span>
               }
               @if (canPromote(m)) {
                 <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 text-xs" title="Make this person a full member of the workspace" (click)="promote(m)">
@@ -153,11 +169,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           }
 
           @for (i of invites(); track i.id) {
-            <div class="flex items-center gap-3 px-[18px] py-2.5">
+            <div class="flex items-center gap-2.5 px-5 py-[9px]">
+              <span class="bg-secondary border-border text-muted-foreground inline-flex size-[26px] shrink-0 items-center justify-center border" aria-hidden="true">
+                <svg [lucideIcon]="pendingIcon" [size]="14"></svg>
+              </span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 text-[13px]">
                   <span class="text-foreground truncate">{{ i.email }}</span>
-                  <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[14px]">pending</span>
+                  <span class="bg-secondary border-border text-text-2 border px-[7px] py-0.5 text-[11px] leading-[14px]">pending</span>
                 </div>
                 <div class="text-faint font-mono text-[10.5px]" [class.text-red]="expired(i)">{{ expiry(i) }}</div>
               </div>
@@ -176,17 +195,23 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           }
 
           @if (loading() && !people().length && !everyone().length) {
-            <div class="text-muted-foreground px-[18px] py-4 text-[13px]">Loading…</div>
+            <div class="text-muted-foreground px-5 py-4 text-[13px]">Loading…</div>
           }
         </div>
 
-        <p class="text-muted-foreground border-border border-t px-[18px] py-3 text-[12px] leading-snug">
-          Guests see this project, the people on it, and the workspace's statuses and labels read-only. Nothing else in {{ workspaceName() }}. Promote someone to make them a member.
-        </p>
+        <div class="bg-[var(--bg-deep,var(--background))] border-border flex items-start gap-2.5 border-t px-5 py-2.5">
+          <svg [lucideIcon]="hintIcon" [size]="14" class="text-muted-foreground mt-0.5 shrink-0" aria-hidden="true"></svg>
+          <p class="text-text-2 m-0 min-w-0 flex-1 text-[12px] leading-[18px]">
+            Guests see this project, the people on it, and the workspace's statuses and labels read-only. Nothing else in {{ workspaceName() }}. Promote someone to make them a member.
+          </p>
+        </div>
 
-        <v3-dialog-foot>
-          <button hlmBtn variant="outline" size="sm" type="button" (click)="copyLink()">Copy project link</button>
-          <button hlmBtn size="sm" type="button" (click)="open.set(false)">Done</button>
+        <v3-dialog-foot class="px-5">
+          <button v3-hint hlmBtn variant="ghost" size="sm" type="button" class="text-text-2 -ms-2.5 gap-1.5" (click)="copyLink()">
+            <svg [lucideIcon]="linkIcon" [size]="13" aria-hidden="true"></svg>
+            Copy project link
+          </button>
+          <button hlmBtn variant="outline" size="sm" type="button" (click)="open.set(false)">Done</button>
         </v3-dialog-foot>
       </hlm-dialog-content>
     </hlm-dialog>
@@ -206,6 +231,10 @@ export class ProjectShareDialog {
 
   protected readonly guestId = GUEST_ROLE_ID;
   protected readonly xIcon = LucideX;
+  protected readonly everyoneIcon = LucideUsers;
+  protected readonly pendingIcon = LucideMail;
+  protected readonly hintIcon = LucideEye;
+  protected readonly linkIcon = LucideLink;
   protected readonly emails = signal<string[]>([]);
   protected readonly busy = signal(false);
   /** Links for invitations the server could not email (shown once). */

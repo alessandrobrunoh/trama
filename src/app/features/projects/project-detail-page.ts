@@ -178,13 +178,13 @@ const TONE_COLOR: Record<BurnTone, string> = {
       <header class="flex flex-col gap-4 px-4 pt-6 sm:px-10">
         <div class="flex items-end gap-5">
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div class="flex min-w-0 items-center gap-2 font-mono text-[10.5px] leading-[13px] uppercase">
-              <app-project-glyph-picker class="-my-[11px] -ml-2.5" [project]="p" [canEdit]="canManage()" [size]="12" />
+            <div class="flex min-w-0 items-center gap-2 font-mono text-[10.5px] leading-[normal] uppercase">
+              <app-project-glyph-picker class="-mx-2.5 -my-[11px]" [project]="p" [canEdit]="canManage()" [size]="12" />
               <span class="text-faint">Project ·</span>
               <app-inline-text
-                class="w-14 shrink-0"
+                class="-mx-1.5 -my-1 w-14 shrink-0"
                 label="project tag"
-                textClass="text-faint font-mono text-[10.5px] leading-[13px]"
+                textClass="text-faint font-mono text-[10.5px] leading-[normal]"
                 [value]="p.key"
                 [canEdit]="canManage()"
                 [maxLength]="projectKeyMax"
@@ -197,32 +197,32 @@ const TONE_COLOR: Record<BurnTone, string> = {
               }
             </div>
             <app-inline-text
-              class="min-w-0"
+              class="-mx-1.5 -my-1 min-w-0"
               label="project name"
-              textClass="font-title text-foreground text-[36px] leading-[40px] tracking-[-0.5px]"
+              textClass="font-title text-foreground text-[36px] leading-[normal] tracking-[-0.5px]"
               [value]="p.name"
               [canEdit]="canManage()"
               (save)="update({ name: $event })"
             />
-            <div class="flex min-w-0 items-start gap-2">
+            <div class="flex min-w-0 items-center gap-2">
               <app-inline-text
-                class="min-w-0 flex-1"
+                class="-mx-1.5 -my-1 min-w-0 flex-1"
                 label="summary"
                 placeholder="Add a short summary…"
-                textClass="text-muted-foreground text-sm"
+                textClass="text-muted-foreground text-sm leading-[18px]"
                 [value]="p.summary ?? ''"
                 [canEdit]="canManage()"
                 [allowEmpty]="true"
                 (save)="update({ summary: $event.trim() || null })"
               />
               @if (canManage()) {
-                <app-project-ai-summary-button [project]="p" />
+                <app-project-ai-summary-button class="-my-2.5 shrink-0" [project]="p" />
               }
             </div>
           </div>
           @if (health(); as h) {
             <span
-              class="text-foreground mb-1 inline-flex shrink-0 items-center gap-1.5 border px-2.5 py-1 font-mono text-[11px] leading-[14px]"
+              class="text-foreground inline-flex shrink-0 items-center gap-1.5 border px-2.5 py-1 font-mono text-[11px] leading-[14px]"
               [style.border-color]="'color-mix(in srgb, ' + h.color + ' 40%, transparent)'"
             >
               <span class="size-[7px] shrink-0" [style.background]="h.color" aria-hidden="true"></span>{{ h.label }}
@@ -235,8 +235,8 @@ const TONE_COLOR: Record<BurnTone, string> = {
             <button
               type="button"
               role="tab"
-              class="-mb-px flex flex-none items-start gap-1.5 border-b-2 pb-2.5 text-[13px] leading-4 whitespace-nowrap outline-none focus-visible:underline"
-              [class]="current() === t ? 'border-primary text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'"
+              class="-mb-px flex flex-none items-start gap-1.5 border-b-2 pb-2 text-[13px] leading-4 whitespace-nowrap outline-none focus-visible:underline"
+              [class]="current() === t ? 'border-red text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'"
               [attr.aria-selected]="current() === t"
               [title]="tabLabel[t] + ' (' + (i + 1) + ')'"
               (click)="setTab(t)"

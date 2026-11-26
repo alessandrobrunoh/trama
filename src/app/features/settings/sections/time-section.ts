@@ -25,7 +25,7 @@ const WEEKDAY: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wedn
     <app-section-header
       flush
       title="Time tracking"
-      [description]="'Time is always logged by people. The timer runs on one task at a time, and an entry belongs to whoever logged it.'"
+      description="Timers and timesheets. Time is always logged by people, one timer at a time."
     >
       <a actions hlmBtn variant="outline" [routerLink]="['/', store.slug(), 'timer']">
         <svg [lucideIcon]="open" [size]="13"></svg>
