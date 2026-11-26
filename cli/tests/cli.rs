@@ -1666,3 +1666,347 @@ fn every_example_in_the_skill_is_a_valid_command() {
     }
     assert!(checked >= 15, "only {checked} examples were checked");
 }
+
+// ───────────────────────────── the short verbs of /trama ─────────────────────────────
+
+fn short_task() -> Value {
+    json!({ "id": "in_1", "key": "BUG-1", "title": "Parent", "kind": "bug", "projectId": "pj_1", "status": "todo", "threadUrl": "https://delta.example/t/1" })
+}
+
+#[test]
+fn link_sets_the_thread_and_a_conflict_names_the_one_already_linked() {
+    let mock = Mock::start(vec![route("PATCH", "/api/w/acme/tasks/BUG-1", 200, json!({ "id": "in_1", "key": "BUG-1", "threadUrl": "https://delta.example/t/2" }))]);
+    let run = Run::new().with_key(&mock.api());
+    let o = run.run(&["link", "BUG-1", "--thread", "https://delta.example/t/2"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let v = out_json(&o);
+    assert_eq!(v["linked"], true);
+    assert_eq!(v["message"], "✓ linked · BUG-1 → https://delta.example/t/2");
+    assert_eq!(mock.last().method, "PATCH");
+    assert_eq!(mock.last().json(), json!({ "threadUrl": "https://delta.example/t/2" }));
+
+    let o = run.run(&["link", "BUG-1", "--thread", "https://delta.example/t/2", "-o", "table"]);
+    assert_eq!(stdout(&o).trim(), "✓ linked · BUG-1 → https://delta.example/t/2");
+
+    // a bare id is joined to the base; without --thread the current thread is used
+    let based = Run::new().with_key(&mock.api()).env("TRAMA_THREAD_URL_BASE", "https://delta.example/t/");
+    assert_eq!(code(&based.run(&["link", "BUG-1", "--thread", "th_9"])), 0);
+    assert_eq!(mock.last().json(), json!({ "threadUrl": "https://delta.example/t/th_9" }));
+    let current = Run::new().with_key(&mock.api()).env("DELTA_THREAD_URL", "https://delta.example/t/5");
+    assert_eq!(code(&current.run(&["link", "BUG-1"])), 0);
+    assert_eq!(mock.last().json(), json!({ "threadUrl": "https://delta.example/t/5" }));
+
+    // no thread at all: a usage error before any request, but --dry-run still shows the request
+    let before = mock.requests().len();
+    let o = run.run(&["link", "BUG-1"]);
+    assert_eq!(code(&o), 2, "{}", stderr(&o));
+    assert_eq!(mock.requests().len(), before);
+    assert_eq!(code(&run.run(&["link", "BUG-1", "--dry-run"])), 0);
+    assert_eq!(code(&run.run(&["link", "BUG-1", "--thread", "not a url", "--dry-run"])), 2);
+
+    let conflict = Mock::start(vec![route(
+        "PATCH",
+        "/api/w/acme/tasks/BUG-1",
+        409,
+        json!({ "statusCode": 409, "code": "thread_already_linked", "message": "The task already links a thread", "threadUrl": "https://delta.example/t/1" }),
+    )]);
+    let o = Run::new().with_key(&conflict.api()).run(&["link", "BUG-1", "--thread", "https://delta.example/t/2"]);
+    assert_eq!(code(&o), 6, "{}", stderr(&o));
+    let e = err_json(&o);
+    assert!(e["error"]["message"].as_str().unwrap().contains("https://delta.example/t/1"), "{e}");
+    assert!(e["error"]["hint"].as_str().unwrap().contains("trama sub BUG-1"), "{e}");
+}
+
+#[test]
+fn sub_creates_a_subtask_in_the_project_and_kind_of_its_parent() {
+    let mock = Mock::start(vec![
+        route("GET", "/api/w/acme/tasks/BUG-1", 200, short_task()),
+        route("POST", "/api/w/acme/tasks", 201, json!({ "id": "in_10", "key": "BUG-10", "title": "Retry metrics", "status": "todo" })),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+    let o = run.run(&["sub", "BUG-1", "Retry metrics", "--thread", "https://delta.example/t/2"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)["message"], "✓ BUG-10 created · thread linked");
+    assert_eq!(
+        mock.last().json(),
+        json!({ "title": "Retry metrics", "parentId": "in_1", "kind": "bug", "projectId": "pj_1", "threadUrl": "https://delta.example/t/2" })
+    );
+    let o = run.run(&["sub", "BUG-1", "Plain"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert!(mock.last().json().get("threadUrl").is_none());
+    assert_eq!(code(&run.run(&["sub", "BUG-1", "   ", "--dry-run"])), 2);
+}
+
+#[test]
+fn status_accepts_dashes_and_workspace_labels_and_skips_a_no_op() {
+    let mock = Mock::start(vec![
+        route("GET", "/api/w/acme/tasks/BUG-1", 200, short_task()),
+        route("PATCH", "/api/w/acme/tasks/BUG-1", 200, short_task()),
+        route("GET", "/api/w/acme", 200, json!({ "settings": { "statuses": { "issue": [{ "id": "st_1", "name": "Planning", "type": "backlog" }] } } })),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+    let o = run.run(&["status", "BUG-1", "in-progress"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)["message"], "✓ BUG-1 Todo → In progress");
+    assert_eq!(mock.last().method, "PATCH");
+    assert_eq!(mock.last().json(), json!({ "status": "in_progress" }));
+
+    assert_eq!(code(&run.run(&["status", "BUG-1", "Planning"])), 0);
+    assert_eq!(mock.last().json(), json!({ "status": "backlog" }));
+
+    let patches = || mock.requests().iter().filter(|r| r.method == "PATCH").count();
+    let before = patches();
+    let o = run.run(&["status", "BUG-1", "todo"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)["changed"], false);
+    assert_eq!(patches(), before, "nothing to change");
+
+    let o = run.run(&["status", "BUG-1", "bogus"]);
+    assert_eq!(code(&o), 2, "{}", stderr(&o));
+    assert!(err_json(&o)["error"]["hint"].as_str().unwrap().contains("in_progress"));
+    assert_eq!(patches(), before);
+}
+
+#[test]
+fn sync_sends_one_validated_request_and_prints_the_lines_of_the_skill() {
+    let reply = json!({
+        "linked": false,
+        "decisionsAdded": 2,
+        "record": { "syncCount": 3, "threadUrl": "https://delta.example/t/1" },
+        "artifact": { "id": "ar_1", "kind": "pull_request" },
+        "timeSuggestion": { "id": "te_1", "minutes": 47 }
+    });
+    let mock = Mock::start(vec![
+        route("POST", "/api/w/acme/tasks/BUG-1/thread/sync", 200, reply.clone()),
+        route("GET", "/api/w/acme/tasks/BUG-1", 200, short_task()),
+        route("GET", "/api/w/acme/projects/pj_1", 200, json!({ "id": "pj_1", "repository": "github.com/acme/web" })),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+    let args = [
+        "sync", "BUG-1", "--summary", "Alert wired", "--decision", "Alert after 3 failures@src/auth/,src/queue.ts", "--decision", "Keep it simple", "--file", "./src/a.ts", "--file", "src/a.ts", "--pr",
+        "https://github.com/acme/web/pull/423", "--minutes", "47", "--turns", "9",
+    ];
+    let o = run.run(&args);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(
+        mock.last().json(),
+        json!({
+            "summary": "Alert wired",
+            "decisions": [{ "text": "Alert after 3 failures", "paths": ["src/auth/", "src/queue.ts"] }, { "text": "Keep it simple" }],
+            "files": ["src/a.ts"],
+            "pullRequestUrl": "https://github.com/acme/web/pull/423",
+            "activeMinutes": 47,
+            "turns": 9
+        })
+    );
+    let v = out_json(&o);
+    assert_eq!(v["message"], "✓ summary · 2 decisions · 1 file · 47m suggested\n✓ PR attached");
+    assert_eq!((v["decisionsAdded"].clone(), v["syncCount"].clone(), v["artifact"]["id"].clone()), (json!(2), json!(3), json!("ar_1")));
+
+    let mut table = args.to_vec();
+    table.extend(["-o", "table"]);
+    assert_eq!(stdout(&run.run(&table)).trim(), "✓ summary · 2 decisions · 1 file · 47m suggested\n✓ PR attached");
+
+    // owner/repo#N is read as GitHub through the project's repository
+    let o = run.run(&["sync", "BUG-1", "--pr", "acme/web#423"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(mock.last().json(), json!({ "pullRequestUrl": "https://github.com/acme/web/pull/423" }));
+
+    // validation happens before any request
+    let before = mock.requests().len();
+    for bad in [vec!["sync", "BUG-1", "--minutes", "0"], vec!["sync", "BUG-1", "--file", "../secret"], vec!["sync", "BUG-1", "--decision", "  "], vec!["sync", "BUG-1", "--pr", "not-a-pr"]] {
+        let o = run.run(&bad);
+        assert!(code(&o) == 2 || code(&o) == 8, "{bad:?}: {} {}", code(&o), stderr(&o));
+    }
+    // --pr with a short form reads the task and project first, so only compare the writes
+    assert!(mock.requests().iter().skip(before).all(|r| r.method == "GET"), "a bad sync sent nothing");
+
+    // a task or --all, never both, and --all needs the current thread
+    assert_eq!(code(&run.run(&["sync"])), 2);
+    assert_eq!(code(&run.run(&["sync", "BUG-1", "--all"])), 2);
+    assert_eq!(code(&run.run(&["sync", "--all", "--summary", "x"])), 2);
+}
+
+#[test]
+fn sync_reports_a_thread_conflict_and_syncs_every_task_of_the_thread_with_all() {
+    let conflict = Mock::start(vec![route(
+        "POST",
+        "/api/w/acme/tasks/BUG-1/thread/sync",
+        409,
+        json!({ "statusCode": 409, "code": "thread_already_linked", "message": "linked", "threadUrl": "https://delta.example/t/1" }),
+    )]);
+    let o = Run::new().with_key(&conflict.api()).run(&["sync", "BUG-1", "--thread", "https://delta.example/t/2", "--summary", "x"]);
+    assert_eq!(code(&o), 6, "{}", stderr(&o));
+    assert!(err_json(&o)["error"]["message"].as_str().unwrap().contains("https://delta.example/t/1"));
+
+    let done = json!({ "linked": false, "decisionsAdded": 0, "record": { "syncCount": 1 }, "artifact": null, "timeSuggestion": null });
+    let mock = Mock::start(vec![
+        route(
+            "GET",
+            "/api/w/acme/tasks",
+            200,
+            json!([
+                { "id": "in_1", "key": "BUG-1", "threadUrl": "https://delta.example/t/1/" },
+                { "id": "in_2", "key": "BUG-2", "threadUrl": "https://delta.example/t/1" },
+                { "id": "in_3", "key": "BUG-3", "threadUrl": "https://delta.example/t/9" },
+                { "id": "in_4", "key": "BUG-4" }
+            ]),
+        ),
+        route("POST", "/api/w/acme/tasks/BUG-1/thread/sync", 200, done.clone()),
+        route("POST", "/api/w/acme/tasks/BUG-2/thread/sync", 200, done),
+    ]);
+    let run = Run::new().with_key(&mock.api()).env("DELTA_THREAD_URL", "https://delta.example/t/1");
+    let o = run.run(&["sync", "--all", "--summary", "Wrapped up"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let v = out_json(&o);
+    assert_eq!(v["synced"].as_array().unwrap().len(), 2);
+    assert!(v["failed"].as_array().unwrap().is_empty());
+    let posts: Vec<String> = mock.requests().iter().filter(|r| r.method == "POST").map(|r| r.path().to_string()).collect();
+    assert_eq!(posts, vec!["/api/w/acme/tasks/BUG-1/thread/sync", "/api/w/acme/tasks/BUG-2/thread/sync"]);
+    assert_eq!(mock.last().json(), json!({ "summary": "Wrapped up" }));
+}
+
+#[test]
+fn show_reads_the_task_its_subtasks_decisions_and_record_in_one_object() {
+    let mock = Mock::start(vec![
+        route("GET", "/api/w/acme/tasks/BUG-1/context", 200, json!({ "issue": short_task() })),
+        route("GET", "/api/w/acme/tasks", 200, family()),
+        route("GET", "/api/w/acme/decisions", 200, json!([{ "id": "dc_1", "issueKey": "BUG-1", "text": "Rotate tokens", "paths": ["src/auth/"] }])),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+    let o = run.run(&["show", "BUG-1", "--json"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let v = out_json(&o);
+    assert_eq!(v["task"]["key"], "BUG-1");
+    assert_eq!(v["subtasks"][0]["key"], "BUG-2");
+    assert_eq!(v["subtasks"][0]["subtasks"][0]["key"], "BUG-3");
+    assert_eq!(v["decisions"][0]["text"], "Rotate tokens");
+    assert!(v["record"].is_null(), "never synced");
+    assert!(mock.requests().iter().any(|r| r.path() == "/api/w/acme/decisions" && r.target.contains("issue=in_1")));
+
+    let o = run.run(&["show", "BUG-1", "-o", "table"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let text = stdout(&o);
+    for want in ["BUG-1  Parent", "2 subtasks", "BUG-3  todo  Grandchild", "1 related decision", "Rotate tokens  (src/auth/)"] {
+        assert!(text.contains(want), "{want} is missing from:\n{text}");
+    }
+}
+
+#[test]
+fn ls_mine_asks_for_the_person_behind_the_key() {
+    let mock = Mock::start(vec![route("GET", "/api/auth/token", 200, identity(&["tasks:read"])), route("GET", "/api/w/acme/tasks", 200, family())]);
+    let run = Run::new().with_key(&mock.api());
+    let o = run.run(&["ls", "--mine"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o).as_array().unwrap().len(), 4);
+    let listing = mock.requests().into_iter().rfind(|r| r.path() == "/api/w/acme/tasks").unwrap();
+    assert!(listing.target.contains("assigneeId=usr_1") && listing.target.contains("open=true") && listing.target.contains("limit=50"), "{}", listing.target);
+
+    let o = run.run(&["ls", "--all", "--limit", "5"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let listing = mock.last();
+    assert!(!listing.target.contains("open=") && !listing.target.contains("assigneeId") && listing.target.contains("limit=5"), "{}", listing.target);
+    assert_eq!(code(&run.run(&["ls", "--open", "--all"])), 2);
+    assert_eq!(code(&run.run(&["ls", "--mine", "--dry-run"])), 0);
+}
+
+#[test]
+fn decisions_ask_and_estimate_read_their_routes_and_never_write() {
+    let mock = Mock::start(vec![
+        route("GET", "/api/w/acme/decisions", 200, json!([{ "id": "dc_1", "issueKey": "BUG-1", "text": "Rotate tokens", "paths": ["src/auth/"] }])),
+        route("GET", "/api/w/acme/search", 200, json!({ "results": [{ "type": "decision", "key": "BUG-1", "id": "in_1", "title": "Rotate tokens" }] })),
+        route(
+            "GET",
+            "/api/w/acme/tasks/BUG-1/estimate-suggestion",
+            200,
+            json!({ "suggestion": 3, "reason": "Median of 2 similar tasks.", "basis": [{ "key": "BUG-7", "title": "Retry", "estimate": 3, "trackedMinutes": 130 }] }),
+        ),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+
+    let o = run.run(&["decisions", "--path", "./src/auth/x.ts", "--issue", "BUG-1", "--limit", "5"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)[0]["text"], "Rotate tokens");
+    let target = mock.last().target;
+    assert!(target.contains("path=") && target.contains("src") && !target.contains("%2E%2F") && target.contains("issue=BUG-1") && target.contains("limit=5"), "{target}");
+    let o = run.run(&["decisions", "-o", "table"]);
+    assert_eq!(stdout(&o).trim(), "BUG-1  Rotate tokens  (src/auth/)");
+    assert_eq!(code(&run.run(&["decisions", "--limit", "999"])), 2);
+    assert_eq!(code(&run.run(&["decision", "--dry-run"])), 0, "`decision` is an alias");
+
+    let o = run.run(&["ask", "refresh", "tokens"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let v = out_json(&o);
+    assert_eq!(v["results"][0]["key"], "BUG-1");
+    assert!(v["note"].as_str().unwrap().contains("does not generate an answer"));
+    let target = mock.last().target;
+    assert!(target.contains("q=refresh") && target.contains("types=") && target.contains("limit=10"), "{target}");
+    assert!(stdout(&run.run(&["ask", "refresh", "-o", "table"])).contains("BUG-1  decision  Rotate tokens"));
+
+    let o = run.run(&["estimate", "BUG-1"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let v = out_json(&o);
+    assert_eq!(v["suggestion"], 3);
+    assert!(v["hint"].as_str().unwrap().contains("nothing was changed"));
+    let o = run.run(&["estimate", "BUG-1", "-o", "table"]);
+    let text = stdout(&o);
+    assert!(text.contains("suggested estimate 3 pt") && text.contains("BUG-7  Retry  3 pt · 2h 10m tracked") && text.contains("trama task update BUG-1 --estimate 3"), "{text}");
+
+    assert!(mock.requests().iter().all(|r| r.method == "GET"), "these three only read");
+}
+
+#[test]
+fn time_logs_finished_work_and_accepts_suggestions() {
+    let entry = json!({ "id": "te_1", "issueId": "in_1", "startedAt": "2026-05-01T09:00:00.000Z", "endedAt": "2026-05-01T10:15:00.000Z" });
+    let mock = Mock::start(vec![
+        route("GET", "/api/w/acme/tasks/BUG-1", 200, short_task()),
+        route("POST", "/api/w/acme/time-entries", 201, entry.clone()),
+        route("GET", "/api/w/acme/time-entries", 200, json!([entry.clone()])),
+        route("POST", "/api/w/acme/time-entries/te_1/accept", 200, entry),
+    ]);
+    let run = Run::new().with_key(&mock.api());
+
+    let o = run.run(&["time", "log", "BUG-1", "1h15", "--at", "2026-05-01T10:15:00Z", "--description", "Alerting"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)["message"], "✓ logged 1h 15m on BUG-1");
+    let body = mock.last().json();
+    assert_eq!(body["issueId"], "in_1");
+    assert_eq!(body["description"], "Alerting");
+    assert!(body["startedAt"].as_str().unwrap().starts_with("2026-05-01T09:00:00"), "{body}");
+    assert!(body["endedAt"].as_str().unwrap().starts_with("2026-05-01T10:15:00"), "{body}");
+    assert_eq!(code(&run.run(&["time", "log", "BUG-1", "soon"])), 2);
+
+    let o = run.run(&["time", "suggestions"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)[0]["id"], "te_1");
+    assert!(mock.last().target.contains("source=suggested"), "{}", mock.last().target);
+
+    for args in [vec!["time", "accept", "te_1"], vec!["time", "suggestions", "accept", "te_1"]] {
+        let o = run.run(&args);
+        assert_eq!(code(&o), 0, "{args:?}: {}", stderr(&o));
+        assert!(out_json(&o)["message"].as_str().unwrap().starts_with("✓ accepted te_1"));
+        assert_eq!((mock.last().method.as_str(), mock.last().path()), ("POST", "/api/w/acme/time-entries/te_1/accept"));
+    }
+
+    // start, stop and status are the timer's own requests
+    let o = run.run(&["time", "start", "BUG-1", "--dry-run"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(out_json(&o)["request"]["url"].as_str().unwrap().rsplit('/').next(), Some("start"));
+    assert_eq!(code(&run.run(&["time", "stop", "--dry-run"])), 0);
+    assert_eq!(code(&run.run(&["time", "status", "--dry-run"])), 0);
+}
+
+#[test]
+fn the_short_verbs_are_listed_and_the_generated_decision_group_is_gone() {
+    let run = Run::new();
+    let o = run.run(&["commands", "-o", "json"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let listed = stdout(&o);
+    for verb in ["show", "ls", "link", "sub", "status", "sync", "decisions", "ask", "estimate", "time log", "time suggestions", "time accept"] {
+        assert!(listed.contains(&format!("\"command\":\"{verb}\"")), "{verb} is not listed:\n{listed}");
+    }
+    assert!(!listed.contains("decision list") && !listed.contains("estimate suggest"), "the generated groups stand aside");
+    for args in [["decisions", "--help"], ["sync", "--help"], ["time", "--help"]] {
+        assert_eq!(code(&run.run(&args)), 0);
+    }
+}

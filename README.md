@@ -75,7 +75,7 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 - **Task-first work.** Sub-tasks, comments and artifacts are available from the Task when needed.
 - **Humans and agents as actors.** Agents are first-class members with scoped tokens, usage caps and an auditable activity trail. Accountability stays with a human.
 - **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Link PRs and receive webhooks.
-- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->19 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
+- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->22 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
 - **Agent skills** that teach a coding agent how to pick up work, report progress and triage.
 - **Live updates** over SSE, a command palette, keyboard shortcuts, search, roles and API tokens with narrow scopes.
 - **Self-hosting first**: one PostgreSQL, three small images, no large infrastructure stack.

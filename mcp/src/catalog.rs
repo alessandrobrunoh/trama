@@ -454,7 +454,7 @@ mod tests {
     fn catalog_contains_only_issue_first_routes() {
         let tools = load().unwrap();
         let raw = TOOLS_JSON.to_ascii_lowercase();
-        for retired_term in ["workstream", "criterion", "dependency", "graph", "input-request", "decision", "customer", "/teams", "/repositories"] {
+        for retired_term in ["workstream", "criterion", "dependency", "graph", "input-request", "customer", "/teams", "/repositories"] {
             assert!(!raw.contains(retired_term), "raw catalog still contains {retired_term}");
         }
         assert!(!tools.iter().any(|tool| {
@@ -464,7 +464,6 @@ mod tests {
                 || tool.path.starts_with("/teams")
                 || tool.path.starts_with("/repositories")
                 || tool.path.starts_with("/customers")
-                || tool.path.starts_with("/decisions")
                 || tool.path.starts_with("/input-requests")
                 || tool.path.starts_with("/releases")
         }));

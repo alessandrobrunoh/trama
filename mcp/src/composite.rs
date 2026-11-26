@@ -24,6 +24,10 @@ pub const HANDLERS: &[&str] = &[
     "create_task",
     "start_work",
     "report_progress",
+    "link_thread",
+    "sync_thread",
+    "find_decisions",
+    "suggest_estimate",
     "attach_artifact",
     "add_comment",
     "triage_tasks",
@@ -284,6 +288,10 @@ fn issue_summary(v: &Value) -> Value {
     )
 }
 
+fn decision_summary(v: &Value) -> Value {
+    pick(v, &["id", "issueKey", "text", "paths", "threadUrl", "createdAt"])
+}
+
 // ───────────────────────────── resolving keys and ids ─────────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -414,6 +422,10 @@ pub async fn run(name: &str, args: &Value, ex: &Exec<'_>) -> Option<Res> {
         "create_task" => create_task(a, ex).await,
         "start_work" => start_work(a, ex).await,
         "report_progress" => report_progress(a, ex).await,
+        "link_thread" => link_thread(a, ex).await,
+        "sync_thread" => sync_thread(a, ex).await,
+        "find_decisions" => find_decisions(a, ex).await,
+        "suggest_estimate" => suggest_estimate(a, ex).await,
         "attach_artifact" => attach_artifact(a, ex).await,
         "add_comment" => add_comment(a, ex).await,
         "triage_tasks" => triage_tasks(a, ex).await,
@@ -490,6 +502,18 @@ async fn context_of(kind: Kind, id: &str, opts: ContextOpts, ex: &Exec<'_>) -> R
                 }
             };
             let mut out = json!({ "type": "issue", "issue": issue, "artifacts": artifacts });
+            // The decisions people and agents recorded on this task: read them before changing its files.
+            if ex.uses.iter().any(|u| u == "list_decisions") {
+                let task = if out["issue"]["issue"].is_object() { &out["issue"]["issue"] } else { &out["issue"] };
+                let task_ref = task["id"].as_str().unwrap_or(id).to_string();
+                match ex.call("list_decisions", json!({ "issue": task_ref })).await {
+                    Ok(v) => out["decisions"] = Value::Array(rows(&v).iter().map(decision_summary).collect()),
+                    // An API without decisions, or a key that cannot read them, is not a failure of the briefing.
+                    Err(StepError::Denied(_)) => {}
+                    Err(e) if e.not_found() => {}
+                    Err(e) => warnings.push(format!("decisions: {}", e.message())),
+                }
+            }
             if comments {
                 let subject_id = out["issue"]["id"].as_str().unwrap_or(id).to_string();
                 match ex.call("list_comments", json!({ "subjectType": "issue", "subjectId": subject_id })).await {
@@ -904,6 +928,140 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         out.insert("artifact".into(), artifact_out);
     }
     Ok(Outcome::with(Value::Object(out), !failed.is_empty()))
+}
+
+// ───────────────────────────── thread records ─────────────────────────────
+
+/// The refusal of a link: the task already works with another thread. It is an error result so the
+/// agent stops and asks; nothing was changed.
+fn already_linked(key: &str, current: Option<&str>, requested: Option<&str>, detail: Option<&str>) -> Outcome {
+    let message = match current {
+        Some(url) => format!("{key} already linked to {url}"),
+        None => detail.map(str::to_string).unwrap_or_else(|| format!("{key} already links another thread")),
+    };
+    let mut out = json!({
+        "linked": false,
+        "code": work::THREAD_ALREADY_LINKED,
+        "issue": key,
+        "message": message,
+        "hint": format!("A task has one thread. Ask the person; if they agree, create a subtask of {key} with create_task {{parentId, threadUrl}} and work there. Never replace the link."),
+    });
+    if let Some(url) = current {
+        out["threadUrl"] = json!(url);
+    }
+    if let Some(url) = requested {
+        out["requestedThreadUrl"] = json!(url);
+    }
+    Outcome::with(out, true)
+}
+
+/// Links the thread you work in to a task, unless the task already links a different one.
+async fn link_thread(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let reference = text(a, "issue").ok_or("issue is required")?;
+    let url = work::check_http_url("threadUrl", text(a, "threadUrl").ok_or("threadUrl is required")?)?;
+    let issue = resolve(ex, reference, Some(Kind::Issue), true).await?;
+    let key = issue.raw()["key"].as_str().unwrap_or(reference).to_string();
+    match issue.raw()["threadUrl"].as_str() {
+        Some(current) if current == url => {
+            return Ok(Outcome::ok(json!({ "linked": true, "alreadyLinked": true, "issue": key, "threadUrl": url })));
+        }
+        Some(current) => return Ok(already_linked(&key, Some(current), Some(&url), None)),
+        None => {}
+    }
+    match ex.call("update_task", json!({ "idOrKey": issue.id, "threadUrl": url })).await {
+        Ok(_) => Ok(Outcome::ok(json!({ "linked": true, "issue": key, "threadUrl": url }))),
+        // Somebody linked a thread between the read and the write.
+        Err(StepError::Api { status: Some(409), message }) => {
+            let current = ex.call("get_task", json!({ "idOrKey": issue.id })).await.ok().and_then(|t| t["threadUrl"].as_str().map(str::to_string));
+            Ok(already_linked(&key, current.as_deref(), Some(&url), Some(&message)))
+        }
+        Err(e) => Err(e.message()),
+    }
+}
+
+/// What `sync_thread` returns: the facts of the sync, not the whole record.
+fn sync_result(reference: &str, reply: &Value) -> Value {
+    let record = &reply["record"];
+    let artifact = if reply["artifact"].is_object() { pick(&reply["artifact"], &["id", "kind", "title", "state", "url"]) } else { Value::Null };
+    json!({
+        "synced": true,
+        "issue": reference,
+        "linked": reply["linked"].as_bool().unwrap_or(false),
+        "decisionsAdded": reply["decisionsAdded"].as_u64().unwrap_or(0),
+        "files": record["files"].as_array().map_or(0, Vec::len),
+        "syncCount": record["syncCount"],
+        "threadUrl": record["threadUrl"],
+        "artifact": artifact,
+        "timeSuggestion": reply["timeSuggestion"],
+        "note": "Time is only suggested: the person accepts it. The status stays theirs; do not change it.",
+    })
+}
+
+/// Updates the record of the task's thread: summary, decisions, files, PR and active time.
+async fn sync_thread(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let reference = text(a, "issue").ok_or("issue is required")?;
+    let strings = |v: Option<&Value>| -> Vec<String> { v.and_then(Value::as_array).map(|items| items.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default() };
+    let mut parts = work::SyncParts {
+        summary: text(a, "summary").map(str::to_string),
+        files: strings(a.get("files")),
+        pull_request_url: text(a, "pullRequestUrl").map(str::to_string),
+        active_minutes: a.get("activeMinutes").and_then(Value::as_i64),
+        turns: a.get("turns").and_then(Value::as_i64),
+        thread_url: text(a, "threadUrl").map(str::to_string),
+        ..work::SyncParts::default()
+    };
+    for item in a.get("decisions").and_then(Value::as_array).into_iter().flatten() {
+        let decision = item.as_object().ok_or("each decision is an object {text, paths?}")?;
+        let said = text(decision, "text").ok_or("a decision needs its text")?;
+        parts.decisions.push((said.to_string(), strings(decision.get("paths"))));
+    }
+    let mut body = work::sync_body(&parts)?;
+    body["idOrKey"] = json!(reference);
+    match ex.call("sync_thread", body).await {
+        Ok(reply) => Ok(Outcome::ok(sync_result(reference, &reply))),
+        Err(StepError::Api { status: Some(409), message }) => {
+            let known = message.contains("already") || message.contains(work::THREAD_ALREADY_LINKED);
+            if known { Ok(already_linked(reference, None, parts.thread_url.as_deref(), Some(&message))) } else { Err(message) }
+        }
+        Err(e) => Err(e.message()),
+    }
+}
+
+/// Decisions recorded on tasks, newest first: by file path (equal, a directory prefix, or a glob match) or task.
+async fn find_decisions(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let mut q = Map::new();
+    let path = text(a, "path");
+    if let Some(p) = path {
+        q.insert("path".into(), json!(p.trim_start_matches("./")));
+    }
+    if let Some(i) = text(a, "issue") {
+        q.insert("issue".into(), json!(i));
+    }
+    if let Some(n) = a.get("limit").and_then(Value::as_u64) {
+        q.insert("limit".into(), json!(n.clamp(1, 200)));
+    }
+    let reply = ex.call("list_decisions", Value::Object(q)).await.map_err(|e| e.message())?;
+    let list: Vec<Value> = rows(&reply).iter().map(decision_summary).collect();
+    let mut out = json!({ "count": list.len(), "decisions": list });
+    if out["count"] == 0 {
+        out["hint"] = json!(if path.is_some() { "no recorded decision covers this path" } else { "no recorded decision" });
+    } else {
+        out["hint"] = json!("Follow them unless the person says otherwise; if one is wrong, tell the person instead of working around it.");
+    }
+    Ok(Outcome::ok(out))
+}
+
+/// Points suggested from similar finished tasks. A suggestion only: people decide the estimate.
+async fn suggest_estimate(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let reference = text(a, "issue").ok_or("issue is required")?;
+    let reply = ex.call("suggest_estimate", json!({ "idOrKey": reference })).await.map_err(|e| e.message())?;
+    let mut out = if reply.is_object() { reply } else { json!({ "result": reply }) };
+    out["hint"] = json!(if out["suggestion"].is_number() {
+        "A suggestion only: tell the person. Set it with update_task {idOrKey, estimate} only if they agree."
+    } else {
+        "Too little history to suggest a size: leave the estimate to the person."
+    });
+    Ok(Outcome::ok(out))
 }
 
 // ───────────────────────────── add_comment ─────────────────────────────

@@ -1,7 +1,7 @@
 # trama-mcp
 
 MCP server for Trama, written in Rust. It exposes the REST API to any MCP client (Claude, Cursor, VS Code, or the
-in-app Assistant) with <!-- mcp-tools-count:start -->19 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
+in-app Assistant) with <!-- mcp-tools-count:start -->22 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
 
 **It holds no data and no secrets.** Each client connects with its own API key
 (Settings → API tokens → *Custom*). The server forwards that key to the API, which remains the only authority:
@@ -71,6 +71,10 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | `update_task` | Change a task's status, priority, assignee, labels, parent, duplicate marker… |
 | `start_work` | Pick up a task: context, safety checks, marks the start |
 | `report_progress` | Record artifacts, task status and a comment |
+| `link_thread` | Link the thread you work in to a task (one thread per task) |
+| `sync_thread` | Update the task's thread record: summary, decisions, files, PR, active minutes |
+| `find_decisions` | Past decisions, by file path or task: read them before touching a file |
+| `suggest_estimate` | Suggest points from similar finished tasks; you never set the estimate |
 | `track_time` | Your timer: start or stop it on a task, see what runs, list, add or delete entries |
 | `attach_artifact` | Attach or update a PR, build or link on a task |
 | `add_comment` | Comment on any object by key or id |
@@ -81,8 +85,8 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 <!-- mcp-tools-table:end -->
 
 `list_accounts` is added when several keys are connected. The composite tools (`get_context`, `find_work`, `list_projects`,
-`start_work`, `report_progress`, `track_time`, `attach_artifact`, `add_comment`, `triage_tasks`,
-`create_task`) orchestrate several API calls with the caller's own key, check each step's permission and validate every
+`start_work`, `report_progress`, `link_thread`, `sync_thread`, `find_decisions`, `suggest_estimate`, `track_time`,
+`attach_artifact`, `add_comment`, `triage_tasks`, `create_task`) orchestrate several API calls with the caller's own key, check each step's permission and validate every
 argument, so they can do nothing a plain tool could not. A tool whose permissions the key lacks is hidden.
 
 What the task-level tools cover beyond plain CRUD:
@@ -100,6 +104,18 @@ What the task-level tools cover beyond plain CRUD:
 - **`list_projects {repository}`** matches the repository string itself (owner/name or URL, any spelling of the same
   repository), because the API does not filter by it. Project `health` is not exposed in any schema: it duplicates the
   project status (the API still stores it).
+
+- **Thread records** (the `/trama` flow, same behaviour as the `trama show|link|sync|decisions|estimate` CLI verbs).
+  A task links **one** thread. `link_thread {issue, threadUrl}` sets it (idempotent for the same URL); when the task
+  already links a different one it answers an error with `code: "thread_already_linked"`, the `threadUrl` it has and the
+  advice to ask the person and continue on a new subtask (`create_task {parentId, threadUrl}`), and it never replaces it.
+  `sync_thread {issue, summary?, decisions?, files?, pullRequestUrl?, activeMinutes?, turns?, threadUrl?}` sends what a
+  thread did in one request: the summary replaces the last one, decisions append (`{text, paths?}` where a path is a file,
+  a directory like `src/auth/` or a glob like `src/auth/*`), files merge, the PR is attached to the task and
+  `activeMinutes` becomes a *suggested* time entry a person accepts (`trama time accept`). It never changes the task
+  status. `find_decisions {path?, issue?, limit?}` lists past decisions, newest first; call it before editing a file.
+  `suggest_estimate {issue}` reads the points suggested from similar finished tasks and writes nothing. `get_context`
+  also returns the task's `decisions`.
 
 `track_time` calls routes outside the API permission catalog, so it is a composite with its own
 code (`src/composite.rs`, request building in `src/work.rs`) rather than a `tools.json` entry; the `full` profile, which is

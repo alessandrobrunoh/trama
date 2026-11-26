@@ -79,10 +79,10 @@ pub async fn run(label: &str, call: &Call, accept: &str, ctx: &Ctx) -> Result<()
     run_across(&targets, call, accept, ctx).await
 }
 
-/// Sends one request to the single workspace the flags select and returns the JSON reply (`null` when
-/// it has no body), for commands that read or combine several routes. A request that matched more than
-/// one profile is refused: such a command works on one workspace at a time.
-pub async fn fetch(call: &Call, ctx: &Ctx) -> Result<Value> {
+/// Sends one request to the single workspace the flags select and returns the reply whatever its status,
+/// so a command can read the body of an error (a 409 that names the current thread). A request that
+/// matched more than one profile is refused: such a command works on one workspace at a time.
+pub async fn send(call: &Call, ctx: &Ctx) -> Result<crate::http::Reply> {
     let mut targets = config::resolve_many(&ctx.ov)?;
     if targets.len() > 1 {
         let where_: Vec<String> = targets
@@ -95,10 +95,13 @@ pub async fn fetch(call: &Call, ctx: &Ctx) -> Result<Value> {
     let creds = targets.pop().ok_or_else(CliError::not_logged_in)?;
     let api = Api::new(&creds.url, ctx.timeout)?;
     let slug = auth::workspace_slug(&api, &creds).await?;
-    let reply = api
-        .workspace(&creds.token, &slug, call, crate::http::ACCEPT_JSON)
-        .await?
-        .into_result()?;
+    api.workspace(&creds.token, &slug, call, crate::http::ACCEPT_JSON).await
+}
+
+/// Sends one request to the single workspace the flags select and returns the JSON reply (`null` when
+/// it has no body), for commands that read or combine several routes.
+pub async fn fetch(call: &Call, ctx: &Ctx) -> Result<Value> {
+    let reply = send(call, ctx).await?.into_result()?;
     if reply.body.trim().is_empty() {
         return Ok(Value::Null);
     }
