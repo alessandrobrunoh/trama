@@ -15,7 +15,10 @@ status codes, bodies and side effects.
   `service.rs` (database work, callable from other crates). Split further when a file grows.
 - Handlers are private `async fn`s annotated with `#[utoipa::path(...)]` (full path including
   `/api`, a `tag` named after the crate, every response status).
-- Do **not** edit `src/lib.rs` or `src/openapi.rs`; the integration step wires routers in.
+- Wire your crate in yourself: merge its `router()` in `app()` in `src/lib.rs`, add its
+  `ApiDoc` to `api_doc()` in `src/openapi.rs` (and a tag there), and add it to the root
+  package's `[dependencies]`. Keep those lists sorted by crate name so parallel merges conflict
+  only on adjacent lines.
 - External dependencies come from `[workspace.dependencies]`; add new ones there.
 
 ## Wire format
@@ -31,11 +34,54 @@ status codes, bodies and side effects.
 ## Input
 
 - JSON bodies: `trama_core::ApiJson<T>` (object only, NUL and list-size checks, unknown fields
-  dropped). Value rules: `trama_core::validation::Checks` with the same rules as the DTO's
-  class-validator decorators. `@Clearable()` fields: `#[serde(default)] Patch<T>`.
-- Query strings: `axum::extract::Query` with a typed struct.
+  dropped, 413 `request entity too large` past 2 MB). Value rules:
+  `trama_core::validation::Checks` with the same rules as the DTO's class-validator decorators.
+  `@Clearable()` / `@OptionalNotNull()` fields: `#[serde(default)] Patch<T>`. `@IsThreadUrl()`:
+  `trama_common::validation::thread_url`.
+- Query strings: `axum::extract::Query` with a typed struct. A `%00` anywhere in the path or
+  query is already refused with 400 by the HTTP layers (`RejectUnsafeInputPipe`).
 - Error messages: the `AppError` constructors with the NestJS wording
   (`AppError::entity_not_found("Issue", key)` for `notFound(...)`).
+
+## Configuration
+
+Never read `std::env` in a module. Every variable NestJS reads is a field of
+`trama_core::Config` (`state.config`), parsed with the NestJS defaults and quirks: `mail`,
+`ai`, `grok`, `push` (VAPID), `rate_limit`, `outbound`, `encryption`, `seed`, `public_views`,
+`app_url`, `public_url`, `mcp_url`, `trust_proxy`, `demo_login`, `admin_reset_enabled`,
+`import_runner_enabled`, `sse_recheck_ms`, `webhook_retry_ms`, `production`. A variable NestJS
+reads that is missing there belongs in `crates/core/src/config.rs` and `.env.example`.
+
+In tests build configuration with `Config::from_vars(&[("NODE_ENV", "production")])`, not by
+overriding single fields (derived values such as `outbound.require_https` would not follow).
+
+## Platform services (`trama-common`)
+
+Use these instead of writing your own; the crate docs list them all.
+
+| Need | Use |
+| --- | --- |
+| Encrypt / decrypt integration credentials (`SecretsService`) | `Secrets::of(&state)?` then `.encrypt(plain, aad)` / `.decrypt(payload, aad)` (`v2`) |
+| `encryptSecret` / `decryptSecret` / `sha256` | `Secrets::encrypt_secret` / `decrypt_secret`, `crypto::sha256_hex` |
+| `SecretsService.generateWebhookSecret()` | `crypto::generate_webhook_secret()` |
+| `safeRequest` | `SafeRequest::post(url).header(..).body(..).timeout(..).send(&state.config.outbound).await` |
+| `outboundUrlProblem` | `safe_fetch::outbound_url_problem(url, &state.config.outbound).await` |
+| `createSafeHttpsAgent` (Web Push) | `safe_fetch::guarded_client(&policy, Arc::new(SystemResolver))` |
+| `MailService.send` / `.enabled` | `Mailer::of(&state).send(Mail { to, subject, text, html }).await` / `.enabled()` |
+| `appUrl()` | `state.config.app_url` (`trama_common::app_url`) |
+| `IntegrationsService.publicUrl(req)` | `proxy::public_base_url(&state.config, Some(&parts))` |
+| `req.ip` | the `proxy::ClientIp` extractor, or `proxy::client_ip(..)` |
+| `requestStore.getStore()?.clientId` | `trama_common::client_id()`; read it before `tokio::spawn` and pass it on, or wrap the task in `request_context::scope` |
+| `CountersService.next/nextAbove/bumpTo` | `counters::next(&txn, ws, name)`, `next_above`, `bump_to` (pass the transaction) |
+| `RefsService.projects/issues/users/resolveSubject` | `refs::projects(&db, ws, &ids)`, `issues`, `users`, `subject_exists` |
+| `slugify`, `unique`, `isUniqueViolation` | `util::slugify`, `util::unique`, `util::is_unique_violation(&db_err)` |
+
+Process-wide services are registered on `AppState` at startup
+(`trama_common::with_platform_services`) and looked up by type with `state.extension::<T>()`;
+a crate that needs another process-wide service (a broadcast bus, a cache) registers it the
+same way in `run()` rather than adding a field to `AppState`. In tests register fakes with
+`AppState::new(db, config).with_extension(Mailer::capture(&config))` and read
+`mailer.sent()`.
 
 ## Auth, permissions and events
 
