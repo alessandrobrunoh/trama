@@ -61,8 +61,9 @@ async fn rate_limited_answers_carry_cors_and_security_headers() {
             .body(Body::empty())
             .unwrap()
     };
-    // no auth module here: the first login is a 404, the second is refused before routing
-    assert_eq!(send(app.clone(), login()).await.0, StatusCode::NOT_FOUND);
+    // the first login reaches the handler (an empty body is a 400), the second is refused
+    // before routing
+    assert_eq!(send(app.clone(), login()).await.0, StatusCode::BAD_REQUEST);
     let (status, headers, body) = send(app, login()).await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
     assert!(headers.contains_key(header::RETRY_AFTER));

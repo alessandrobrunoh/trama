@@ -11,14 +11,18 @@ use utoipa::openapi::OpenApi as Document;
         description = "Tasks, projects and Delta thread records.",
         license(name = "PolyForm Shield 1.0.0", identifier = "PolyForm-Shield-1.0.0"),
     ),
-    tags((name = "system", description = "Health and operations")),
+    tags(
+        (name = "auth", description = "Sign-up, sessions and API token introspection"),
+        (name = "system", description = "Health and operations"),
+    ),
 )]
 pub(crate) struct ApiDoc;
 
-/// The full document. Add each new module crate's `ApiDoc` here.
+/// The full document. Add each new module crate's `ApiDoc` here, sorted by crate name.
 #[must_use]
 pub fn api_doc() -> Document {
     let mut doc = ApiDoc::openapi();
+    doc.merge(trama_auth::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
     doc
 }

@@ -1,10 +1,10 @@
 //! Routes of the system module, mounted under `/api`.
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::routing::get;
-use axum::{Json, Router};
 use sea_orm::ConnectionTrait;
+use trama_auth::{Gate, Routes};
 use trama_core::time::now_iso;
 use trama_core::{AppError, AppState};
 use utoipa::OpenApi;
@@ -16,9 +16,13 @@ use crate::schemas::{HealthDown, HealthUp, PublicConfig};
 #[openapi(paths(health, public_config), components(schemas(HealthUp, HealthDown, PublicConfig)))]
 pub struct ApiDoc;
 
-/// Routes of this module.
-pub fn router() -> Router<AppState> {
-    Router::new().route("/health", get(health)).route("/config", get(public_config))
+/// Routes of this module; both are public.
+pub fn router() -> Routes {
+    Routes::new().get("/health", Gate::public(), health).get(
+        "/config",
+        Gate::public(),
+        public_config,
+    )
 }
 
 /// Unauthenticated settings the sign-in page needs before a session exists. Public.
@@ -70,8 +74,8 @@ mod tests {
 
     async fn get_health(state: AppState) -> (StatusCode, Value) {
         let res = router()
-            .with_state(state)
-            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .into_app(state)
+            .oneshot(Request::get("/api/health").body(Body::empty()).unwrap())
             .await
             .unwrap();
         let status = res.status();
@@ -98,8 +102,8 @@ mod tests {
     async fn get_config(vars: &[(&str, &str)]) -> Value {
         let state = AppState::new(sea_orm::DatabaseConnection::default(), Config::from_vars(vars));
         let res = router()
-            .with_state(state)
-            .oneshot(Request::get("/config").body(Body::empty()).unwrap())
+            .into_app(state)
+            .oneshot(Request::get("/api/config").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);

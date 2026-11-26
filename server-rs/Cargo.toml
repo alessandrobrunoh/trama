@@ -13,6 +13,8 @@ publish = false
 
 [workspace.dependencies]
 aes-gcm = "0.10.3"
+# Password hashes: argon2id, the PHC strings the NestJS `argon2` package writes.
+argon2 = { version = "0.5.3", features = ["std"] }
 axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -42,6 +44,7 @@ url = "2"
 utoipa = { version = "6", features = ["chrono"] }
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 
+trama-auth = { path = "crates/auth" }
 trama-common = { path = "crates/common" }
 trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
@@ -64,6 +67,14 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
+# argon2 at 64 MiB × 3 passes takes seconds unoptimized; keep sign-up and login usable in dev
+# builds and tests.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 [package]
 name = "trama-api"
 description = "Trama API server: composes the module crates into one Axum application."
@@ -82,6 +93,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
 utoipa-scalar.workspace = true
+trama-auth.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
 trama-migration.workspace = true

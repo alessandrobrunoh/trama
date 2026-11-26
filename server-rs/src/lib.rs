@@ -9,6 +9,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::http::{Method, Uri};
 use sea_orm_migration::MigratorTrait;
+use trama_auth::Routes;
 use trama_core::{AppError, AppState, Config};
 use utoipa_scalar::{Scalar, Servable};
 
@@ -16,12 +17,18 @@ mod openapi;
 
 pub use openapi::api_doc;
 
+/// Every module's routes, each behind its `trama_auth::Gate`. Keep sorted by crate name.
+fn routes() -> Routes {
+    Routes::new().merge(trama_auth::router()).merge(trama_system::router())
+}
+
 /// The whole application over `state`.
 ///
-/// Outside production the OpenAPI document is served at `/api/openapi.json` and a Scalar
-/// reference at `/api/docs`.
+/// Every module route sits behind the access guard (`trama_auth::guard`). Outside production
+/// the OpenAPI document is served at `/api/openapi.json` and a Scalar reference at `/api/docs`;
+/// they are merged after the guard, so they stay public.
 pub fn app(state: AppState) -> Router {
-    let mut api: Router<AppState> = Router::new().merge(trama_system::router());
+    let mut api: Router<AppState> = routes().into_router(&state);
     if !state.config.production {
         let doc = api_doc();
         api = api.merge(Scalar::with_url("/docs", doc.clone())).route(
