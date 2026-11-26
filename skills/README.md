@@ -6,11 +6,11 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 
 | Skill | Use it when |
 |---|---|
-| [`trama`](trama/SKILL.md) | Always first: concepts, ground rules, tool map, and the tasks of this checkout |
+| [`trama`](trama/SKILL.md) | The `/trama TRM-123` entry point: the 7-step flow (show, link, in progress, sync, PR, decisions, time), concepts and ground rules |
 | [`trama-project-context`](trama-project-context/SKILL.md) | First use in a repository: create or refresh `.trama` and scope future task lookups |
 | [`trama-workflow`](trama-workflow/SKILL.md) | Task-first work across one or more tasks |
-| [`trama-start-work`](trama-start-work/SKILL.md) | Reading context and starting implementation |
-| [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording factual progress and artifacts on tasks |
+| [`trama-start-work`](trama-start-work/SKILL.md) | Reading context and decisions, linking the thread, starting implementation |
+| [`trama-report-progress`](trama-report-progress/SKILL.md) | Syncing the thread record (summary, files, decisions, PR, suggested time) |
 | [`trama-triage-tasks`](trama-triage-tasks/SKILL.md) | Filing, finding, and triaging tasks |
 | [`trama-cli`](trama-cli/SKILL.md) | The same work through the `trama` shell command, when MCP is unavailable (`trama skill install` installs it) |
 
@@ -25,8 +25,18 @@ mkdir -p ~/.claude/skills && cp -R skills/trama* ~/.claude/skills/
 ```
 
 Or for one repository: copy them to `<repo>/.claude/skills/`. Other agents: put the folders wherever that
-agent loads skills from. If you installed an earlier version, delete the old `trama-triage-issues` and
-`trama-ask-and-decide` folders: they were replaced by `trama-triage-tasks` and removed.
+agent loads skills from. If you installed an earlier version, delete the old `trama-ask-and-decide` and
+`trama-triage-issues` folders: `trama-triage-tasks` replaced the second, and the first was removed (decisions
+now live in the thread record: `trama decisions` and `trama ask`).
+
+## How agents use them
+
+Invoke `/trama TRM-128` (or name a task key). The agent reads the task and its past decisions, links its thread
+(one thread per task; if it is taken, it asks and creates a linked subtask), sets the task in progress, syncs the
+record after every turn that edits files, attaches the PR with `sync --pr`, and checks `decisions --path` before
+touching a file. Active time arrives as a suggestion a person accepts. **People own the status**: the agent only
+ever sets in progress, never in review or done. The current thread is `DELTA_THREAD_URL`; when it is unset the
+agent asks for the link.
 
 Connect the MCP server too (the skills assume its tools exist). Use the deployed tool catalog and `list_capabilities` + `run_tool` to discover the current operations and exact arguments; see [Tool profiles](../mcp/README.md#tool-profiles):
 
@@ -37,7 +47,7 @@ claude mcp add --transport http trama https://<your-trama-host>/mcp \
 ```
 
 Create the key in Trama under Settings → API tokens. Give agents the narrowest permissions that do the job
-(see `trama-report-progress` for what it writes), and keep the default usage caps. One key is bound to one
+(see `trama-report-progress` for what it writes: task updates, thread syncs, artifacts and comments), and keep the default usage caps. One key is bound to one
 workspace. To cover more, connect several keys (comma-separated bearer, or `trama mcp` after `trama account add`).
 Reads then span every connected workspace; writes still need exactly one (`workspace` on MCP, `--workspace` on the CLI).
 
