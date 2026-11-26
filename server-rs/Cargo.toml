@@ -12,13 +12,21 @@ rust-version = "1.88"
 publish = false
 
 [workspace.dependencies]
+aes-gcm = "0.10.3"
 axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 dotenvy = "0.15"
+hex = "0.4"
 http-body-util = "0.1"
+indexmap = "2"
+lettre = { version = "0.11.24", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1-rustls-tls"] }
 percent-encoding = "2"
 rand = "0.9"
+# Outgoing HTTP. Requests to user-chosen URLs go through trama_common::safe_fetch.
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+sha2 = "0.11"
+unicode-normalization = "0.1"
 sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-json", "with-chrono"] }
 sea-orm-migration = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -33,6 +41,7 @@ url = "2"
 utoipa = { version = "6", features = ["chrono"] }
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 
+trama-common = { path = "crates/common" }
 trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-migration = { path = "crates/migration" }
@@ -71,6 +80,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
 utoipa-scalar.workspace = true
+trama-common.workspace = true
 trama-core.workspace = true
 trama-migration.workspace = true
 trama-system.workspace = true

@@ -31,6 +31,7 @@ pub fn app(state: AppState) -> Router {
     }
     let config = Arc::clone(&state.config);
     let router = Router::new().nest("/api", api).fallback(not_found).with_state(state);
+    let router = trama_common::with_platform_layers(router, &config);
     trama_core::http::with_http_layers(router, &config)
 }
 
@@ -47,16 +48,21 @@ async fn not_found(method: Method, uri: Uri) -> AppError {
 /// migrated, or the port cannot be bound.
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
+    // refuse to start without an encryption key in production, before touching the database
+    trama_common::Secrets::from_config(&config)?;
 
     trama_core::db::ensure_database(&config.database_url).await;
     let db = trama_core::db::connect(&config.database_url).await?;
     trama_migration::Migrator::up(&db, None).await?;
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
+    let port = config.port;
+    let state = trama_common::with_platform_services(AppState::new(db.clone(), config))?;
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!("Trama API listening on http://localhost:{}/api", config.port);
+    tracing::info!("Trama API listening on http://localhost:{port}/api");
 
-    axum::serve(listener, app(AppState::new(db.clone(), config)))
+    // the socket address feeds the rate limiter and `TRAMA_TRUST_PROXY`
+    axum::serve(listener, app(state).into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     db.close().await?;
