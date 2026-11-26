@@ -991,6 +991,104 @@ export function isThreadUrl(value: unknown): value is string {
   }
 }
 
+// ───────────────────────────── Thread records (/trama skill) ─────────────────────────────
+// One task links at most one Delta thread (`Issue.threadUrl`). The agent working in that thread keeps a read-only
+// record of it in Trama with `trama sync`: a summary, the files it touched, the decisions it made and, optionally,
+// the PR it opened and the active time it suggests. Decisions outlive the record: `trama decisions --path` reads
+// them back before an agent touches a file.
+
+/** Error code of the 409 returned when a task already links a different thread. */
+export const THREAD_ALREADY_LINKED = 'thread_already_linked';
+/** Longest `ThreadRecord.summary`, in characters. */
+export const THREAD_SUMMARY_MAX = 4000;
+/** Most files one record keeps (newest sync wins). */
+export const THREAD_FILES_MAX = 500;
+/** Longest file path, in characters. */
+export const THREAD_PATH_MAX = 512;
+/** Longest `ThreadDecision.text`, in characters. */
+export const DECISION_TEXT_MAX = 1000;
+/** Most decisions one sync may add. */
+export const DECISIONS_PER_SYNC_MAX = 20;
+/** Most paths one decision may name. */
+export const DECISION_PATHS_MAX = 50;
+/** Most active minutes one sync may suggest (a working day). */
+export const THREAD_SUGGESTED_MINUTES_MAX = 720;
+
+/** A decision an agent recorded while working on a task, scoped to the files (or path prefixes / globs) it concerns. */
+export interface ThreadDecision {
+  id: string;
+  issueId: string;
+  /** Task key (`TRM-128`), for display. */
+  issueKey: string;
+  text: string;
+  /** Repository paths, path prefixes (`src/auth/`) or globs (`src/auth/*`). Empty = applies to the whole task. */
+  paths: string[];
+  /** Thread the decision came from, when the task had one linked. */
+  threadUrl: string | null;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+}
+
+/** The read-only record of the thread linked to a task, as last synced by the agent. */
+export interface ThreadRecord {
+  issueId: string;
+  threadUrl: string | null;
+  /** Latest summary sent by `trama sync` (replaces the previous one). */
+  summary: string | null;
+  /** Files touched in the thread, deduplicated, newest sync first. */
+  files: string[];
+  /** Turns of the thread so far, when the agent reports it. */
+  turns: number | null;
+  /** Number of syncs received. */
+  syncCount: number;
+  lastSyncAt: ISODate;
+  lastSyncBy: ActorRef;
+  /** Decisions of this task, oldest first. */
+  decisions: ThreadDecision[];
+}
+
+/** Body of `POST /w/:slug/tasks/:idOrKey/thread/sync`. Every field is optional; send what changed. */
+export interface ThreadSyncInput {
+  /** Links this thread when the task has none; 409 `thread_already_linked` when it links a different one. */
+  threadUrl?: string;
+  summary?: string;
+  /** Decisions made since the last sync (appended, never replaced). */
+  decisions?: { text: string; paths?: string[] }[];
+  /** Files touched since the last sync (merged into the record). */
+  files?: string[];
+  /** A PR / MR the thread opened: attached (or refreshed) as a `pull_request` artifact of the task. */
+  pullRequestUrl?: string;
+  /** Active minutes in the thread since the last sync: stored as a *suggested* time entry a person accepts. */
+  activeMinutes?: number;
+  turns?: number;
+}
+
+export interface ThreadSyncResult {
+  record: ThreadRecord;
+  decisionsAdded: number;
+  /** True when this sync linked `threadUrl` to the task. */
+  linked: boolean;
+  /** The artifact created or refreshed from `pullRequestUrl`. */
+  artifact: Artifact | null;
+  /** The suggested time entry created from `activeMinutes`; null when none was sent or nobody can own it. */
+  timeSuggestion: { id: string; userId: string; minutes: number } | null;
+}
+
+/** `GET /w/:slug/tasks/:idOrKey/estimate-suggestion`: points suggested from similar finished tasks. People decide. */
+export interface EstimateSuggestion {
+  issueId: string;
+  /** A value of the workspace estimate scale, or null when there is too little history. */
+  suggestion: number | null;
+  scale: number[];
+  /** The finished tasks the suggestion is based on, most similar first (at most 5). */
+  basis: { id: string; key: string; title: string; estimate: number; trackedMinutes: number | null }[];
+  /** One sentence on how the suggestion was made, for the agent to relay. */
+  reason: string;
+}
+
+/** Where a time entry came from. `suggested` entries come from `trama sync` and do not count until a person accepts them. */
+export type TimeEntrySource = 'timer' | 'manual' | 'suggested';
+
 // ───────────────────────────── Artifacts ─────────────────────────────
 
 export type ArtifactKind =
