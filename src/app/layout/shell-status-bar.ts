@@ -20,6 +20,8 @@ const PROVIDER_LABEL: Record<string, string> = {
   github: 'GitHub',
   gitlab: 'GitLab',
   bitbucket: 'Bitbucket',
+  jira: 'Jira',
+  linear: 'Linear',
   delta: 'Delta',
 };
 
@@ -61,8 +63,10 @@ const PROVIDER_LABEL: Record<string, string> = {
         <kbd class="bg-secondary text-muted-foreground px-1 font-mono text-[10px]">{{ askKeys }}</kbd>
       </button>
     }
-    <button type="button" class="hover:text-muted-foreground shrink-0 whitespace-pre max-lg:hidden" (click)="ui.openModal('shortcuts')">? shortcuts</button>
-    <button type="button" class="hover:text-muted-foreground -ms-1 shrink-0 max-lg:hidden" (click)="ui.openCommandPalette()">⌘K command</button>
+    <span class="flex shrink-0 gap-[19px] max-lg:hidden">
+      <button type="button" class="hover:text-muted-foreground whitespace-pre" (click)="ui.openModal('shortcuts')">? shortcuts</button>
+      <button type="button" class="hover:text-muted-foreground whitespace-pre" (click)="ui.openCommandPalette()">{{ commandKeys }} command</button>
+    </span>
     @if (timers.running(); as run) {
       <span class="border-red/40 bg-red/12 flex shrink-0 items-center gap-2 border py-0.5 ps-2 pe-1">
         <span class="bg-red size-1.5" aria-hidden="true"></span>
@@ -93,6 +97,7 @@ export class ShellStatusBar {
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
       ? '⌘J'
       : 'Ctrl J';
+  protected readonly commandKeys = this.askKeys === '⌘J' ? '⌘K' : 'Ctrl K';
   protected readonly timers = inject(TimeEntriesStore);
   private readonly sync = inject(SyncStatus);
   protected readonly store = inject(TramaStore);
@@ -129,7 +134,7 @@ export class ShellStatusBar {
     if (this.sync.live() === 'reconnecting') return 'Reconnecting…';
     if (this.sync.lastError()) return 'Sync error';
     const last = this.lastAgentUse();
-    return last ? `Agent sync ${ago(last, this.now())}` : 'Agent not connected';
+    return last ? `Agent sync ${this.since(last)}` : 'Agent not connected';
   });
 
   /** "GitHub · GitLab synced 1m ago" from the connected integrations. */
@@ -142,8 +147,14 @@ export class ShellStatusBar {
       .filter((d): d is string => !!d)
       .sort()
       .pop();
-    return last ? `${names} synced ${ago(last, this.now())}` : names;
+    return last ? `${names} synced ${this.since(last)}` : names;
   });
+
+  /** "4m ago", or "just now". */
+  private since(iso: string): string {
+    const t = ago(iso, this.now());
+    return t === 'now' ? 'just now' : `${t} ago`;
+  }
 
   protected readonly runningKey = computed(() => {
     const id = this.timers.running()?.issueId;

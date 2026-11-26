@@ -1,8 +1,17 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import {
+  LucideCheck,
   LucideChevronRight,
   LucideDynamicIcon,
   LucideInbox,
@@ -19,6 +28,7 @@ import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport } from '../core/viewport';
+import { ago } from '../shared/ago';
 import { Kbd } from '../shared/kbd';
 import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 import { PageChrome, type Crumb } from './page-chrome';
@@ -90,41 +100,35 @@ import { PageChrome, type Crumb } from './page-chrome';
         </div>
       }
 
-      <!-- v3: "acme / Web app / TRM-128 / Title": parents in faint mono, the page in sans -->
-      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center">
-        <ol class="flex min-w-0 items-center gap-1.5">
-          <li class="flex shrink-0 items-center gap-1.5">
-            <a
-              [routerLink]="['/', slug(), 'overview']"
-              class="text-faint hover:text-foreground font-mono text-[11.5px] transition-colors"
-              >{{ slug() }}</a
-            >
-            <span class="text-faint font-mono text-[11.5px]" aria-hidden="true">/</span>
-          </li>
-          @for (c of crumbs(); track $index; let last = $last) {
-            <li class="flex min-w-0 items-center gap-1.5" [class.shrink-0]="!last">
-              @if (c.link && !last) {
-                <a
-                  [routerLink]="c.link"
-                  class="text-faint hover:text-foreground truncate font-mono text-[11.5px] transition-colors"
-                  >{{ c.label }}</a
-                >
-              } @else if (last) {
-                <span
-                  class="text-foreground truncate text-[13px]"
-                  [class.font-mono]="c.mono"
-                  aria-current="page"
-                  >{{ c.label }}</span
-                >
-              } @else {
-                <span class="text-faint truncate font-mono text-[11.5px]">{{ c.label }}</span>
-              }
-              @if (!last) {
+      <!-- "acme / Web app / TRM-128 /" in faint mono, then the page in sans (10px between the two).
+           Settings starts at "Settings /": the workspace slug is left out there. -->
+      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-2.5">
+        @if (parents().length) {
+          <ol class="flex shrink-0 items-center gap-[7px]">
+            @for (c of parents(); track $index) {
+              <li class="flex shrink-0 items-center gap-[7px]">
+                @if (c.link) {
+                  <a
+                    [routerLink]="c.link"
+                    class="text-faint hover:text-foreground font-mono text-[11.5px] transition-colors"
+                    >{{ c.label }}</a
+                  >
+                } @else {
+                  <span class="text-faint font-mono text-[11.5px]">{{ c.label }}</span>
+                }
                 <span class="text-faint font-mono text-[11.5px]" aria-hidden="true">/</span>
-              }
-            </li>
-          }
-        </ol>
+              </li>
+            }
+          </ol>
+        }
+        @if (page(); as p) {
+          <span
+            class="text-foreground min-w-0 truncate text-[13px]"
+            [class.font-mono]="p.mono"
+            aria-current="page"
+            >{{ p.label }}</span
+          >
+        }
       </nav>
 
 
@@ -140,6 +144,15 @@ import { PageChrome, type Crumb } from './page-chrome';
       <div class="top-bar__actions flex shrink-0 items-center gap-2 empty:hidden">
         @if (chrome.actions(); as tpl) {
           <ng-container *ngTemplateOutlet="tpl" />
+        } @else if (inSettings()) {
+          <!-- settings save as you type: Filter and New task do not apply there -->
+          <span
+            class="text-muted-foreground flex items-center gap-1.5 font-mono text-[10.5px]"
+            role="status"
+          >
+            <svg [lucideIcon]="checkIcon" [size]="12" class="shrink-0" aria-hidden="true"></svg>
+            {{ savedLabel() }}
+          </span>
         } @else {
           <!-- v3 default header actions: Filter (F) · New task (C) -->
           <button hlmBtn variant="outline" (click)="ui.openModal('search')">
@@ -165,6 +178,18 @@ export class TopBar {
   private readonly favorites = inject(FavoritesStore);
   private readonly notifications = inject(NotificationsStore);
 
+  constructor() {
+    let wasBusy = false;
+    effect(() => {
+      const busy = this.sync.pendingWrites() > 0;
+      if (wasBusy && !busy && !this.sync.lastError()) this.lastSaved.set(Date.now());
+      wasBusy = busy;
+    });
+    const id = setInterval(() => this.tick.set(Date.now()), 30_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(id));
+  }
+
+  protected readonly checkIcon = LucideCheck;
   protected readonly sep = LucideChevronRight;
   protected readonly panelLeft = LucidePanelLeft;
   protected readonly search = LucideSearch;
@@ -192,6 +217,32 @@ export class TopBar {
     const d = this.chrome.crumbs() ? undefined : this.chrome.page()?.description;
     const labels = this.crumbs().map((c) => c.label.toLowerCase());
     return d && !labels.includes(d.toLowerCase()) ? d : undefined;
+  });
+
+  /** Settings pages: the trail is "Settings / General" and the right side shows the save state. */
+  protected readonly inSettings = computed(
+    () => this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1] === 'settings',
+  );
+  private readonly trail = computed<readonly Crumb[]>(() =>
+    this.inSettings()
+      ? this.crumbs()
+      : [{ label: this.slug(), link: ['/', this.slug(), 'overview'] }, ...this.crumbs()],
+  );
+  /** Everything before the page: shown as "acme / Web app /" in mono. */
+  protected readonly parents = computed(() => this.trail().slice(0, -1));
+  /** The page itself, in sans. */
+  protected readonly page = computed(() => this.trail().at(-1) ?? null);
+
+  /** "Saved · just now": the last time the queue of writes emptied without an error. */
+  private readonly lastSaved = signal<number | null>(null);
+  private readonly tick = signal(Date.now());
+  protected readonly savedLabel = computed(() => {
+    if (this.sync.pendingWrites() > 0) return 'Saving…';
+    if (this.sync.lastError()) return 'Not saved';
+    const at = this.lastSaved();
+    if (at === null) return 'Saved';
+    const t = ago(new Date(at).toISOString(), this.tick());
+    return `Saved · ${t === 'now' ? 'just now' : t + ' ago'}`;
   });
 
   protected readonly crumbs = computed<readonly Crumb[]>(() => {
