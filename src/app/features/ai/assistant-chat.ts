@@ -25,7 +25,6 @@ import { AssistantStore } from '../../core/ai/assistant.store';
 import {
   askAnswerMeta,
   askPlaceholder,
-  askStarters,
   type AskSourceIcon,
 } from '../../core/ai/ask-context';
 import { EntityRefs } from '../../shared/entity-ref';
@@ -67,21 +66,6 @@ export function timeAgo(time: number): string {
         @if (!ai.messages().length && !ai.busy()) {
           <div class="flex flex-col gap-2">
             <div class="text-faint font-mono text-[10.5px] uppercase">Ask about your records</div>
-            @if (ai.ready()) {
-              <ul class="border-border divide-border divide-y border" aria-label="Suggestions">
-                @for (prompt of starters(); track prompt) {
-                  <li>
-                    <button
-                      type="button"
-                      class="text-muted-foreground hover:bg-secondary hover:text-foreground w-full px-3 py-2 text-start text-[13px] outline-none focus-visible:underline"
-                      (click)="ai.draft.set(prompt); focusComposer()"
-                    >
-                      {{ prompt }}
-                    </button>
-                  </li>
-                }
-              </ul>
-            }
           </div>
         }
 
@@ -264,7 +248,6 @@ export class AssistantChat {
   protected readonly sendIcon = LucideCornerDownLeft;
   protected readonly stopIcon = LucideSquare;
   protected readonly placeholder = computed(() => askPlaceholder(this.ai.context()?.kind));
-  protected readonly starters = computed(() => askStarters(this.ai.context()?.kind));
   /** "Draft update" only makes sense about a task or a project. */
   protected readonly actionsOn = computed(() => {
     const kind = this.ai.context()?.kind;
