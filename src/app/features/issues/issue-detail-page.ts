@@ -200,7 +200,7 @@ import { TaskTimerPill } from './task-timer-pill';
             <!-- A subtask: where it belongs, and whether the parent has a thread of its own. -->
             @if (parent(); as p) {
               <div class="bg-card border-border flex min-w-0 items-center gap-2.5 border px-3.5 py-2.5">
-                <svg [lucideIcon]="parentIcon" [size]="13" class="text-faint shrink-0" aria-hidden="true"></svg>
+                <svg [lucideIcon]="parentIcon" [size]="14" class="text-faint shrink-0" aria-hidden="true"></svg>
                 <span class="text-faint shrink-0 font-mono text-[10px] leading-[12px] max-sm:hidden">SUBTASK OF</span>
                 <a
                   [routerLink]="['/', slug(), 'tasks', p.key]"

@@ -64,7 +64,7 @@ import { LabelChip, LabelChips } from './label-chip';
             @if (known().length === 0) {
               <span class="text-muted-foreground">{{ disabled() ? 'None' : placeholder() }}</span>
             } @else {
-              <app-label-chips [ids]="known()" [max]="8" />
+              <app-label-chips [ids]="known()" [max]="8" [variant]="chipLook()" />
             }
           </button>
         }
@@ -161,6 +161,8 @@ export class LabelPicker {
   readonly variant = input<'field' | 'chip'>('field');
   /** Extra classes for the field trigger (e.g. a shorter row in the task inspector). */
   readonly triggerClass = input('');
+  /** How the picked labels read in the `field` trigger (`hairline`: the task page's property column). */
+  readonly chipLook = input<'pill' | 'hairline'>('pill');
   readonly label = input('Labels');
   readonly placeholder = input('Add labels');
   readonly disabled = input(false);

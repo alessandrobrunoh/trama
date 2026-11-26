@@ -77,7 +77,7 @@ import {
         @if (expandable().length) {
           <button
             type="button"
-            class="text-faint hover:text-foreground focus-visible:ring-ring -my-1 inline-flex size-6 shrink-0 items-center justify-center outline-none focus-visible:ring-2"
+            class="text-faint hover:text-foreground focus-visible:ring-ring inline-flex size-[25px] shrink-0 items-center justify-center outline-none focus-visible:ring-2"
             [attr.aria-label]="allCollapsed() ? 'Expand all subtasks' : 'Collapse all subtasks'"
             [hlmTooltip]="allCollapsed() ? 'Expand all' : 'Collapse all'"
             (click)="toggleAll()"
@@ -90,7 +90,7 @@ import {
             hlmBtn
             type="button"
             variant="ghost"
-            class="-my-1"
+            class="h-[25px]"
             [attr.aria-pressed]="progressView()"
             hlmTooltip="Burn-up of the subtasks"
             (click)="progressView.set(!progressView())"
@@ -104,7 +104,7 @@ import {
             hlmBtn
             type="button"
             variant="ghost"
-            class="-my-1"
+            class="h-[25px]"
             [attr.aria-label]="'Add subtask to ' + issue().key"
             (click)="startAdd(issue().id)"
           >
@@ -215,7 +215,7 @@ import {
             @if (showEstimate(c)) {
               <app-issue-prop class="max-sm:hidden" [issue]="c" field="estimate" chip />
             }
-            <app-issue-prop [issue]="c" field="status" chip />
+            <app-issue-prop [issue]="c" field="status" chip [caret]="false" />
             @if (c.assigneeId) {
               <app-actor-avatar [actor]="{ type: 'user', id: c.assigneeId }" [size]="22" />
             } @else {

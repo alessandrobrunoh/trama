@@ -53,18 +53,26 @@ import { TaskStatusWizard } from './task-status-wizard';
 import { TaskTime } from './task-time';
 import { trackedOn } from './task-time-model';
 
-/** One hairline row of the column: a 84px mono label and the value beside it. */
+/**
+ * One hairline row of the column: a 84px mono label and the value beside it. The frame's rows are 34 to 42px
+ * high depending on what they hold (`height`), so a picker's tall hit area never makes a row taller.
+ */
 @Component({
   selector: 'app-task-prop',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'border-border flex min-w-0 items-center gap-2.5 border-b px-[18px] py-2.5' },
+  host: {
+    class: 'border-border flex min-w-0 items-center gap-2.5 border-b px-[18px] py-0.5',
+    '[style.min-height.px]': 'height()',
+  },
   template: `
-    <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[12px]">{{ label() }}</span>
+    <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[13px]">{{ label() }}</span>
     <div class="flex min-w-0 flex-1 items-center gap-1.5"><ng-content /></div>
   `,
 })
 export class TaskProp {
   readonly label = input('');
+  /** Minimum row height in px, border included. */
+  readonly height = input(36);
 }
 
 @Component({
@@ -95,26 +103,26 @@ export class TaskProp {
   host: { class: 'block min-w-0' },
   template: `
     @if (issue(); as i) {
-      <div class="flex flex-col">
+      <div class="-ml-px flex flex-col">
         <!-- How to start it in Delta (a subtask that already has its own thread does not need it). -->
         @if (!parent() || !i.threadUrl) {
           <div class="border-border flex flex-col gap-2 border-b px-[18px] py-3.5">
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">WORK ON IT IN DELTA</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">WORK ON IT IN DELTA</span>
             <button
               type="button"
-              class="bg-background border-border hover:border-border-strong focus-visible:ring-ring flex w-full items-center gap-2 border px-2.5 py-2 text-left outline-none focus-visible:ring-2"
+              class="bg-background border-border hover:border-border-strong focus-visible:ring-ring flex w-full items-center gap-2 border px-2.5 py-[7px] text-left outline-none focus-visible:ring-2"
               aria-label="Copy the /trama command"
               hlmTooltip="Copy command · ⇧C"
               (click)="copyCommand()"
             >
               <span class="text-foreground font-mono text-[12px] leading-[15px]">/trama {{ i.key }}</span>
               <span class="flex-1"></span>
-              <svg [lucideIcon]="copyIcon" [size]="14" class="text-muted-foreground shrink-0" aria-hidden="true"></svg>
+              <svg [lucideIcon]="copyIcon" [size]="13" class="text-muted-foreground shrink-0" aria-hidden="true"></svg>
             </button>
           </div>
         }
 
-        <app-task-prop label="STATUS">
+        <app-task-prop label="STATUS" [height]="40">
           <app-issue-prop [issue]="i" field="status" chip />
           @if (canEdit()) {
             <app-task-status-wizard class="ml-auto" variant="link" [issue]="i" />
@@ -122,12 +130,12 @@ export class TaskProp {
         </app-task-prop>
 
         @if (!parent()) {
-          <app-task-prop label="PRIORITY">
+          <app-task-prop label="PRIORITY" [height]="34">
             <app-issue-prop [issue]="i" field="priority" chip />
           </app-task-prop>
         }
 
-        <app-task-prop label="ASSIGNEE">
+        <app-task-prop label="ASSIGNEE" [height]="42">
           <app-issue-prop [issue]="i" field="assignee" showLabel chip [avatarSize]="22" />
           @if (canEdit() && store.me(); as me) {
             @if (i.assigneeId !== me.id) {
@@ -179,7 +187,7 @@ export class TaskProp {
         @if (!parent() && showEstimate()) {
           <div class="border-border flex flex-col gap-2.5 border-b px-[18px] py-3.5">
             <div class="flex items-center gap-2.5">
-              <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[12px]">ESTIMATE</span>
+              <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[13px]">ESTIMATE</span>
               <app-picker
                 #estimatePicker
                 variant="bare"
@@ -192,12 +200,12 @@ export class TaskProp {
                 [disabled]="!canEdit()"
                 [options]="estimateOpts()"
                 [value]="i.estimate !== undefined && i.estimate !== null ? ['' + i.estimate] : []"
-                triggerClass="h-8 px-0"
+                triggerClass="h-[26px] px-0"
                 (valueChange)="setEstimate(i.id, $event[0])"
               >
-                <span class="font-title text-foreground text-[26px] leading-[30px]">{{ estimateText() }}</span>
+                <span class="font-title text-foreground text-[26px] leading-[26px] tracking-normal!">{{ estimateText() }}</span>
               </app-picker>
-              <span class="border-border text-muted-foreground border px-1.5 py-px font-mono text-[10px] leading-[13px]">{{ scale() }}</span>
+              <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[13px]">{{ scale() }}</span>
               <span class="flex-1"></span>
               @if (canEdit()) {
                 <button
@@ -216,10 +224,10 @@ export class TaskProp {
             }
             <div class="flex flex-col gap-[5px]">
               <div class="flex items-center gap-1.5">
-                <span class="text-faint font-mono text-[10px] leading-[12px]">TRACKED</span>
+                <span class="text-faint font-mono text-[10px] leading-[13px]">TRACKED</span>
                 <span class="text-foreground text-[12.5px] leading-4">{{ trackedText() }}</span>
                 @if (typical()) {
-                  <span class="text-faint font-mono text-[10.5px] leading-[13px]">of ~{{ span(typical()!) }}</span>
+                  <span class="text-faint font-mono text-[10.5px] leading-[14px]">of ~{{ span(typical()!) }}</span>
                 }
                 <span class="flex-1"></span>
                 <ng-container [ngTemplateOutlet]="timerButton" />
@@ -231,7 +239,7 @@ export class TaskProp {
             @if (rollup(); as r) {
               <button
                 type="button"
-                class="bg-yellow/[0.07] border-yellow/25 text-yellow flex w-full items-center gap-2 border px-[9px] py-[7px] text-left font-mono text-[10.5px] leading-[13px] disabled:cursor-default"
+                class="bg-yellow/[0.07] border-yellow/25 text-yellow flex w-full items-center gap-2 border px-[9px] py-1.5 text-left font-mono text-[10.5px] leading-[14px] disabled:cursor-default"
                 [disabled]="!canEdit() || r.next === null"
                 (click)="r.next !== null && setEstimate(i.id, '' + r.next)"
               >
@@ -259,11 +267,11 @@ export class TaskProp {
                 triggerClass="h-5 w-[84px] justify-start px-0"
                 (valueChange)="setEstimate(i.id, $event[0])"
               >
-                <span class="text-faint hover:text-muted-foreground font-mono text-[10px] leading-[12px]">EST {{ estimateText() }}</span>
+                <span class="text-faint hover:text-muted-foreground font-mono text-[10px] leading-[13px]">EST {{ estimateText() }}</span>
               </app-picker>
               <span class="text-foreground text-[12.5px] leading-4">{{ trackedText() }}</span>
               @if (typical()) {
-                <span class="text-faint font-mono text-[10.5px] leading-[13px]">of ~{{ span(typical()!) }}</span>
+                <span class="text-faint font-mono text-[10.5px] leading-[14px]">of ~{{ span(typical()!) }}</span>
               }
               <span class="flex-1"></span>
               <ng-container [ngTemplateOutlet]="timerButton" />
@@ -278,14 +286,15 @@ export class TaskProp {
           <app-task-prop label="LABELS">
             <app-label-picker
               scope="issue"
-              triggerClass="min-h-6 py-0"
+              chipLook="hairline"
+              triggerClass="min-h-6 px-0! py-0 font-sans text-[12.5px]"
               [disabled]="!canEdit()"
               [value]="i.labels"
               (valueChange)="store.updateIssue(i.id, { labels: $event })"
             />
           </app-task-prop>
         } @else if (parentIssue(); as p) {
-          <app-task-prop label="PARENT">
+          <app-task-prop label="PARENT" [height]="34">
             <a
               [routerLink]="['/', slug(), 'tasks', p.key]"
               class="text-foreground hover:underline font-mono text-[11px] leading-[14px]"
@@ -295,7 +304,7 @@ export class TaskProp {
           </app-task-prop>
         }
 
-        <app-task-prop label="SOURCE">
+        <app-task-prop label="SOURCE" [height]="34">
           @let src = source();
           @if (parent() && src.kind === 'trama') {
             <span class="text-muted-foreground font-mono text-[11px] leading-[14px]">Trama only · not synced</span>
@@ -320,19 +329,19 @@ export class TaskProp {
           }
         </app-task-prop>
 
-        <app-task-prop label="THREAD">
+        <app-task-prop label="THREAD" [height]="34">
           <app-issue-thread-link class="min-w-0 flex-1" variant="row" [issue]="i" [canEdit]="canEdit()" />
         </app-task-prop>
 
         <div class="flex flex-col gap-1.5 px-[18px] py-3.5">
           @if (parent()) {
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">SUBTASKS = MORE THREADS</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">SUBTASKS = MORE THREADS</span>
             <p class="text-muted-foreground text-xs leading-[19px]">
               The parent keeps its own thread. This subtask was started with /trama {{ i.key }} and records a
               separate piece of work.
             </p>
           } @else {
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">ONE THREAD PER TASK</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">ONE THREAD PER TASK</span>
             <p class="text-muted-foreground text-xs leading-[19px]">
               @if (i.threadUrl) {
                 To relink, run /trama {{ i.key }} in a new Delta thread — the agent will offer to create a subtask
@@ -345,9 +354,9 @@ export class TaskProp {
           }
         </div>
 
-        <div class="flex flex-col gap-1 px-[18px] pt-1.5 pb-3.5">
-          <span class="text-faint font-mono text-[10.5px] leading-[13px]">Created {{ createdText() }}</span>
-          <span class="text-faint font-mono text-[10.5px] leading-[13px]">Updated {{ i.updatedAt | ago }} ago</span>
+        <div class="flex flex-col gap-1 px-[18px] py-1.5">
+          <span class="text-faint font-mono text-[10.5px] leading-[14px]">Created {{ createdText() }}</span>
+          <span class="text-faint font-mono text-[10.5px] leading-[14px]">Updated {{ i.updatedAt | ago }} ago</span>
         </div>
 
         <!-- Everything the frames leave out, out of the way. -->
@@ -559,8 +568,9 @@ export class TaskInspector {
   protected readonly trackedPct = computed(() => {
     const typical = this.typical();
     const t = this.tracked().totalMs;
-    if (!t) return 0;
-    return typical ? Math.min(100, (t / typical) * 100) : 100;
+    // Without a typical duration there is nothing to measure against: a full bar would read as done.
+    if (!t || !typical) return 0;
+    return Math.min(100, (t / typical) * 100);
   });
   protected readonly trackedLabel = computed(() => {
     const typical = this.typical();

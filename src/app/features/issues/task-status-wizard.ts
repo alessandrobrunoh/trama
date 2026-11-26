@@ -57,7 +57,7 @@ const RECENT_TRACK_MS = 3 * DAY_MS;
         <button
           hlmPopoverTrigger
           type="button"
-          class="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs outline-none focus-visible:ring-2"
+          class="text-faint hover:text-foreground focus-visible:ring-ring inline-flex h-6 items-center gap-1 px-1.5 font-mono text-[10.5px] outline-none focus-visible:ring-2"
           aria-label="Check status"
         >
           <svg [lucideIcon]="scanIcon" [size]="12" aria-hidden="true"></svg> Check
