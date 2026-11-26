@@ -54,6 +54,8 @@ trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
 trama-entities = { path = "crates/entities" }
 trama-events = { path = "crates/events" }
+trama-external-identities = { path = "crates/external-identities" }
+trama-favorites = { path = "crates/favorites" }
 trama-migration = { path = "crates/migration" }
 trama-notifications = { path = "crates/notifications" }
 trama-sharing = { path = "crates/sharing" }
@@ -106,6 +108,8 @@ trama-auth.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true
+trama-external-identities.workspace = true
+trama-favorites.workspace = true
 trama-migration.workspace = true
 trama-notifications.workspace = true
 trama-sharing.workspace = true
