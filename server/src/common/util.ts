@@ -1,10 +1,25 @@
 import { randomBytes } from 'node:crypto';
 import { NotFoundException } from '@nestjs/common';
 
+let deterministicIdSequence: number | undefined;
+
 /** Opaque prefixed id, e.g. `wk_k3j9x0a1b2c3`. */
 export function uid(prefix: string): string {
+  if (deterministicIdSequence !== undefined)
+    return `${prefix}_fixture${String(deterministicIdSequence++).padStart(6, '0')}`;
   const rand = randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
   return `${prefix}_${rand.toLowerCase()}`;
+}
+
+/** Runs a synchronous fixture builder with repeatable IDs; ordinary application IDs stay random. */
+export function withDeterministicIds<T>(build: () => T): T {
+  const previous = deterministicIdSequence;
+  deterministicIdSequence = 0;
+  try {
+    return build();
+  } finally {
+    deterministicIdSequence = previous;
+  }
 }
 
 export function notFound(entity: string, id: string): NotFoundException {

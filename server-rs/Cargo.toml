@@ -117,9 +117,11 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+chrono.workspace = true
 dotenvy.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -132,6 +134,7 @@ trama-auth.workspace = true
 trama-comments.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
+trama-entities.workspace = true
 trama-events.workspace = true
 trama-external-identities.workspace = true
 trama-favorites.workspace = true
@@ -159,6 +162,7 @@ trama-workspaces.workspace = true
 http-body-util.workspace = true
 serde_json.workspace = true
 tower.workspace = true
+trama-core = { path = "crates/core", features = ["test-support"] }
 
 [lints]
 workspace = true

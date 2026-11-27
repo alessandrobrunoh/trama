@@ -13,6 +13,7 @@ use trama_auth::Routes;
 use trama_core::{AppError, AppState, Config};
 use utoipa_scalar::{Scalar, Servable};
 
+mod demo_seed;
 mod openapi;
 
 pub use openapi::api_doc;
@@ -87,6 +88,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     trama_core::db::ensure_database(&config.database_url).await;
     let db = trama_core::db::connect(&config.database_url).await?;
     trama_migration::Migrator::up(&db, None).await?;
+    demo_seed::seed_if_empty(&db, config.seed.demo, config.production, config.seed.mock_history)
+        .await
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
 
     let port = config.port;
     // live events reach every instance's streams through Postgres NOTIFY / LISTEN

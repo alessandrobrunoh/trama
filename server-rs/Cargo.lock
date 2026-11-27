@@ -3347,6 +3347,7 @@ name = "trama-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "dotenvy",
  "http-body-util",
  "sea-orm",
@@ -3363,6 +3364,7 @@ dependencies = [
  "trama-comments",
  "trama-common",
  "trama-core",
+ "trama-entities",
  "trama-events",
  "trama-external-identities",
  "trama-favorites",

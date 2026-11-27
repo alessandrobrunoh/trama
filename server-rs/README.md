@@ -41,6 +41,18 @@ cargo run                     # creates the database if missing, migrates, serve
 
 Outside production the OpenAPI document is at `/api/openapi.json` and a reference at `/api/docs`.
 
+The demo seed is a versioned fixture exported from the NestJS canonical seed. Runtime loading is
+Rust-only; to regenerate the fixture after changing the canonical data, run from the repository
+root:
+
+```sh
+cd server && npx tsc -p tsconfig.scripts.json && node dist-scripts/scripts/export-demo-fixture.js
+```
+
+On an empty database the Rust server seeds this fixture unless `SEED_DEMO=false`; seeding never
+runs in production. `SEED_MOCK_HISTORY=false` selects the same canonical seed without the generated
+estimate history.
+
 ## Database and the hand-over from NestJS
 
 Both APIs use the same PostgreSQL database while routes move over. The first migration is a
