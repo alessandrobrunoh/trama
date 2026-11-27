@@ -421,8 +421,9 @@ async fn posting_with_a_health_sets_the_project_health_with_the_usual_events() {
     assert_eq!(f.project_health(&f.alpha).await, "at_risk");
     // the same health again does not touch the project
     f.posted(&f.owner, &f.alpha, json!({ "body": "Still risky", "health": "at_risk" })).await;
-    let changes = f.event_types().await.iter().filter(|t| *t == "project.health_changed").count();
-    assert_eq!(changes, 1);
+    let health_events =
+        f.event_types().await.iter().filter(|t| *t == "project.health_changed").count();
+    assert_eq!(health_events, 1);
     // a legacy enum resolves to the catalog id; a different health moves the project
     let moved =
         f.posted(&f.owner, &f.alpha, json!({ "body": "Slipping", "health": "off_track" })).await;

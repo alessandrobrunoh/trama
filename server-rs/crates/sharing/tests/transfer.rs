@@ -307,12 +307,12 @@ async fn moves_project_updates_thread_records_and_decisions_with_the_project() {
     sql(
         db,
         &format!(
-            r#"UPDATE workspaces SET settings = jsonb_set(settings, '{{statuses}}', '{}'::jsonb) WHERE id = 'ws_tgt'"#,
+            r"UPDATE workspaces SET settings = jsonb_set(settings, '{{statuses}}', '{}'::jsonb) WHERE id = 'ws_tgt'",
             serde_json::to_string(&catalog).unwrap()
         ),
     )
     .await;
-    sql(db, r#"UPDATE projects SET health = 'on_track' WHERE id = 'pj_main'"#).await;
+    sql(db, r"UPDATE projects SET health = 'on_track' WHERE id = 'pj_main'").await;
     sql(
         db,
         r#"INSERT INTO project_updates (id, "workspaceId", "projectId", author, body, health) VALUES
