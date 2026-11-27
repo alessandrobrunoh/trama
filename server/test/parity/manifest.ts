@@ -85,6 +85,11 @@ export const MANIFEST: SpecClassification[] = [
     note: 'Wire-level: project view icon cases.',
   },
   {
+    file: 'project-updates.e2e-spec.ts',
+    classification: 'parity',
+    note: 'Wire-level: project update cases (cookie and token clients; events over /events).',
+  },
+  {
     file: 'projects.e2e-spec.ts',
     classification: 'parity',
     note: 'Wire-level: project CRUD cases.',

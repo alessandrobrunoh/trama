@@ -77,8 +77,19 @@ async fn list(
         ));
     }
     if let Some(kind) = q.kind.filter(|t| !t.is_empty()) {
-        query = query
-            .filter(domain_events::Column::Type.like(format!("{}%", kind.replace(['%', '_'], ""))));
+        // LIKE wildcards are escaped rather than dropped: many event types contain `_`
+        let mut pattern = String::with_capacity(kind.len() + 1);
+        for c in kind.chars() {
+            if matches!(c, '\\' | '%' | '_') {
+                pattern.push('\\');
+            }
+            pattern.push(c);
+        }
+        pattern.push('%');
+        query = query.filter(Expr::cust_with_values(
+            r#""domain_events"."type" LIKE $1 ESCAPE '\'"#,
+            [pattern],
+        ));
     }
     if let Some(before) = q.before.filter(|b| !b.is_empty()) {
         let before = parse_js_date(&before)

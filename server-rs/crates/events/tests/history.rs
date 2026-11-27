@@ -170,11 +170,16 @@ async fn filters_by_subject_type_prefix_before_and_legacy_key() {
     assert_eq!(count(&get(&w, &cookie, "?type=issue.").await), 3);
     assert_eq!(count(&get(&w, &cookie, "?type=issue.created").await), 2);
     assert_eq!(count(&get(&w, &cookie, "?type=project").await), 1);
-    // `%` and `_` are removed, not wildcards
+    // `%`, `_` and `\` are matched literally, not as wildcards (they are escaped, not dropped):
+    // `_` in an event type is a plain character
+    assert_eq!(count(&get(&w, &cookie, "?type=issue.status_").await), 1);
+    assert_eq!(count(&get(&w, &cookie, "?type=issue.status_changed").await), 1);
     assert_eq!(count(&get(&w, &cookie, "?type=issue_created").await), 0);
-    assert_eq!(count(&get(&w, &cookie, "?type=issue.crea_ted").await), 2);
-    assert_eq!(count(&get(&w, &cookie, "?type=%25").await), 4);
-    assert_eq!(count(&get(&w, &cookie, "?type=i%25ssue.").await), 3);
+    assert_eq!(count(&get(&w, &cookie, "?type=issue.crea_ted").await), 0);
+    assert_eq!(count(&get(&w, &cookie, "?type=issue.status%25").await), 0);
+    assert_eq!(count(&get(&w, &cookie, "?type=%25").await), 0);
+    assert_eq!(count(&get(&w, &cookie, "?type=i%25ssue.").await), 0);
+    assert_eq!(count(&get(&w, &cookie, "?type=issue%5C").await), 0);
 
     // strictly older than `before`
     let before = get(&w, &cookie, "?before=2026-01-01T12%3A00%3A03.000Z").await;
