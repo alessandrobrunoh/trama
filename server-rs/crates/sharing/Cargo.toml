@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+base64.workspace = true
 chrono.workspace = true
 indexmap.workspace = true
 sea-orm.workspace = true
@@ -21,6 +22,7 @@ trama-contracts.workspace = true
 trama-core.workspace = true
 trama-entities.workspace = true
 trama-events.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true

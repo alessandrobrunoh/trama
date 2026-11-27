@@ -16,11 +16,12 @@ which server answered.
 | `trama-entities` | `crates/entities` | SeaORM entities, one module per table (generated, see `lib.rs`) |
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
 | `trama-notifications` | `crates/notifications` | The inbox, notification settings, Web Push (VAPID, `aes128gcm`), and the listener that turns recorded domain events into in-app, push and email notifications |
+| `trama-routing` | `crates/routing` | Project-scoped git source rules, usable connection/suggestion endpoints, and routing/import lookup APIs |
 | `trama-system` | `crates/system` | `GET /api/health`, `GET /api/config` |
 | `trama-uploads` | `crates/uploads` | File uploads: rules, storage, upload references (`retained`, `assert_attachable`, … for other crates), `/api/w/{slug}/uploads…` |
 
 Each domain gets its own crate as it moves over (`users`, `members`, `invites`,
-`workspaces`, `tasks`, `comments`, `projects`, `time`, …). A module crate exposes:
+`workspaces`, `tasks`, `comments`, `projects`, `routing`, `time`, …). A module crate exposes:
 
 - `router() -> trama_auth::Routes`, every handler with its access `Gate`, merged in `routes()`
   in `src/lib.rs`;
@@ -65,6 +66,9 @@ cargo fmt --all --check
 cargo clippy --all-targets --all-features   # clippy::all is denied, pedantic warns
 cargo test --workspace
 ```
+
+The black-box parity harness runs the NestJS e2e suites' wire-level cases against this API:
+from `server/`, `npm run parity` (see `server/test/parity/README.md`).
 
 Database tests read only `TEST_DATABASE_URL` and create a throwaway `trama_rs_test_*` database
 each, dropped afterwards; without the variable they are skipped.

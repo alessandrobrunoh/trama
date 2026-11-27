@@ -46,6 +46,7 @@ pub fn router() -> Routes {
         .post("/shared/projects/{projectId}/leave", ACCOUNT, leave)
         .get("/w/{slug}/projects/{id}/transfer-preview", TRANSFER, preview)
         .post("/w/{slug}/projects/{id}/transfer", TRANSFER, transfer_project)
+        .merge(crate::invites::routes())
 }
 
 /// Projects shared with me, from every workspace where I am a guest.

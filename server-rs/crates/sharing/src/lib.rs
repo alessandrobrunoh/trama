@@ -16,6 +16,7 @@
 //! Other crates can call [`service::list`] (the projects a person reaches as a guest),
 //! [`service::place`], [`service::hide`], [`service::clear`] and [`service::leave`].
 
+pub mod invites;
 pub mod plan;
 pub mod router;
 pub mod schemas;

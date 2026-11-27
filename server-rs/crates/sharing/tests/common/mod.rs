@@ -12,6 +12,7 @@ use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseConnection, Set};
 use sea_orm_migration::MigratorTrait;
 use serde_json::{Value, json};
 use tower::ServiceExt;
+use trama_common::mail::Mailer;
 use trama_contracts::common::ActorRef;
 use trama_contracts::roles::{TokenScope, fresh_workspace_roles};
 use trama_core::testkit::TestDb;
@@ -33,8 +34,10 @@ impl World {
         let test = TestDb::create().await?;
         trama_migration::Migrator::up(&test.db, None).await.unwrap();
         let events = Events::local();
-        let state =
-            AppState::new(test.db.clone(), Config::from_vars(&[])).with_extension(events.clone());
+        let config = Config::from_vars(&[]);
+        let state = AppState::new(test.db.clone(), config.clone())
+            .with_extension(events.clone())
+            .with_extension(Mailer::capture(&config));
         let app = trama_sharing::router().into_app(state.clone());
         Some(Self { test, state, events, app })
     }

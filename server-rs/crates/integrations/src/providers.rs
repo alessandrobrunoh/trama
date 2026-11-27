@@ -748,6 +748,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn github_reports_a_failed_state_change_from_the_mock_transport() {
+        let (http, seen) = http(500, vec![], json!({ "message": "provider unavailable" }));
+        let error = GithubClient::new(http, "placeholder-token", None)
+            .set_issue_state("octo/app", 7, false, None)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("provider unavailable"));
+        let request = seen.lock().unwrap().pop().unwrap();
+        assert_eq!(request.method, Method::PATCH);
+        assert_eq!(request.url, "https://api.github.com/repos/octo/app/issues/7");
+        assert_eq!(
+            request.headers.iter().find(|(key, _)| key == "Authorization").unwrap().1,
+            "Bearer placeholder-token"
+        );
+    }
+
+    #[tokio::test]
     async fn gitlab_encodes_project_paths() {
         let (http, seen) = http(
             200,

@@ -35,6 +35,7 @@ ring = "0.17"
 # Outgoing HTTP. Requests to user-chosen URLs go through trama_common::safe_fetch.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 sha2 = "0.11"
+subtle = "2"
 sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-json", "with-chrono"] }
 sea-orm-migration = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -64,17 +65,23 @@ trama-events = { path = "crates/events" }
 trama-external-identities = { path = "crates/external-identities" }
 trama-favorites = { path = "crates/favorites" }
 trama-insights = { path = "crates/insights" }
+trama-importers = { path = "crates/importers" }
 trama-integrations = { path = "crates/integrations" }
 trama-issues = { path = "crates/issues" }
 trama-migration = { path = "crates/migration" }
 trama-milestones = { path = "crates/milestones" }
 trama-notifications = { path = "crates/notifications" }
 trama-outgoing-webhooks = { path = "crates/outgoing-webhooks" }
+trama-projects = { path = "crates/projects" }
+trama-routing = { path = "crates/routing" }
 trama-search = { path = "crates/search" }
 trama-sharing = { path = "crates/sharing" }
+trama-snapshot = { path = "crates/snapshot" }
 trama-system = { path = "crates/system" }
+trama-time-entries = { path = "crates/time-entries" }
 trama-uploads = { path = "crates/uploads" }
 trama-views = { path = "crates/views" }
+trama-webhooks = { path = "crates/webhooks" }
 trama-workspaces = { path = "crates/workspaces" }
 
 [workspace.lints.rust]
@@ -129,17 +136,23 @@ trama-events.workspace = true
 trama-external-identities.workspace = true
 trama-favorites.workspace = true
 trama-insights.workspace = true
+trama-importers.workspace = true
 trama-integrations.workspace = true
 trama-issues.workspace = true
 trama-migration.workspace = true
 trama-milestones.workspace = true
 trama-notifications.workspace = true
 trama-outgoing-webhooks.workspace = true
+trama-projects.workspace = true
+trama-routing.workspace = true
 trama-search.workspace = true
 trama-sharing.workspace = true
+trama-snapshot.workspace = true
 trama-system.workspace = true
+trama-time-entries.workspace = true
 trama-uploads.workspace = true
 trama-views.workspace = true
+trama-webhooks.workspace = true
 trama-workspaces.workspace = true
 
 [dev-dependencies]
