@@ -104,6 +104,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // outgoing webhooks are delivered from the same recorded events
     let state = trama_outgoing_webhooks::with_services(state);
     let outgoing_webhooks = trama_outgoing_webhooks::spawn(&state);
+    // queued and abandoned imports are resumed from their stored cursor
+    let state = trama_importers::with_services(state);
+    let importer = trama_importers::spawn(&state);
+    let importer_state = state.clone();
     // closing or reopening a task that a two-way routing rule created does the same on the host
     // (NestJS has no switch for it: `TwoWaySyncService` always listens)
     let two_way_sync = trama_routing::outbound::spawn(&state);
@@ -117,6 +121,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     notifications.abort();
     outgoing_webhooks.abort();
+    // running imports hand themselves back; another instance (or the next start) resumes them
+    trama_importers::stop(&importer_state);
+    importer.abort();
     two_way_sync.abort();
     events.shutdown().await;
     db.close().await?;

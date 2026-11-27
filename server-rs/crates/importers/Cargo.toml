@@ -14,7 +14,8 @@ regex.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tracing.workspace = true
 utoipa.workspace = true
 url.workspace = true
 trama-auth.workspace = true
@@ -22,14 +23,20 @@ trama-common.workspace = true
 trama-contracts.workspace = true
 trama-core.workspace = true
 trama-entities.workspace = true
+trama-events.workspace = true
+trama-external-identities.workspace = true
 trama-integrations.workspace = true
 trama-issues.workspace = true
+trama-milestones.workspace = true
+trama-projects.workspace = true
 trama-routing.workspace = true
 
 [lints]
 workspace = true
 
 [dev-dependencies]
+http-body-util.workspace = true
 sea-orm-migration.workspace = true
+tower.workspace = true
 trama-core = { workspace = true, features = ["test-support"] }
 trama-migration.workspace = true
