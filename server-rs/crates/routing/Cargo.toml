@@ -25,7 +25,10 @@ tracing.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
+async-trait.workspace = true
 http-body-util.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+trama-common.workspace = true
 sea-orm-migration.workspace = true
 tower.workspace = true
 trama-core = { workspace = true, features = ["test-support"] }

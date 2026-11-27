@@ -9,6 +9,7 @@ use sea_orm::{
 };
 use trama_contracts::common::{ActorRef, GitProvider};
 use trama_contracts::issues::{ArtifactState, IssueKind, IssueSource};
+use trama_contracts::status::{load_status_catalog, status_type_of};
 use trama_core::{AppError, AppState};
 use trama_entities::{integration_connections, issues, routing_rule_items, routing_rules};
 use trama_integrations::candidates::IssueCandidateState;
@@ -219,7 +220,9 @@ async fn follow_issue(
     else {
         return Ok(RoutedIssue { status: RoutedIssueStatus::Ignored, key: None });
     };
-    let was_finished = task.status == "done" || task.status == "canceled";
+    let catalog = load_status_catalog(&state.db, &item.workspace_id).await.issue;
+    let was_finished =
+        matches!(status_type_of(&catalog, Some(&task.status)), Some("done" | "canceled"));
     let next_status = match candidate.state {
         IssueCandidateState::Closed if !was_finished => Some(
             if candidate.state_reason.is_some_and(|reason| {
@@ -230,13 +233,17 @@ async fn follow_issue(
                 "done"
             },
         ),
-        IssueCandidateState::Open
-            if was_finished && item.external_state.as_deref() == Some("closed") =>
-        {
-            Some("todo")
-        }
+        IssueCandidateState::Open if was_finished => Some("todo"),
         _ => None,
     };
+    // Stored before the task changes, so the outbound sync sees the host already in that state.
+    let mut active = item.clone().into_active_model();
+    active.external_state = Set(Some(if candidate.state == IssueCandidateState::Open {
+        "open".to_owned()
+    } else {
+        "closed".to_owned()
+    }));
+    active.update(&state.db).await?;
     let changed = if let Some(status) = next_status {
         service::update(
             state,
@@ -250,13 +257,6 @@ async fn follow_issue(
     } else {
         false
     };
-    let mut active = item.clone().into_active_model();
-    active.external_state = Set(Some(if candidate.state == IssueCandidateState::Open {
-        "open".to_owned()
-    } else {
-        "closed".to_owned()
-    }));
-    active.update(&state.db).await?;
     if let Some(rule_id) = item.rule_id.as_deref() {
         record_success(state, rule_id).await?;
     }

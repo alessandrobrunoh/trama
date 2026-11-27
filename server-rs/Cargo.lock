@@ -3868,6 +3868,7 @@ dependencies = [
 name = "trama-routing"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "chrono",
  "http-body-util",
@@ -3879,6 +3880,7 @@ dependencies = [
  "tower",
  "tracing",
  "trama-auth",
+ "trama-common",
  "trama-contracts",
  "trama-core",
  "trama-entities",
