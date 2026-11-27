@@ -2769,6 +2769,60 @@
         "updatedAt": "2025-12-31T00:00:00.000Z"
       }
     ],
+    "threadRecords": [
+      {
+        "issueId": "in_fixture000141",
+        "workspaceId": "ws_fixture000000",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "summary": "Found the logout loop: two tabs refresh the session at once and the second refresh is treated as a replay. Serialised the refresh per session and added a regression test.",
+        "files": [
+          "src/auth/session.ts",
+          "src/auth/refresh.ts",
+          "src/auth/session.spec.ts"
+        ],
+        "turns": 14,
+        "syncCount": 3,
+        "createdAt": "2025-12-12T00:00:00.000Z",
+        "lastSyncAt": "2025-12-31T00:00:00.000Z",
+        "lastSyncBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "id": "dc_fixture000191",
+        "workspaceId": "ws_fixture000000",
+        "issueId": "in_fixture000141",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "createdBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        },
+        "createdAt": "2025-12-13T00:00:00.000Z",
+        "text": "Refresh tokens stay server side; the client never reads them.",
+        "paths": [
+          "src/auth/*"
+        ]
+      },
+      {
+        "id": "dc_fixture000192",
+        "workspaceId": "ws_fixture000000",
+        "issueId": "in_fixture000141",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "createdBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        },
+        "createdAt": "2025-12-30T00:00:00.000Z",
+        "text": "Serialise refreshes per session with a short lock instead of retrying on replay.",
+        "paths": [
+          "src/auth/refresh.ts",
+          "src/auth/session.ts"
+        ]
+      }
+    ],
     "dependencies": [],
     "comments": [
       {
@@ -2787,7 +2841,7 @@
         "updatedAt": "2025-12-11T00:00:00.000Z"
       },
       {
-        "id": "cm_fixture000191",
+        "id": "cm_fixture000193",
         "workspaceId": "ws_fixture000000",
         "subject": {
           "type": "artifact",
@@ -2802,7 +2856,7 @@
         "updatedAt": "2025-12-31T00:00:00.000Z"
       },
       {
-        "id": "cm_fixture000195",
+        "id": "cm_fixture000197",
         "workspaceId": "ws_fixture000000",
         "subject": {
           "type": "issue",
@@ -4229,7 +4283,7 @@
         }
       },
       {
-        "id": "ev_fixture000192",
+        "id": "ev_fixture000194",
         "workspaceId": "ws_fixture000000",
         "at": "2025-12-31T00:00:00.000Z",
         "actor": {
@@ -4242,12 +4296,12 @@
           "id": "ar_fixture000128"
         },
         "data": {
-          "commentId": "cm_fixture000191",
+          "commentId": "cm_fixture000193",
           "excerpt": "Please rebase on the queue refactor before the next review round."
         }
       },
       {
-        "id": "ev_fixture000196",
+        "id": "ev_fixture000198",
         "workspaceId": "ws_fixture000000",
         "at": "2025-12-31T00:00:00.000Z",
         "actor": {
@@ -4260,7 +4314,7 @@
           "id": "in_fixture000163"
         },
         "data": {
-          "commentId": "cm_fixture000195",
+          "commentId": "cm_fixture000197",
           "excerpt": "Collector lint fails because the exporter endpoint is templated in Helm. Fixing the values file."
         }
       },
@@ -9041,7 +9095,7 @@
     ],
     "views": [
       {
-        "id": "vw_fixture000193",
+        "id": "vw_fixture000195",
         "workspaceId": "ws_fixture000000",
         "ownerId": "usr_fixture000003",
         "name": "Backlog issues",
@@ -9070,7 +9124,7 @@
         "updatedAt": "2025-12-14T00:00:00.000Z"
       },
       {
-        "id": "vw_fixture000194",
+        "id": "vw_fixture000196",
         "workspaceId": "ws_fixture000000",
         "ownerId": "usr_fixture000001",
         "name": "Project roadmap",
@@ -10433,6 +10487,60 @@
         "updatedAt": "2025-12-31T00:00:00.000Z"
       }
     ],
+    "threadRecords": [
+      {
+        "issueId": "in_fixture000141",
+        "workspaceId": "ws_fixture000000",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "summary": "Found the logout loop: two tabs refresh the session at once and the second refresh is treated as a replay. Serialised the refresh per session and added a regression test.",
+        "files": [
+          "src/auth/session.ts",
+          "src/auth/refresh.ts",
+          "src/auth/session.spec.ts"
+        ],
+        "turns": 14,
+        "syncCount": 3,
+        "createdAt": "2025-12-12T00:00:00.000Z",
+        "lastSyncAt": "2025-12-31T00:00:00.000Z",
+        "lastSyncBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "id": "dc_fixture000191",
+        "workspaceId": "ws_fixture000000",
+        "issueId": "in_fixture000141",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "createdBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        },
+        "createdAt": "2025-12-13T00:00:00.000Z",
+        "text": "Refresh tokens stay server side; the client never reads them.",
+        "paths": [
+          "src/auth/*"
+        ]
+      },
+      {
+        "id": "dc_fixture000192",
+        "workspaceId": "ws_fixture000000",
+        "issueId": "in_fixture000141",
+        "threadUrl": "https://delta.dev/t/login-redirect-5d2e",
+        "createdBy": {
+          "type": "agent",
+          "id": "ag_fixture000013"
+        },
+        "createdAt": "2025-12-30T00:00:00.000Z",
+        "text": "Serialise refreshes per session with a short lock instead of retrying on replay.",
+        "paths": [
+          "src/auth/refresh.ts",
+          "src/auth/session.ts"
+        ]
+      }
+    ],
     "dependencies": [],
     "comments": [
       {
@@ -10451,7 +10559,7 @@
         "updatedAt": "2025-12-11T00:00:00.000Z"
       },
       {
-        "id": "cm_fixture000191",
+        "id": "cm_fixture000193",
         "workspaceId": "ws_fixture000000",
         "subject": {
           "type": "artifact",
@@ -10466,7 +10574,7 @@
         "updatedAt": "2025-12-31T00:00:00.000Z"
       },
       {
-        "id": "cm_fixture000195",
+        "id": "cm_fixture000197",
         "workspaceId": "ws_fixture000000",
         "subject": {
           "type": "issue",
@@ -11893,7 +12001,7 @@
         }
       },
       {
-        "id": "ev_fixture000192",
+        "id": "ev_fixture000194",
         "workspaceId": "ws_fixture000000",
         "at": "2025-12-31T00:00:00.000Z",
         "actor": {
@@ -11906,12 +12014,12 @@
           "id": "ar_fixture000128"
         },
         "data": {
-          "commentId": "cm_fixture000191",
+          "commentId": "cm_fixture000193",
           "excerpt": "Please rebase on the queue refactor before the next review round."
         }
       },
       {
-        "id": "ev_fixture000196",
+        "id": "ev_fixture000198",
         "workspaceId": "ws_fixture000000",
         "at": "2025-12-31T00:00:00.000Z",
         "actor": {
@@ -11924,14 +12032,14 @@
           "id": "in_fixture000163"
         },
         "data": {
-          "commentId": "cm_fixture000195",
+          "commentId": "cm_fixture000197",
           "excerpt": "Collector lint fails because the exporter endpoint is templated in Helm. Fixing the values file."
         }
       }
     ],
     "views": [
       {
-        "id": "vw_fixture000193",
+        "id": "vw_fixture000195",
         "workspaceId": "ws_fixture000000",
         "ownerId": "usr_fixture000003",
         "name": "Backlog issues",
@@ -11960,7 +12068,7 @@
         "updatedAt": "2025-12-14T00:00:00.000Z"
       },
       {
-        "id": "vw_fixture000194",
+        "id": "vw_fixture000196",
         "workspaceId": "ws_fixture000000",
         "ownerId": "usr_fixture000001",
         "name": "Project roadmap",

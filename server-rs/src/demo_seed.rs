@@ -58,6 +58,8 @@ pub async fn load(
         ("milestones", "milestones"),
         ("issues", "issues"),
         ("artifacts", "artifacts"),
+        ("threadRecords", "task_thread_records"),
+        ("decisions", "task_decisions"),
         ("dependencies", "dependencies"),
         ("comments", "comments"),
     ] {
@@ -224,6 +226,8 @@ fn validate(fixture: &Value) -> Result<(), &'static str> {
             "milestones",
             "issues",
             "artifacts",
+            "threadRecords",
+            "decisions",
             "dependencies",
             "comments",
             "events",
@@ -265,6 +269,8 @@ fn validate_references(data: &Map<String, Value>) -> Result<(), &'static str> {
         "milestones",
         "issues",
         "artifacts",
+        "threadRecords",
+        "decisions",
         "comments",
         "events",
         "views",
@@ -328,6 +334,25 @@ fn validate_references(data: &Map<String, Value>) -> Result<(), &'static str> {
             return Err("artifact author refers to a missing agent");
         }
     }
+    for group in ["threadRecords", "decisions"] {
+        for row in data[group].as_array().ok_or("canonical seed group must be an array")? {
+            if !issue_ids.contains(row["issueId"].as_str().ok_or("thread row issueId missing")?) {
+                return Err("thread record or decision refers to a missing issue");
+            }
+            for actor in ["lastSyncBy", "createdBy"] {
+                if row[actor]["type"] == "user"
+                    && row[actor]["id"].as_str().is_some_and(|id| !user_ids.contains(id))
+                {
+                    return Err("thread row actor refers to a missing user");
+                }
+                if row[actor]["type"] == "agent"
+                    && row[actor]["id"].as_str().is_some_and(|id| !agent_ids.contains(id))
+                {
+                    return Err("thread row actor refers to a missing agent");
+                }
+            }
+        }
+    }
     for row in data["comments"].as_array().ok_or("comments must be an array")? {
         if row["subject"]["type"] == "issue"
             && row["subject"]["id"].as_str().is_some_and(|id| !issue_ids.contains(id))
@@ -379,6 +404,23 @@ mod tests {
         assert_eq!(fixture["data"]["users"].as_array().unwrap().len(), 6);
         assert!(fixture["data"]["issues"].as_array().unwrap().len() >= 40);
         assert!(fixture["data"]["events"].as_array().unwrap().len() >= 100);
+        // the thread of AUTH-142 kept a record and two decisions
+        for key in ["data", "withoutMockHistory"] {
+            let records = fixture[key]["threadRecords"].as_array().unwrap();
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0]["syncCount"], 3);
+            assert_eq!(fixture[key]["decisions"].as_array().unwrap().len(), 2);
+        }
+    }
+
+    #[test]
+    fn validation_refuses_thread_rows_of_a_missing_issue() {
+        let mut orphan = super::fixture().expect("valid JSON");
+        orphan["data"]["decisions"][0]["issueId"] = json!("in_missing");
+        assert_eq!(validate(&orphan), Err("thread record or decision refers to a missing issue"));
+        let mut stranger = super::fixture().expect("valid JSON");
+        stranger["data"]["threadRecords"][0]["lastSyncBy"]["id"] = json!("ag_missing");
+        assert_eq!(validate(&stranger), Err("thread row actor refers to a missing agent"));
     }
 
     #[test]
@@ -410,6 +452,8 @@ mod tests {
             ("milestones", "milestones"),
             ("issues", "issues"),
             ("artifacts", "artifacts"),
+            ("threadRecords", "task_thread_records"),
+            ("decisions", "task_decisions"),
             ("dependencies", "dependencies"),
             ("comments", "comments"),
             ("events", "domain_events"),
@@ -450,9 +494,13 @@ mod tests {
         trama_migration::Migrator::up(&test_db.db, None).await.expect("migrate throwaway db");
         assert!(seed_if_empty(&test_db.db, true, false, false).await.unwrap());
         let fixture = fixture().unwrap();
-        for (group, table) in
-            [("issues", "issues"), ("events", "domain_events"), ("milestones", "milestones")]
-        {
+        for (group, table) in [
+            ("issues", "issues"),
+            ("events", "domain_events"),
+            ("milestones", "milestones"),
+            ("threadRecords", "task_thread_records"),
+            ("decisions", "task_decisions"),
+        ] {
             let expected = fixture["withoutMockHistory"][group].as_array().unwrap().len();
             let row = test_db
                 .db
