@@ -90,7 +90,7 @@ async fn lists_the_projects_a_person_reaches_as_a_guest_with_the_workspace_that_
 async fn lists_icons_and_orders_by_workspace_then_project_name() {
     let Some(s) = scene().await else { return };
     let db = s.w.db();
-    sql(db, r#"UPDATE projects SET icon = 'rocket' WHERE id = 'pj_shared'"#).await;
+    sql(db, r"UPDATE projects SET icon = 'rocket' WHERE id = 'pj_shared'").await;
     // a second workspace whose name sorts before "Studio", and a project that sorts first in it
     workspace_with(db, "acme", "Acme", json!({})).await;
     user(db, "u_boss").await;
@@ -282,7 +282,7 @@ async fn hides_a_project_brings_it_back_and_lets_a_guest_leave() {
     // a viewer keeps the membership, with nothing left in it
     let access = scalar(
         s.w.db(),
-        r#"SELECT access->'projects'->>'projectIds' AS v FROM memberships WHERE id = 'mb_ws_studio_u_gina'"#,
+        r"SELECT access->'projects'->>'projectIds' AS v FROM memberships WHERE id = 'mb_ws_studio_u_gina'",
     )
     .await;
     assert_eq!(access.as_deref(), Some("[]"));
@@ -308,7 +308,7 @@ async fn a_guest_left_with_nothing_loses_the_membership() {
     // one project left: the membership stays, limited to it
     let left = scalar(
         db,
-        r#"SELECT access->'projects'->>'projectIds' AS v FROM memberships WHERE id = 'mb_ws_studio_u_guest'"#,
+        r"SELECT access->'projects'->>'projectIds' AS v FROM memberships WHERE id = 'mb_ws_studio_u_guest'",
     )
     .await;
     assert_eq!(left.as_deref(), Some(r#"["pj_hidden"]"#));

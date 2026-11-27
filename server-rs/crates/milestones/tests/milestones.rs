@@ -254,6 +254,7 @@ async fn the_list_is_ordered_by_project_then_position_then_age() {
 }
 
 #[tokio::test]
+#[allow(clippy::many_single_char_names)] // milestones named after their letters
 async fn reorder_keeps_unlisted_milestones_after_the_listed_ones() {
     let Some(f) = fx().await else { return };
     let a = f.make(json!({"projectId": "pj_a", "name": "A"})).await;
@@ -609,10 +610,10 @@ async fn the_service_lists_and_creates_for_other_crates() {
     )
     .await
     .unwrap();
-    assert_eq!(m.sort_order, 0.0);
+    assert!(m.sort_order.abs() < f64::EPSILON);
     assert_eq!(m.target_date.as_deref(), Some("2026-12-01T00:00:00.000Z"));
     let listed = service::list(f.w.db(), "ws_acme", None).await.unwrap();
-    assert_eq!(listed, [m.clone()]);
+    assert_eq!(listed, std::slice::from_ref(&m));
     assert_eq!(service::get(f.w.db(), "ws_acme", &m.id).await.unwrap(), m);
     let err = service::create(
         &f.w.state,

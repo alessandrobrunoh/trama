@@ -471,12 +471,12 @@ async fn rebuilds_the_reference_rows_from_the_records() {
     assert_eq!(rows, expected);
     // the dropped mention released its blob, mentioned files are flagged, drafts are untouched
     let rows = uploads::Entity::find().all(db).await.unwrap();
-    let state = |id: &str| rows.iter().find(|u| u.id == id).map(|u| u.referenced);
-    assert_eq!(state(&stale), None);
+    let flag = |id: &str| rows.iter().find(|u| u.id == id).map(|u| u.referenced);
+    assert_eq!(flag(&stale), None);
     for id in [&in_issue, &in_project, &in_comment, &in_artifact] {
-        assert_eq!(state(id), Some(true), "{id}");
+        assert_eq!(flag(id), Some(true), "{id}");
     }
-    assert_eq!(state(&draft), Some(false));
+    assert_eq!(flag(&draft), Some(false));
     // running it again changes nothing
     reconcile_upload_references(db, "ws_acme").await.unwrap();
     assert_eq!(count(db).await, (5, 4));

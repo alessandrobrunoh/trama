@@ -105,6 +105,7 @@ impl Req {
     pub fn bearer(self, secret: &str) -> Self {
         self.header("authorization", &format!("Bearer {secret}"))
     }
+    #[allow(clippy::needless_pass_by_value)] // call sites read better with `json!(...)` by value
     pub fn json(mut self, body: Value) -> Self {
         self.body = Some(body.to_string());
         self.header("content-type", "application/json")

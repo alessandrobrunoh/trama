@@ -8,6 +8,7 @@
 mod common;
 
 use axum::http::StatusCode;
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::{Value, json};
 use trama_contracts::common::ActorRef;
 use trama_contracts::roles::TokenScope;
@@ -637,7 +638,6 @@ async fn people_who_left_the_workspace_are_not_told() {
     .await;
     let dev = session(w.db(), "u_dev").await;
     eventually("the assignment", || inbox(&w, &dev, ""), |b| !items(b).is_empty()).await;
-    use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
     let gone = trama_entities::notifications::Entity::find()
         .filter(trama_entities::notifications::Column::UserId.eq("u_gone"))
         .count(w.db())
@@ -813,12 +813,14 @@ mod delivery {
             return;
         };
         let f = fixture(&w).await;
-        let (a, b, c) = tokio::join!(
+        let (first, second, third) = tokio::join!(
             deliver(&f.env, &f.workspace, &f.recipient),
             deliver(&f.env, &f.workspace, &f.recipient),
             deliver(&f.env, &f.workspace, &f.recipient),
         );
-        (a.unwrap(), b.unwrap(), c.unwrap());
+        for result in [first, second, third] {
+            result.unwrap();
+        }
         assert_eq!(count(&w).await, 1);
         // the body is cut at 500 characters
         let row = notifications::Entity::find().one(w.db()).await.unwrap().unwrap();

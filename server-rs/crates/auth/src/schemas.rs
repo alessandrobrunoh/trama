@@ -156,6 +156,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[allow(clippy::needless_pass_by_value)] // takes `Result::unwrap_err()` directly
     fn messages(err: AppError) -> String {
         err.to_string()
     }

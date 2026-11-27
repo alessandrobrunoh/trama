@@ -27,7 +27,6 @@ type Seen = Arc<Mutex<Vec<(HeaderMap, Vec<u8>)>>>;
 
 /// A push service that answers `status` to every request.
 async fn push_service(status: u16) -> (String, Seen) {
-    let seen: Seen = Seen::default();
     async fn handle(
         State((seen, status)): State<(Seen, u16)>,
         headers: HeaderMap,
@@ -36,6 +35,7 @@ async fn push_service(status: u16) -> (String, Seen) {
         seen.lock().unwrap().push((headers, body.to_vec()));
         StatusCode::from_u16(status).unwrap()
     }
+    let seen: Seen = Seen::default();
     let app = Router::new().route("/push", post(handle)).with_state((Arc::clone(&seen), status));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();

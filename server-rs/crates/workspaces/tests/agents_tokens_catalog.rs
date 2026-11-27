@@ -7,6 +7,7 @@ mod common;
 use axum::http::StatusCode;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};
+use trama_contracts::labels::LabelScope;
 use trama_contracts::roles::TokenScope;
 use trama_entities::{api_tokens, issues};
 
@@ -375,7 +376,6 @@ async fn assign_validates_record_labels_against_the_catalog() {
         let db = w.db();
         async move { trama_workspaces::labels::assign(db, "ws_acme", ids.as_deref(), scope, None).await }
     };
-    use trama_contracts::labels::LabelScope;
 
     assert_eq!(assign(None, Some(LabelScope::Issue)).await.unwrap(), None);
     assert_eq!(

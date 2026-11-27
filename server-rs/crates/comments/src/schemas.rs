@@ -309,9 +309,9 @@ mod tests {
         assert_eq!(ok.subject_id, "in_1");
         assert_eq!(ok.limit, Some(25));
         assert_eq!(ok.cursor.as_deref(), Some("abc"));
-        let bare =
+        let defaults =
             PageCommentsQuery::parse(Some("subjectType=project&subjectId=pj_1&x=1")).unwrap();
-        assert_eq!((bare.limit, bare.cursor), (None, None));
+        assert_eq!((defaults.limit, defaults.cursor), (None, None));
 
         let none = page_errors("");
         assert!(none.contains("subjectType must be one of the following values: issue, artifact, project, milestone, import"), "{none}");

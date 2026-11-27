@@ -470,10 +470,14 @@ async fn attaches_a_file_to_a_task_as_an_artifact() {
     let upload_id = upload_url.rsplit('/').next().unwrap().to_owned();
     let row = uploads::Entity::find_by_id(&upload_id).one(w.db()).await.unwrap().unwrap();
     assert!(row.referenced);
-    let refs = upload_references::Entity::find().all(w.db()).await.unwrap();
-    assert_eq!(refs.len(), 1);
+    let references = upload_references::Entity::find().all(w.db()).await.unwrap();
+    assert_eq!(references.len(), 1);
     assert_eq!(
-        (refs[0].subject_type.as_str(), refs[0].subject_id.as_str(), refs[0].project_id.as_deref()),
+        (
+            references[0].subject_type.as_str(),
+            references[0].subject_id.as_str(),
+            references[0].project_id.as_deref()
+        ),
         ("artifact", id.as_str(), Some("pj_a"))
     );
 

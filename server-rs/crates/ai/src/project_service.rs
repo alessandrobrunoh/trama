@@ -405,6 +405,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)] // the scripted model answers `None` when it runs out
     fn ok(reply: &str) -> Option<Result<String, String>> {
         Some(Ok(reply.to_owned()))
     }

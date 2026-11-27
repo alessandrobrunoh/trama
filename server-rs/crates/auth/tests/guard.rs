@@ -203,7 +203,7 @@ async fn workspace_resolution_hides_workspaces_from_non_members() {
     let roles: Vec<_> = fresh_workspace_roles().into_iter().filter(|r| r.id != "viewer").collect();
     w.db()
         .execute_unprepared(&format!(
-            r#"UPDATE workspaces SET settings = '{}' WHERE id = 'ws_acme'"#,
+            r"UPDATE workspaces SET settings = '{}' WHERE id = 'ws_acme'",
             json!({ "roles": roles })
         ))
         .await
@@ -259,7 +259,7 @@ async fn roles_and_capabilities_gate_routes() {
     }
     w.db()
         .execute_unprepared(&format!(
-            r#"UPDATE workspaces SET settings = '{}' WHERE id = 'ws_acme'"#,
+            r"UPDATE workspaces SET settings = '{}' WHERE id = 'ws_acme'",
             json!({ "roles": roles })
         ))
         .await

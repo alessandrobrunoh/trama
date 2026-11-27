@@ -317,7 +317,7 @@ pub async fn token(
             name: "k".into(),
             actor: trama_contracts::common::ActorRef::user(user),
             scope: Some(scope),
-            permissions: permissions.map(|p| trama_auth::permissions::normalize_permissions(p)),
+            permissions: permissions.map(trama_auth::permissions::normalize_permissions),
             limits: None,
             created_by_user_id: None,
             expires_at: None,

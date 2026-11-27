@@ -119,11 +119,11 @@ async fn closes_a_stream_when_effective_project_access_changes() {
     let (auth, ctx) = open(&w, Req::get("/api/w/acme/tasks").session(&cookie)).await;
     assert!(valid(w.db(), &auth, &ctx).await);
     let after = only_projects(&["pr_2"], false);
-    sql(w.db(), &format!(r#"UPDATE memberships SET access = '{after}'"#)).await;
+    sql(w.db(), &format!(r"UPDATE memberships SET access = '{after}'")).await;
     assert!(!valid(w.db(), &auth, &ctx).await);
     // back to the original access: valid again
     let before = only_projects(&["pr_1"], false);
-    sql(w.db(), &format!(r#"UPDATE memberships SET access = '{before}'"#)).await;
+    sql(w.db(), &format!(r"UPDATE memberships SET access = '{before}'")).await;
     assert!(valid(w.db(), &auth, &ctx).await);
     // the limit lifted
     sql(w.db(), "UPDATE memberships SET access = NULL").await;

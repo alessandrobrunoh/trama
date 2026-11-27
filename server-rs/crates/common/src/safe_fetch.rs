@@ -594,6 +594,7 @@ mod tests {
         OutboundPolicy { allow_private: true, ..OutboundPolicy::default() }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn allowing(hosts: &[&str], base: OutboundPolicy) -> OutboundPolicy {
         OutboundPolicy { allowed_hosts: hosts.iter().map(|h| (*h).to_owned()).collect(), ..base }
     }

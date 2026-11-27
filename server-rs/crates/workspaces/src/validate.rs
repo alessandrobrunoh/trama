@@ -349,7 +349,7 @@ mod tests {
     fn integers_are_bounded() {
         let run = |v: Value| {
             messages(|c| {
-                integer(c, Presence::SkipUnset, "limits.writesPerDay", &value(v), 1, 20_000)
+                integer(c, Presence::SkipUnset, "limits.writesPerDay", &value(v), 1, 20_000);
             })
         };
         assert_eq!(run(json!(5)), "");

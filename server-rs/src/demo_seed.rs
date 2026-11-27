@@ -244,6 +244,7 @@ fn validate(fixture: &Value) -> Result<(), &'static str> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // one flat check per fixture group
 fn validate_references(data: &Map<String, Value>) -> Result<(), &'static str> {
     let ids = |group: &str| -> Result<std::collections::HashSet<&str>, &'static str> {
         data[group]
@@ -313,10 +314,10 @@ fn validate_references(data: &Map<String, Value>) -> Result<(), &'static str> {
         if row["parentId"].as_str().is_some_and(|id| !issue_ids.contains(id)) {
             return Err("issue parent refers to a missing issue");
         }
-        if let Some(ids) = row["milestoneIds"].as_array() {
-            if ids.iter().filter_map(Value::as_str).any(|id| !milestone_ids.contains(id)) {
-                return Err("issue refers to a missing milestone");
-            }
+        if let Some(ids) = row["milestoneIds"].as_array()
+            && ids.iter().filter_map(Value::as_str).any(|id| !milestone_ids.contains(id))
+        {
+            return Err("issue refers to a missing milestone");
         }
     }
     for row in data["artifacts"].as_array().ok_or("artifacts must be an array")? {
@@ -371,17 +372,15 @@ fn validate_references(data: &Map<String, Value>) -> Result<(), &'static str> {
         }
     }
     for row in data["events"].as_array().ok_or("events must be an array")? {
-        for actor in ["actor"] {
-            if row[actor]["type"] == "user"
-                && row[actor]["id"].as_str().is_some_and(|id| !user_ids.contains(id))
-            {
-                return Err("event actor refers to a missing user");
-            }
-            if row[actor]["type"] == "agent"
-                && row[actor]["id"].as_str().is_some_and(|id| !agent_ids.contains(id))
-            {
-                return Err("event actor refers to a missing agent");
-            }
+        let actor = &row["actor"];
+        if actor["type"] == "user" && actor["id"].as_str().is_some_and(|id| !user_ids.contains(id))
+        {
+            return Err("event actor refers to a missing user");
+        }
+        if actor["type"] == "agent"
+            && actor["id"].as_str().is_some_and(|id| !agent_ids.contains(id))
+        {
+            return Err("event actor refers to a missing agent");
         }
     }
     for row in data["views"].as_array().ok_or("views must be an array")? {
@@ -479,7 +478,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let actual: i64 = row.try_get("", "count").unwrap();
-            assert_eq!(actual as usize, expected, "unexpected row count in {table}");
+            assert_eq!(
+                usize::try_from(actual).unwrap(),
+                expected,
+                "unexpected row count in {table}"
+            );
         }
         let users = trama_entities::users::Entity::find().all(&test_db.db).await.unwrap();
         assert!(trama_auth::service::verify_password(&users[0].password_hash, DEMO_PASSWORD).await);
@@ -512,7 +515,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let actual: i64 = row.try_get("", "count").unwrap();
-            assert_eq!(actual as usize, expected, "unexpected row count in {table}");
+            assert_eq!(
+                usize::try_from(actual).unwrap(),
+                expected,
+                "unexpected row count in {table}"
+            );
         }
         test_db.drop().await;
     }

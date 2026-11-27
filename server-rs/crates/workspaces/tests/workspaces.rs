@@ -66,13 +66,8 @@ async fn creating_validates_the_name_and_slug() {
     assert_eq!(taken.status, StatusCode::CONFLICT);
 
     // tokens cannot mint workspaces
-    let secret = common::token(
-        w.db(),
-        &derived.body["id"].as_str().unwrap().to_owned(),
-        "u1",
-        TokenScope::Admin,
-    )
-    .await;
+    let secret =
+        common::token(w.db(), derived.body["id"].as_str().unwrap(), "u1", TokenScope::Admin).await;
     let minted =
         w.send(Req::post("/api/workspaces").bearer(&secret).json(json!({ "name": "Nope" }))).await;
     assert_eq!(minted.status, StatusCode::FORBIDDEN);

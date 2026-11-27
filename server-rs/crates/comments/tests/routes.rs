@@ -618,13 +618,13 @@ async fn keeps_the_files_a_comment_mentions() {
 
     // the uploader saves it onto a comment: a reference keeps it alive
     let id = created(&w, &t.member, "issue", "in_a", &markdown(&upload)).await;
-    let refs = upload_references::Entity::find().all(w.db()).await.unwrap();
-    assert_eq!(refs.len(), 1);
+    let references = upload_references::Entity::find().all(w.db()).await.unwrap();
+    assert_eq!(references.len(), 1);
     assert_eq!(
-        (refs[0].upload_id.as_str(), refs[0].subject_type.as_str()),
+        (references[0].upload_id.as_str(), references[0].subject_type.as_str()),
         (upload.as_str(), "comment")
     );
-    assert_eq!(refs[0].subject_id, id);
+    assert_eq!(references[0].subject_id, id);
     // now everyone who can read the comment can attach it again
     let again = created(&w, &t.other, "issue", "in_a", &markdown(&upload)).await;
     assert_eq!(upload_references::Entity::find().all(w.db()).await.unwrap().len(), 2);

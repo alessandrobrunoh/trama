@@ -319,7 +319,7 @@ async fn update_many_a_person_claims_unassigned_issues_moved_to_in_progress() {
 async fn update_many_skips_the_status_event_when_the_status_does_not_change() {
     let Some(w) = setup().await else { return };
     issue(w.db(), "ws_acme", "in_a", "BUG-1", None, &[]).await;
-    sql(w.db(), r#"UPDATE issues SET status = 'done' WHERE id = 'in_a'"#).await;
+    sql(w.db(), r"UPDATE issues SET status = 'done' WHERE id = 'in_a'").await;
     let rows = vec![row(&w, "in_a").await];
     let patch = BulkIssuePatch { status: Some("done".into()), ..BulkIssuePatch::default() };
     service::update_many(&w.state, "ws_acme", &actor(), rows, patch).await.unwrap();

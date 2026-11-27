@@ -198,9 +198,9 @@ async fn rejects_a_snooze_that_is_not_a_future_date() {
     let url = format!("{URL}/ci_failed:ar_1/snooze");
     let post = |body: Value| f.w.send(Req::post(&url).session(&f.ada).json(body));
 
-    let past = post(json!({ "until": "2000-01-01T00:00:00.000Z" })).await;
-    assert_eq!(past.status, StatusCode::BAD_REQUEST);
-    assert_eq!(past.message(), "snoozedUntil must be a future date");
+    let expired = post(json!({ "until": "2000-01-01T00:00:00.000Z" })).await;
+    assert_eq!(expired.status, StatusCode::BAD_REQUEST);
+    assert_eq!(expired.message(), "snoozedUntil must be a future date");
     // an ISO string that is not a date JavaScript reads is NaN
     let week = post(json!({ "until": "2999-W01" })).await;
     assert_eq!(week.message(), "snoozedUntil must be a future date");
@@ -357,7 +357,7 @@ async fn lists_from_the_snapshot_rows_without_querying() {
     let issue_rows = issues::Entity::find().all(db).await.unwrap();
     let artifact_rows = artifacts::Entity::find().all(db).await.unwrap();
     // the rows are used as they are: the database no longer has anything to derive
-    sql(db, r#"UPDATE artifacts SET review = NULL, ci = NULL"#).await;
+    sql(db, r"UPDATE artifacts SET review = NULL, ci = NULL").await;
     let rows = SnapshotRows { issues: &issue_rows, artifacts: &artifact_rows };
     let items = list(db, "ws_acme", "u_ada", Some(rows)).await.unwrap();
     assert_eq!(items.len(), 2);

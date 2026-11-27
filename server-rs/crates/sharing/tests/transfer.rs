@@ -29,8 +29,8 @@ async fn scene() -> Option<Scene> {
     let mut statuses = default_status_catalog();
     for entry in &mut statuses.issue {
         if entry.kind == "in_progress" {
-            entry.id = "st_doing".to_owned();
-            entry.name = "Doing".to_owned();
+            "st_doing".clone_into(&mut entry.id);
+            "Doing".clone_into(&mut entry.name);
         }
     }
     workspace_with(
@@ -113,6 +113,7 @@ async fn one(w: &World, select: &str) -> String {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)] // one end-to-end transfer, checked table by table
 async fn previews_and_then_moves_the_project_with_its_issues_guests_and_history() {
     let Some(s) = scene().await else { return };
     let w = &s.w;
@@ -371,6 +372,7 @@ async fn moves_project_updates_thread_records_and_decisions_with_the_project() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)] // one end-to-end transfer, checked table by table
 async fn carries_comments_artifacts_files_and_edges_and_clears_what_points_back() {
     let Some(s) = scene().await else { return };
     let w = &s.w;
@@ -702,7 +704,7 @@ async fn blocks_when_the_target_has_no_role_a_guest_can_hold() {
     sql(
         w.db(),
         &format!(
-            r#"UPDATE workspaces SET settings = jsonb_set(settings, '{{roles}}', '{}'::jsonb) WHERE id = 'ws_tgt'"#,
+            r"UPDATE workspaces SET settings = jsonb_set(settings, '{{roles}}', '{}'::jsonb) WHERE id = 'ws_tgt'",
             serde_json::to_string(&only).unwrap()
         ),
     )

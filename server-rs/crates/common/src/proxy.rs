@@ -111,6 +111,7 @@ mod tests {
         h
     }
 
+    #[allow(clippy::unnecessary_wraps)] // `client_ip` takes an optional peer
     fn sock(ip: &str) -> Option<SocketAddr> {
         Some(SocketAddr::new(ip.parse().unwrap(), 1234))
     }

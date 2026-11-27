@@ -170,8 +170,7 @@ impl Sse {
             }
             match tokio::time::timeout(wait, self.body.frame()).await {
                 Err(_) => return Frame::Timeout,
-                Ok(None) => return Frame::Closed,
-                Ok(Some(Err(_))) => return Frame::Closed,
+                Ok(None | Some(Err(_))) => return Frame::Closed,
                 Ok(Some(Ok(frame))) => {
                     if let Ok(data) = frame.into_data() {
                         self.buffer.push_str(&String::from_utf8_lossy(&data).replace("\r\n", "\n"));
@@ -342,7 +341,7 @@ pub async fn token(
             name: "k".into(),
             actor,
             scope: Some(scope),
-            permissions: permissions.map(|p| trama_auth::permissions::normalize_permissions(p)),
+            permissions: permissions.map(trama_auth::permissions::normalize_permissions),
             limits: None,
             created_by_user_id: None,
             expires_at,

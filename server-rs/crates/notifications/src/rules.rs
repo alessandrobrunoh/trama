@@ -252,6 +252,7 @@ mod tests {
         LegacySubjectRef { kind, id: id.into() }
     }
 
+    #[allow(clippy::needless_pass_by_value)] // call sites pass `json!(...)`
     fn ctx(kind: &str, issue: Option<RuleIssue>, data: Value) -> RuleContext {
         RuleContext {
             event: RuleEvent {
