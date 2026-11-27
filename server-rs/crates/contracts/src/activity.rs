@@ -211,6 +211,7 @@ string_enum! {
         Milestone = "milestone",
         Import = "import",
         Comment = "comment",
+        ProjectUpdate = "project_update",
         View = "view",
         Membership = "membership",
         Invite = "invite",

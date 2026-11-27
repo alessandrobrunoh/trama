@@ -232,6 +232,7 @@ pub const WEBHOOK_EVENT_GROUPS: &[WebhookEventGroup] = &[
             "project.updated",
             "project.status_changed",
             "project.health_changed",
+            "project.update_posted",
             "project.deleted",
         ],
     },

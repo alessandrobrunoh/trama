@@ -9,6 +9,7 @@
 //! | `POST /api/w/{slug}/projects` | 201, `manageProjects` |
 //! | `PATCH /api/w/{slug}/projects/{id}` | `manageProjects`; `null` clears a clearable field |
 //! | `DELETE /api/w/{slug}/projects/{id}` | 204, `manageProjects` |
+//! | `…/projects/{id}/updates` (list, post, edit, delete) | see [`updates`] |
 //!
 //! Writes need the `manageProjects` capability; reads are open to every member, and a narrowed
 //! member only reaches the projects of their access (create always refuses: their list cannot
@@ -37,6 +38,7 @@ pub mod icon;
 pub mod router;
 pub mod schemas;
 pub mod service;
+pub mod updates;
 
 pub use router::{ApiDoc, router};
 pub use service::{NewProject, ProjectFilter, ProjectPatch};

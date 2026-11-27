@@ -55,7 +55,7 @@ fn is_color_input(value: &str) -> bool {
 }
 
 /// `@IsString() @MinLength(min)? @MaxLength(max)?`: the length rules also fail on a non-string.
-fn text(
+pub(crate) fn text(
     c: &mut Checks,
     field: &str,
     value: Option<&Value>,

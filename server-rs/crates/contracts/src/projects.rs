@@ -8,7 +8,7 @@ use unicode_normalization::UnicodeNormalization;
 use utoipa::ToSchema;
 
 use crate::activity::AttentionSeverity;
-use crate::common::{Id, IsoDate, Priority};
+use crate::common::{ActorRef, Id, IsoDate, Priority};
 use crate::roles::Role;
 
 string_enum! {
@@ -117,6 +117,38 @@ pub struct Milestone {
     /// Last update.
     pub updated_at: IsoDate,
 }
+
+// ───────────────────────────── Project updates ─────────────────────────────
+
+/// A written status update on a project (Project · Updates): what the author says about where
+/// things stand, with the health they reported. `GET /api/w/:slug/projects/:id/updates` lists
+/// them newest first.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUpdate {
+    /// Update id (`pu_…`).
+    pub id: Id,
+    /// Workspace id.
+    pub workspace_id: Id,
+    /// Project id.
+    pub project_id: Id,
+    /// Who posted it.
+    pub author: ActorRef,
+    /// Markdown. The first paragraph is the headline shown at the top of the Updates tab.
+    pub body: String,
+    /// Project health catalog id reported with the update; posting one also sets the project's
+    /// health.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health: Option<String>,
+    /// When it was posted.
+    pub created_at: IsoDate,
+    /// Set when the author edited the text after posting.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edited_at: Option<IsoDate>,
+}
+
+/// `PROJECT_UPDATE_BODY_MAX`: longest project update body, in characters.
+pub const PROJECT_UPDATE_BODY_MAX: usize = 20_000;
 
 // ───────────────────────────── Shared projects and transfer ─────────────────────────────
 

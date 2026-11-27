@@ -11,14 +11,26 @@ use utoipa::OpenApi;
 
 use crate::schemas::{CreateProjectDto, ListProjectsQuery, UpdateProjectDto};
 use crate::service::{self, present};
+use crate::updates;
 
-/// OpenAPI document of this module.
+/// The project routes proper; [`ApiDoc`] adds the update routes.
 #[derive(OpenApi)]
 #[openapi(
     paths(list, get_one, create, update, remove),
     components(schemas(CreateProjectDto, Project, UpdateProjectDto))
 )]
+struct ProjectsDoc;
+
+/// OpenAPI document of this module: the projects and their updates.
 pub struct ApiDoc;
+
+impl OpenApi for ApiDoc {
+    fn openapi() -> utoipa::openapi::OpenApi {
+        let mut doc = ProjectsDoc::openapi();
+        doc.merge(updates::router::ApiDoc::openapi());
+        doc
+    }
+}
 
 /// Writes need `manageProjects` (`@Can('manageProjects')`); reads are open to every member.
 const MANAGE: Gate = Gate::authenticated().can(Capability::ManageProjects);
@@ -31,6 +43,7 @@ pub fn router() -> Routes {
         .post("/w/{slug}/projects", MANAGE, create)
         .patch("/w/{slug}/projects/{id}", MANAGE, update)
         .delete("/w/{slug}/projects/{id}", MANAGE, remove)
+        .merge(updates::router::router())
 }
 
 /// The workspace's projects, newest update first; narrowed members only see the projects of

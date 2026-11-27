@@ -254,6 +254,20 @@ async fn find<C: ConnectionTrait>(
         .ok_or_else(|| AppError::entity_not_found("Project", id))
 }
 
+/// The catalog id of a project health (a legacy enum value resolves to the seeded one).
+///
+/// # Errors
+///
+/// 400 when the workspace's health catalog has no such entry.
+pub async fn resolve_health<C: ConnectionTrait>(
+    db: &C,
+    workspace_id: &str,
+    stored: &str,
+) -> Result<String, AppError> {
+    let catalog = load_status_catalog(db, workspace_id).await;
+    Ok(require_status(&catalog.project_health, stored, "health")?.id.clone())
+}
+
 /// The project rows a caller reaches, newest update first; a status or health filter also matches
 /// the legacy enum, `q` is a case-insensitive substring of the name. The request's project access
 /// applies. This is what the workspace snapshot embeds.
