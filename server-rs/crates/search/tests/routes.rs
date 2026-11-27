@@ -151,6 +151,92 @@ async fn ties_go_to_projects_then_issues_then_artifacts_then_title() {
     f.w.drop().await;
 }
 
+/// `finds decisions and thread records, each with its task`.
+#[tokio::test]
+async fn finds_decisions_and_thread_records_each_with_its_task() {
+    let Some(f) = fx().await else { return };
+    issue(f.w.db(), "ws_acme", "in_1", "TRM-128", "Refresh alerts", None).await;
+    issue(f.w.db(), "ws_acme", "in_2", "TRM-129", "Unrelated", None).await;
+    sql(
+        f.w.db(),
+        r#"INSERT INTO task_decisions (id, "workspaceId", "issueId", text, paths, "createdBy")
+           VALUES ('dc_1', 'ws_acme', 'in_1', 'Keep refresh tokens server side', '["src/auth/*"]',
+                   '{"type":"agent","id":"ag_1"}'),
+                  ('dc_2', 'ws_acme', 'in_2', 'Use a queue', '["src/jobs/*"]',
+                   '{"type":"agent","id":"ag_1"}')"#,
+    )
+    .await;
+    sql(
+        f.w.db(),
+        r#"INSERT INTO task_thread_records ("issueId", "workspaceId", summary, "lastSyncBy")
+           VALUES ('in_1', 'ws_acme', 'Added metrics for refresh', '{"type":"agent","id":"ag_1"}')"#,
+    )
+    .await;
+
+    let res = f.get("q=refresh&types=decision,record").await;
+    assert_eq!(res.status, StatusCode::OK, "{}", res.message());
+    let results = res.body["results"].as_array().unwrap();
+    assert_eq!(results.len(), 2, "{results:?}");
+    let decision = results.iter().find(|r| r["type"] == "decision").unwrap();
+    assert_eq!(
+        *decision,
+        json!({
+            "type": "decision", "id": "dc_1", "key": "TRM-128", "issueId": "in_1",
+            "title": "Keep refresh tokens server side", "subtitle": "Refresh alerts", "score": 40
+        })
+    );
+    // the hit of a record is its task: title = the task's title, subtitle = the summary
+    let record = results.iter().find(|r| r["type"] == "record").unwrap();
+    assert_eq!(
+        *record,
+        json!({
+            "type": "record", "id": "in_1", "key": "TRM-128", "issueId": "in_1",
+            "title": "Refresh alerts", "subtitle": "Added metrics for refresh", "score": 55
+        })
+    );
+    // the task key finds both of its hits; the decision paths are searchable
+    assert_eq!(f.ids("q=trm-128&types=decision,record").await, ["dc_1", "in_1"]);
+    assert_eq!(f.ids("q=src%2Fjobs&types=decision").await, ["dc_2"]);
+    // without `types` every kind is searched
+    assert_eq!(f.ids("q=refresh").await, ["in_1", "in_1", "dc_1"]);
+    f.w.drop().await;
+}
+
+#[tokio::test]
+async fn decisions_and_records_follow_the_project_of_their_task() {
+    let Some(f) = fx().await else { return };
+    project(f.w.db(), "ws_acme", "pj_a", "Alpha", None, None).await;
+    project(f.w.db(), "ws_acme", "pj_b", "Beta", None, None).await;
+    issue(f.w.db(), "ws_acme", "in_a", "A-1", "Visible task", Some("pj_a")).await;
+    issue(f.w.db(), "ws_acme", "in_b", "B-1", "Hidden task", Some("pj_b")).await;
+    issue(f.w.db(), "ws_acme", "in_free", "F-1", "Free task", None).await;
+    for (n, task) in [("a", "in_a"), ("b", "in_b"), ("free", "in_free")] {
+        sql(
+            f.w.db(),
+            &format!(
+                r#"INSERT INTO task_decisions (id, "workspaceId", "issueId", text, "createdBy")
+                   VALUES ('dc_{n}', 'ws_acme', '{task}', 'Zebra decision {n}', '{{"type":"agent","id":"ag_1"}}');
+                   INSERT INTO task_thread_records ("issueId", "workspaceId", summary, "lastSyncBy")
+                   VALUES ('{task}', 'ws_acme', 'Zebra summary {n}', '{{"type":"agent","id":"ag_1"}}')"#
+            ),
+        )
+        .await;
+    }
+    let narrowed =
+        person(f.w.db(), "acme", "u_narrow", "member", Some(only_projects(&["pj_a"], false))).await;
+    let get = |cookie: &str| f.w.send(Req::get(&format!("{URL}?q=zebra")).session(cookie));
+    let mut ids = get(&narrowed).await.ids();
+    ids.sort();
+    assert_eq!(ids, ["dc_a", "in_a"]);
+    let with_free =
+        person(f.w.db(), "acme", "u_free", "member", Some(only_projects(&["pj_a"], true))).await;
+    let mut ids = get(&with_free).await.ids();
+    ids.sort();
+    assert_eq!(ids, ["dc_a", "dc_free", "in_a", "in_free"]);
+    assert_eq!(f.ids("q=zebra").await.len(), 6);
+    f.w.drop().await;
+}
+
 #[tokio::test]
 async fn limits_the_results() {
     let Some(f) = fx().await else { return };
@@ -185,7 +271,7 @@ async fn an_empty_search_finds_nothing() {
 #[tokio::test]
 async fn validates_the_query_like_class_validator() {
     let Some(f) = fx().await else { return };
-    let types = "each value in types must be one of the following values: project, issue, artifact";
+    let types = "each value in types must be one of the following values: project, issue, artifact, decision, record";
     let limit = "limit must not be greater than 100; limit must not be less than 1; limit must be an integer number";
     for (query, message) in [
         ("", "q must be a string".to_owned()),

@@ -1,4 +1,4 @@
-//! Searching projects, issues and artifacts (`search.service.ts`).
+//! Searching projects, issues, artifacts, task decisions and thread records (`search.service.ts`).
 //!
 //! Each type is one `ILIKE` query over its searchable columns (every word of the search must
 //! match at least one of them); the rows are scored in memory, the caller's project access is
@@ -19,16 +19,19 @@ use crate::schemas::{SearchResponse, SearchResult, SearchType};
 struct Spec {
     kind: SearchType,
     from: &'static str,
-    /// Selects `id`, `key`, `title`, `subtitle`, `legacyWorkstreamKey`, `body`, `projectId`.
+    /// Selects `id`, `key`, `title`, `subtitle`, `legacyWorkstreamKey`, `body`, `projectId` and,
+    /// when `with_issue`, `issueId`.
     select: &'static str,
     /// Searchable columns.
     fields: &'static [&'static str],
     /// Tie-break order between types.
     rank: u8,
     resource: MemberResource,
+    /// The rows name the task they belong to (`issueId`): decisions and records.
+    with_issue: bool,
 }
 
-const SPECS: [Spec; 3] = [
+const SPECS: [Spec; 5] = [
     Spec {
         kind: SearchType::Project,
         from: r#""projects" x"#,
@@ -36,6 +39,7 @@ const SPECS: [Spec; 3] = [
         fields: &[r#"x."name""#, r#"x."summary""#, r#"x."description""#],
         rank: 1,
         resource: MemberResource::Projects,
+        with_issue: false,
     },
     Spec {
         kind: SearchType::Issue,
@@ -44,6 +48,7 @@ const SPECS: [Spec; 3] = [
         fields: &[r#"x."key""#, r#"x."aliases"::text"#, r#"x."title""#, r#"x."body""#],
         rank: 3,
         resource: MemberResource::Issues,
+        with_issue: false,
     },
     Spec {
         kind: SearchType::Artifact,
@@ -52,6 +57,27 @@ const SPECS: [Spec; 3] = [
         fields: &[r#"x."externalId""#, r#"x."title""#],
         rank: 4,
         resource: MemberResource::Artifacts,
+        with_issue: false,
+    },
+    Spec {
+        // title = the decision, subtitle = its task's title
+        kind: SearchType::Decision,
+        from: r#""task_decisions" x JOIN "issues" i ON i."id" = x."issueId""#,
+        select: r#"x."id", i."key", x."text" AS title, i."title" AS subtitle, NULL AS "legacyWorkstreamKey", x."paths"::text AS body, i."projectId" AS "projectId", x."issueId" AS "issueId""#,
+        fields: &[r#"i."key""#, r#"x."text""#, r#"x."paths"::text"#],
+        rank: 5,
+        resource: MemberResource::Issues,
+        with_issue: true,
+    },
+    Spec {
+        // title = the task's title, subtitle = the start of the summary; the hit id is the task id
+        kind: SearchType::Record,
+        from: r#""task_thread_records" x JOIN "issues" i ON i."id" = x."issueId""#,
+        select: r#"x."issueId" AS id, i."key", i."title", left(COALESCE(x."summary", ''), 160) AS subtitle, NULL AS "legacyWorkstreamKey", x."summary" AS body, i."projectId" AS "projectId", x."issueId" AS "issueId""#,
+        fields: &[r#"i."key""#, r#"i."title""#, r#"x."summary""#],
+        rank: 6,
+        resource: MemberResource::Issues,
+        with_issue: true,
     },
 ];
 
@@ -73,6 +99,7 @@ struct Row {
     legacy_workstream_key: Option<String>,
     body: Option<String>,
     project_id: Option<String>,
+    issue_id: Option<String>,
 }
 
 /// `escapeLike`: a search word as a literal inside `ILIKE '%…%'`.
@@ -207,6 +234,7 @@ async fn load(
                 legacy_workstream_key: row.try_get("", "legacyWorkstreamKey")?,
                 body: row.try_get("", "body")?,
                 project_id: row.try_get("", "projectId")?,
+                issue_id: if spec.with_issue { row.try_get("", "issueId")? } else { None },
             })
         })
         .collect()
@@ -221,6 +249,7 @@ fn to_result(kind: SearchType, query: &str, row: Row) -> SearchResult {
         title: row.title,
         subtitle: row.subtitle,
         legacy_workstream_key: row.legacy_workstream_key.filter(|k| !k.is_empty()),
+        issue_id: row.issue_id.filter(|id| !id.is_empty()),
         score,
     }
 }
@@ -279,7 +308,6 @@ mod tests {
             "workstreamid",
             "originworkstreamid",
             "customers",
-            "decisions",
             "repositories",
             "teams",
             "originissueid",

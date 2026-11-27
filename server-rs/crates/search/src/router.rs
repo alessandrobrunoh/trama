@@ -19,8 +19,8 @@ pub fn router() -> Routes {
     Routes::new().get("/w/{slug}/search", Gate::authenticated(), search)
 }
 
-/// Searches projects, issues and artifacts by key, title and body. People limited to some
-/// projects only find work in those projects.
+/// Searches projects, issues, artifacts, task decisions and thread records by key, title and
+/// body. People limited to some projects only find work in those projects.
 #[utoipa::path(
     get,
     path = "/api/w/{slug}/search",

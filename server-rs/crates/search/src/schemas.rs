@@ -16,11 +16,16 @@ pub enum SearchType {
     Issue,
     /// An artifact (pull request, build, …).
     Artifact,
+    /// A decision an agent recorded on a task.
+    Decision,
+    /// The thread record of a task (the hit id is the task id).
+    Record,
 }
 
 impl SearchType {
     /// `SEARCH_TYPES`, in the order the validation message lists them.
-    pub const ALL: [Self; 3] = [Self::Project, Self::Issue, Self::Artifact];
+    pub const ALL: [Self; 5] =
+        [Self::Project, Self::Issue, Self::Artifact, Self::Decision, Self::Record];
 
     /// The wire string.
     #[must_use]
@@ -29,6 +34,8 @@ impl SearchType {
             Self::Project => "project",
             Self::Issue => "issue",
             Self::Artifact => "artifact",
+            Self::Decision => "decision",
+            Self::Record => "record",
         }
     }
 
@@ -48,16 +55,21 @@ pub struct SearchResult {
     pub kind: SearchType,
     /// Record id.
     pub id: String,
-    /// Human key: the issue key (or an alias), the artifact's external id.
+    /// Human key: the issue key (or an alias), the artifact's external id, the task key of a
+    /// decision or a record.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
-    /// Name or title.
+    /// Name or title; the decision itself for a decision, the task's title for a record.
     pub title: String,
-    /// Project status, `kind · status` of an issue, `kind · state` of an artifact.
+    /// Project status, `kind · status` of an issue, `kind · state` of an artifact, the title of
+    /// a decision's task, the start of a record's summary.
     pub subtitle: String,
     /// The retired Workstream an artifact came from, kept as provenance only.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub legacy_workstream_key: Option<String>,
+    /// The task a `decision` or `record` hit belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issue_id: Option<String>,
     /// Relevance: key match 60 to 100, title match 30 to 70, body match 20, anything else 10.
     pub score: u32,
 }
@@ -75,7 +87,8 @@ pub struct SearchResponse {
 pub struct SearchQuery {
     /// The text to look for; every word must match.
     pub q: String,
-    /// Comma-separated resource types: `project`, `issue`, `artifact`. Empty: all.
+    /// Comma-separated resource types: `project`, `issue`, `artifact`, `decision`, `record`.
+    /// Empty: all.
     #[param(value_type = Option<String>)]
     pub types: Vec<SearchType>,
     /// 1..=100, default 20.
@@ -172,8 +185,7 @@ mod tests {
     fn validates_like_class_validator() {
         assert_eq!(message(""), "q must be a string");
         assert_eq!(message("q=a&q=b"), "q must be a string");
-        let types =
-            "each value in types must be one of the following values: project, issue, artifact";
+        let types = "each value in types must be one of the following values: project, issue, artifact, decision, record";
         assert_eq!(message("q=a&types=nope"), types);
         assert_eq!(message("q=a&types=issue&types=nope"), types);
         let limit = "limit must not be greater than 100; limit must not be less than 1; limit must be an integer number";
