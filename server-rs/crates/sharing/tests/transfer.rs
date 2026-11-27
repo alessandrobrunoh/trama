@@ -289,6 +289,87 @@ async fn previews_and_then_moves_the_project_with_its_issues_guests_and_history(
     s.w.drop().await;
 }
 
+/// `updates go with their project when it is deleted or transferred` (`project-updates.e2e-spec`)
+/// and the thread records and decisions of the moved tasks.
+#[tokio::test]
+async fn moves_project_updates_thread_records_and_decisions_with_the_project() {
+    let Some(s) = scene().await else { return };
+    let w = &s.w;
+    let db = w.db();
+    // the target's "on track" health has another id; a health it has no entry for is dropped
+    let mut catalog = default_status_catalog();
+    for entry in &mut catalog.project_health {
+        if entry.kind == "on_track" {
+            entry.id = "st_on".to_owned();
+            entry.name = "On track".to_owned();
+        }
+    }
+    sql(
+        db,
+        &format!(
+            r#"UPDATE workspaces SET settings = jsonb_set(settings, '{{statuses}}', '{}'::jsonb) WHERE id = 'ws_tgt'"#,
+            serde_json::to_string(&catalog).unwrap()
+        ),
+    )
+    .await;
+    sql(db, r#"UPDATE projects SET health = 'on_track' WHERE id = 'pj_main'"#).await;
+    sql(
+        db,
+        r#"INSERT INTO project_updates (id, "workspaceId", "projectId", author, body, health) VALUES
+             ('pu_a', 'ws_src', 'pj_main', '{"type":"user","id":"u_owner"}', 'Mapped', 'on_track'),
+             ('pu_b', 'ws_src', 'pj_main', '{"type":"user","id":"u_owner"}', 'Kept as is', 'off_track'),
+             ('pu_c', 'ws_src', 'pj_main', '{"type":"user","id":"u_owner"}', 'Unknown there', 'retired'),
+             ('pu_d', 'ws_src', 'pj_main', '{"type":"user","id":"u_owner"}', 'No health', NULL)"#,
+    )
+    .await;
+    sql(
+        db,
+        r#"INSERT INTO issues (id, "workspaceId", key, number, kind, title, source, priority, status)
+           VALUES ('is_out', 'ws_src', 'UNPR-1', 1, 'bug', 'Stays behind', 'manual', 'none', 'backlog')"#,
+    )
+    .await;
+    sql(
+        db,
+        r#"INSERT INTO task_thread_records ("issueId", "workspaceId", summary, "lastSyncBy") VALUES
+             ('is_1', 'ws_src', 'Moves', '{"type":"agent","id":"ag_1"}'),
+             ('is_out', 'ws_src', 'Stays', '{"type":"agent","id":"ag_1"}');
+           INSERT INTO task_decisions (id, "workspaceId", "issueId", text, "createdBy") VALUES
+             ('dc_1', 'ws_src', 'is_1', 'Moves', '{"type":"agent","id":"ag_1"}'),
+             ('dc_2', 'ws_src', 'is_2', 'Moves too', '{"type":"agent","id":"ag_1"}'),
+             ('dc_out', 'ws_src', 'is_out', 'Stays', '{"type":"agent","id":"ag_1"}')"#,
+    )
+    .await;
+
+    let res = go(w, &s.owner, "tgt").await;
+    assert_eq!(res.status, StatusCode::OK, "{:?}", res.body);
+
+    assert_eq!(
+        one(
+            w,
+            r#"SELECT string_agg(concat_ws('|', id, "workspaceId", coalesce(health, '-')), ',' ORDER BY id) AS v FROM project_updates"#
+        )
+        .await,
+        "pu_a|ws_tgt|st_on,pu_b|ws_tgt|off_track,pu_c|ws_tgt|-,pu_d|ws_tgt|-"
+    );
+    assert_eq!(
+        one(
+            w,
+            r#"SELECT string_agg(concat_ws('|', "issueId", "workspaceId"), ',' ORDER BY "issueId") AS v FROM task_thread_records"#
+        )
+        .await,
+        "is_1|ws_tgt,is_out|ws_src"
+    );
+    assert_eq!(
+        one(
+            w,
+            r#"SELECT string_agg(concat_ws('|', id, "workspaceId"), ',' ORDER BY id) AS v FROM task_decisions"#
+        )
+        .await,
+        "dc_1|ws_tgt,dc_2|ws_tgt,dc_out|ws_src"
+    );
+    s.w.drop().await;
+}
+
 #[tokio::test]
 async fn carries_comments_artifacts_files_and_edges_and_clears_what_points_back() {
     let Some(s) = scene().await else { return };

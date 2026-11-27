@@ -1,7 +1,7 @@
 //! Moving a project to another workspace (`server/src/sharing/project-transfer.service.ts`).
 //!
-//! Moves a project, with its milestones, issues, time entries, comments, artifacts and history,
-//! to another workspace. The caller must be able to administer both workspaces. Issue keys are
+//! Moves a project, with its milestones, issues, time entries, comments, artifacts, thread
+//! records, written updates and history, to another workspace. The caller must be able to administer both workspaces. Issue keys are
 //! kept (so the project tag must be free in the target), statuses and labels are mapped to the
 //! target's by type and name, guests are carried over as limited members, and anything that
 //! pointed at a person who is not in the target is cleared. One transaction: either everything
@@ -697,6 +697,38 @@ async fn apply(txn: &DatabaseTransaction, plan: Plan) -> Result<Moved, Fail> {
     )
     .await?;
 
+    // written updates move with the project; the health each reported follows the mapping, or is
+    // dropped when the target has no such health
+    let target_health: HashSet<String> = resolve_workspace_settings(&target.settings)
+        .statuses
+        .project_health
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect();
+    let reported = ids_returned(
+        txn,
+        r#"SELECT DISTINCT "health" AS "id" FROM "project_updates"
+            WHERE "projectId" = $1 AND "health" IS NOT NULL"#,
+        vec![project.id.as_str().into()],
+    )
+    .await?;
+    for health in reported {
+        let next = mapped(&mapping.statuses.project_health, &health);
+        let next = target_health.contains(&next).then_some(next);
+        run_sql(
+            txn,
+            r#"UPDATE "project_updates" SET "health" = $3 WHERE "projectId" = $1 AND "health" = $2"#,
+            vec![project.id.as_str().into(), health.into(), next.into()],
+        )
+        .await?;
+    }
+    run_sql(
+        txn,
+        r#"UPDATE "project_updates" SET "workspaceId" = $1 WHERE "projectId" = $2"#,
+        vec![tgt.into(), project.id.as_str().into()],
+    )
+    .await?;
+
     let new_health =
         project.health.as_ref().map(|health| mapped(&mapping.statuses.project_health, health));
     let lead = project.lead_id.clone().filter(|id| target_people.contains(id));
@@ -723,6 +755,22 @@ async fn apply(txn: &DatabaseTransaction, plan: Plan) -> Result<Moved, Fail> {
         vec![tgt.into(), src.into(), project.id.as_str().into(), id_list(&issue_ids)],
     )
     .await?;
+
+    // the thread record and the decisions of a task go with the task
+    if !issue_ids.is_empty() {
+        for table in ["task_thread_records", "task_decisions"] {
+            run_sql(
+                txn,
+                &format!(
+                    r#"UPDATE "{table}" SET "workspaceId" = $1
+                        WHERE "workspaceId" = $2 AND "issueId" = {}"#,
+                    any_of(3)
+                ),
+                vec![tgt.into(), src.into(), id_list(&issue_ids)],
+            )
+            .await?;
+        }
+    }
 
     let artifact_ids = ids_returned(
         txn,
