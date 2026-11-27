@@ -57,7 +57,7 @@ a new spec cannot land unclassified.
 
 | Classification | Meaning | Files |
 | --- | --- | --- |
-| `parity` | Wire-level only: supertest/`Client`/`TokenClient` (plus `app.get(DataSource)` side-effect queries, which hit `trama_parity`). Runs unchanged against the Rust API. | 21 suites (see manifest) |
+| `parity` | Wire-level only: supertest/`Client`/`TokenClient` (plus `app.get(DataSource)` side-effect queries, which hit `trama_parity`). Runs unchanged against the Rust API. | 22 suites (see manifest) |
 | `provider-injection` | Swaps providers into an in-process NestJS app (`overrideProvider(HttpClient)` mocks, `vi.spyOn(webpush, …)`). The mock lives in the Node process, so it cannot intercept a separate Rust process. Still covered by `npm run test:e2e`. | `connection-ownership`, `external-identities`, `outgoing-webhooks`, `routing-rules`, `push` |
 | `migration` | TypeORM data migrations, executed directly on a throwaway database. Schema changes stay in the NestJS migration chain until the hand-over (see `server-rs/README.md`). | the five `*-migration` specs |
 | `in-process-only` | Wire-level behavior, but written against the in-process app surface: `live-relay` asserts on `EventsService.stream$` of two NestJS instances (the Postgres relay it exercises is byte-compatible by design, see `PORTING.md`); `events-stream-visibility` binds its own ephemeral port with `app.listen(0)` and needs a remote-aware harness to run against Rust. | `live-relay`, `events-stream-visibility` |
