@@ -1,0 +1,32 @@
+[package]
+name = "trama-uploads"
+description = "File uploads of the Trama API: the upload rules, storage, upload references and the /api/w/{slug}/uploads routes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum = { workspace = true, features = ["multipart"] }
+percent-encoding.workspace = true
+regex.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true
+trama-auth.workspace = true
+trama-contracts.workspace = true
+trama-core.workspace = true
+trama-entities.workspace = true
+trama-events.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+sea-orm-migration.workspace = true
+tokio.workspace = true
+tower.workspace = true
+trama-core = { workspace = true, features = ["test-support"] }
+trama-migration.workspace = true
+
+[lints]
+workspace = true

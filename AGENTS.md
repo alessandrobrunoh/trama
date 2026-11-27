@@ -2,13 +2,15 @@
 
 ## Project Structure
 
-The Angular frontend lives in `src/`: `app/core` contains shared state and services, `app/features` contains product areas, `app/shared` and `app/ui` contain reusable components, and `public/` holds static assets. The NestJS API is in `server/src`; its unit tests sit beside implementation files and end-to-end tests are in `server/test`. Shared domain contracts are in `contracts/`, with synchronization tooling in `scripts/`.
+The Angular frontend lives in `src/`: `app/core` contains shared state and services, `app/features` contains product areas, `app/shared` and `app/ui` contain reusable components, and `public/` holds static assets. The NestJS API is in `server/src`; its unit tests sit beside implementation files and end-to-end tests are in `server/test`. Shared domain contracts are in `contracts/`, with synchronization tooling in `scripts/`. The API is being ported to Rust in `server-rs/`, a Cargo workspace with one crate per domain under `server-rs/crates/`; see `server-rs/README.md`.
 
 ## Build, Test, and Development
 
 Install frontend dependencies with `npm install`. Use `npm start` to run the Angular app at `http://localhost:4300`, and `npm run build` for a production build. `npm test` runs Angular tests.
 
 The API has its own dependencies and scripts: run `cd server && npm install`, then `npm run db:up` and `npm run start:dev` for local development. Run API unit tests with `npm test`, end-to-end tests with `npm run test:e2e`, and checks with `npm run lint` or `npm run build`. End-to-end tests recreate the `trama_core_test` database; do not point that test configuration at data you need to keep.
+
+For the Rust API run `cd server-rs && cargo run`; check it with `cargo fmt --all --check`, `cargo clippy --all-targets --all-features` and `cargo test --workspace` (database tests use `TEST_DATABASE_URL` and create their own throwaway databases). Until the hand-over, schema changes stay in the NestJS migrations and the Rust baseline is regenerated with `server-rs/scripts/dump-baseline.sh`.
 
 ## Coding Style
 

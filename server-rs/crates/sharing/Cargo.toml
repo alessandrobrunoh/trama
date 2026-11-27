@@ -1,0 +1,36 @@
+[package]
+name = "trama-sharing"
+description = "Shared with me, Show in placements and moving a project between workspaces: the port of server/src/sharing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+indexmap.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+utoipa.workspace = true
+trama-auth.workspace = true
+trama-common.workspace = true
+trama-contracts.workspace = true
+trama-core.workspace = true
+trama-entities.workspace = true
+trama-events.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+sea-orm-migration.workspace = true
+tokio.workspace = true
+tower.workspace = true
+trama-core = { workspace = true, features = ["test-support"] }
+trama-migration.workspace = true
+
+[lints]
+workspace = true

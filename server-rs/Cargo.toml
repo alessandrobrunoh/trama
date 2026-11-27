@@ -1,0 +1,170 @@
+# The Rust API is its own Cargo workspace. The root package `trama-api` wires every module crate
+# into one Axum server; each domain lives in crates/<name> and exposes `router()` plus its
+# OpenAPI document.
+[workspace]
+resolver = "3"
+members = [".", "crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[workspace.dependencies]
+aes-gcm = "0.10.3"
+# Password hashes: argon2id, the PHC strings the NestJS `argon2` package writes.
+argon2 = { version = "0.5.3", features = ["std"] }
+async-trait = "0.1"
+axum = { version = "0.8.9", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA time zone names (workspace `timeZone` setting), matched case-insensitively like `Intl`.
+chrono-tz = { version = "0.10", features = ["case-insensitive"] }
+dotenvy = "0.15"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+hex = "0.4"
+http-body-util = "0.1"
+indexmap = "2"
+lettre = { version = "0.11.24", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1-rustls-tls"] }
+percent-encoding = "2"
+rand = "0.9"
+regex = "1"
+# ECDSA (VAPID), ECDH, HKDF and AES-GCM for Web Push; already in the tree through rustls.
+ring = "0.17"
+# Outgoing HTTP. Requests to user-chosen URLs go through trama_common::safe_fetch.
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+sha2 = "0.11"
+subtle = "2"
+sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-json", "with-chrono"] }
+sea-orm-migration = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1.54", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tokio-stream = "0.1.19"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["cors", "limit", "set-header", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+unicode-normalization = "0.1"
+url = "2"
+utoipa = { version = "6", features = ["chrono"] }
+utoipa-scalar = { version = "0.4", features = ["axum"] }
+
+trama-ai = { path = "crates/ai" }
+trama-artifacts = { path = "crates/artifacts" }
+trama-attention = { path = "crates/attention" }
+trama-auth = { path = "crates/auth" }
+trama-comments = { path = "crates/comments" }
+trama-common = { path = "crates/common" }
+trama-contracts = { path = "crates/contracts" }
+trama-core = { path = "crates/core" }
+trama-entities = { path = "crates/entities" }
+trama-events = { path = "crates/events" }
+trama-external-identities = { path = "crates/external-identities" }
+trama-favorites = { path = "crates/favorites" }
+trama-insights = { path = "crates/insights" }
+trama-importers = { path = "crates/importers" }
+trama-integrations = { path = "crates/integrations" }
+trama-issues = { path = "crates/issues" }
+trama-migration = { path = "crates/migration" }
+trama-milestones = { path = "crates/milestones" }
+trama-notifications = { path = "crates/notifications" }
+trama-outgoing-webhooks = { path = "crates/outgoing-webhooks" }
+trama-projects = { path = "crates/projects" }
+trama-routing = { path = "crates/routing" }
+trama-search = { path = "crates/search" }
+trama-sharing = { path = "crates/sharing" }
+trama-snapshot = { path = "crates/snapshot" }
+trama-system = { path = "crates/system" }
+trama-threads = { path = "crates/threads" }
+trama-time-entries = { path = "crates/time-entries" }
+trama-uploads = { path = "crates/uploads" }
+trama-views = { path = "crates/views" }
+trama-webhooks = { path = "crates/webhooks" }
+trama-workspaces = { path = "crates/workspaces" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# Keep file:line in backtraces for our code without the full debuginfo that bloats target/.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+# argon2 at 64 MiB × 3 passes takes seconds unoptimized; keep sign-up and login usable in dev
+# builds and tests.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
+[package]
+name = "trama-api"
+description = "Trama API server: composes the module crates into one Axum application."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+dotenvy.workspace = true
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+utoipa.workspace = true
+utoipa-scalar.workspace = true
+trama-ai.workspace = true
+trama-artifacts.workspace = true
+trama-attention.workspace = true
+trama-auth.workspace = true
+trama-comments.workspace = true
+trama-common.workspace = true
+trama-core.workspace = true
+trama-entities.workspace = true
+trama-events.workspace = true
+trama-external-identities.workspace = true
+trama-favorites.workspace = true
+trama-insights.workspace = true
+trama-importers.workspace = true
+trama-integrations.workspace = true
+trama-issues.workspace = true
+trama-migration.workspace = true
+trama-milestones.workspace = true
+trama-notifications.workspace = true
+trama-outgoing-webhooks.workspace = true
+trama-projects.workspace = true
+trama-routing.workspace = true
+trama-search.workspace = true
+trama-sharing.workspace = true
+trama-snapshot.workspace = true
+trama-system.workspace = true
+trama-threads.workspace = true
+trama-time-entries.workspace = true
+trama-uploads.workspace = true
+trama-views.workspace = true
+trama-webhooks.workspace = true
+trama-workspaces.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+serde_json.workspace = true
+tower.workspace = true
+trama-core = { path = "crates/core", features = ["test-support"] }
+
+[lints]
+workspace = true

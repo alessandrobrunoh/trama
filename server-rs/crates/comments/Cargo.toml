@@ -1,0 +1,36 @@
+[package]
+name = "trama-comments"
+description = "Comments of the Trama API: the /api/w/{slug}/comments routes, cursor pagination and the comment index of the snapshot."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+regex.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+url.workspace = true
+utoipa.workspace = true
+trama-auth.workspace = true
+trama-common.workspace = true
+trama-contracts.workspace = true
+trama-core.workspace = true
+trama-entities.workspace = true
+trama-events.workspace = true
+trama-uploads.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+sea-orm-migration.workspace = true
+tokio.workspace = true
+tower.workspace = true
+trama-core = { workspace = true, features = ["test-support"] }
+trama-migration.workspace = true
+
+[lints]
+workspace = true
