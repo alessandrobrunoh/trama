@@ -125,6 +125,11 @@ export const MANIFEST: SpecClassification[] = [
     note: 'Wire-level: thread-url validation cases.',
   },
   {
+    file: 'threads.e2e-spec.ts',
+    classification: 'parity',
+    note: 'Wire-level: thread sync, decisions, suggestions and estimate cases (cookie clients only).',
+  },
+  {
     file: 'token-permissions.e2e-spec.ts',
     classification: 'parity',
     note: 'Wire-level: API token scope cases.',
