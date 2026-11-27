@@ -301,7 +301,21 @@ async fn stores_a_thread_url_on_create_and_patch_and_clears_it_with_null() {
     assert!(other.get("threadUrl").is_none());
 
     let key = task["key"].as_str().unwrap();
+    // a task links one thread: another URL needs an unlink first, the same URL is a no-op
     let next = "http://localhost:4300/t/abc?x=1#top";
+    let refused = patch(&w, &t.owner, key, &json!({ "threadUrl": next })).await;
+    assert_eq!(refused.status, StatusCode::CONFLICT);
+    assert_eq!(refused.body["code"], "thread_already_linked");
+    assert_eq!(refused.body["threadUrl"], url);
+    assert_eq!(refused.body["statusCode"], 409);
+    assert_eq!(refused.body["error"], "Conflict");
+    let same = patch(&w, &t.owner, key, &json!({ "threadUrl": url })).await;
+    assert_eq!(same.status, StatusCode::OK);
+    assert_eq!(same.body["threadUrl"], url);
+    assert_eq!(
+        patch(&w, &t.owner, key, &json!({ "threadUrl": null })).await.status,
+        StatusCode::OK
+    );
     assert_eq!(
         patch(&w, &t.owner, key, &json!({ "threadUrl": next })).await.body["threadUrl"],
         next

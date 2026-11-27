@@ -65,6 +65,7 @@ pub mod roles;
 pub mod routing;
 pub mod settings;
 pub mod status;
+pub mod threads;
 pub mod views;
 
 pub use access::{MemberAccess, MemberAction, MemberGrant, MemberProjectScope, MemberResource};

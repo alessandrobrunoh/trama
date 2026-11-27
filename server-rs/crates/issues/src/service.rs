@@ -48,6 +48,7 @@ use crate::hierarchy::{
 };
 use crate::keys::{IssueKeyChange, IssueRekeyReason, allocate_issue_numbers, issue_key_prefix};
 use crate::rows::{present, strings};
+use crate::thread_link::assert_thread_linkable;
 
 /// An issue to create (`CreateIssueDto` after validation, or what an importer builds).
 #[derive(Clone, Debug, PartialEq)]
@@ -625,6 +626,11 @@ async fn prepare_update<C: ConnectionTrait>(
     refs_checked: bool,
     catalog: &[StatusEntry],
 ) -> Result<Prepared, AppError> {
+    assert_thread_linkable(
+        &row.key,
+        row.thread_url.as_deref(),
+        patch.thread_url.as_ref().and_then(Option::as_deref),
+    )?;
     let previous_assignee_id = row.assignee_id.clone();
     if !refs_checked {
         if let Some(assignee) = &patch.assignee_id {
@@ -915,6 +921,16 @@ pub async fn update(
         prepared.row.parent_id.clone_from(&current.parent_id);
         current.clone()
     };
+    if let Some(Some(next)) = &prepared.patch.thread_url {
+        // the row is locked now: a concurrent link that committed first wins
+        let stored: Option<Option<String>> = issues::Entity::find_by_id(row_id.clone())
+            .select_only()
+            .column(issues::Column::ThreadUrl)
+            .into_tuple()
+            .one(&txn)
+            .await?;
+        assert_thread_linkable(&relation.key, stored.flatten().as_deref(), Some(next))?;
+    }
     settle_key(&txn, workspace_id, &mut prepared, &relation, target_prefix.as_deref()).await?;
     save_rows(&txn, std::slice::from_ref(&prepared.row)).await?;
     txn.commit().await?;

@@ -51,7 +51,7 @@ fn api_to_member(segment: &str) -> Option<MemberResource> {
     Some(match segment {
         "projects" => MemberResource::Projects,
         "milestones" => MemberResource::Milestones,
-        "issues" | "tasks" => MemberResource::Issues,
+        "issues" | "tasks" | "decisions" => MemberResource::Issues,
         "artifacts" => MemberResource::Artifacts,
         "views" => MemberResource::Views,
         "comments" => MemberResource::Comments,
@@ -345,6 +345,19 @@ mod tests {
             grant_of("POST", "/api/w/:slug/projects/:id/updates").as_deref(),
             Some("projects:update")
         );
+    }
+
+    #[test]
+    fn treats_the_thread_record_like_the_task_it_belongs_to() {
+        assert_eq!(
+            grant_of("POST", "/api/w/:slug/tasks/:idOrKey/thread/sync").as_deref(),
+            Some("issues:update")
+        );
+        assert_eq!(
+            grant_of("GET", "/api/w/:slug/tasks/:idOrKey/thread").as_deref(),
+            Some("issues:view")
+        );
+        assert_eq!(grant_of("GET", "/api/w/:slug/decisions").as_deref(), Some("issues:view"));
     }
 
     #[test]

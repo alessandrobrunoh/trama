@@ -49,6 +49,7 @@ pub mod router;
 pub mod rows;
 pub mod schemas;
 pub mod service;
+pub mod thread_link;
 
 pub use keys::{IssueKeyChange, IssueRekeyReason};
 pub use router::{ApiDoc, router};

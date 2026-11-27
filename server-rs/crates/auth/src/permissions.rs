@@ -27,6 +27,8 @@ fn segment_resource(segment: &str) -> Option<ApiResource> {
         "settings" | "labels" | "statuses" => Some(ApiResource::Workspace),
         // importing from GitHub / Linear is an integration (admin); linking one task is a task edit
         "imports" => Some(ApiResource::Integrations),
+        // decisions an agent recorded on tasks (`trama decisions`): read with the tasks they belong to
+        "decisions" => Some(ApiResource::Tasks),
         _ => None,
     }
 }
@@ -196,6 +198,19 @@ mod tests {
     }
 
     #[test]
+    fn maps_the_thread_record_routes_to_the_task_permissions() {
+        let table = [
+            ("POST", "/api/w/:slug/tasks/:idOrKey/thread/sync", "tasks:write"),
+            ("GET", "/api/w/:slug/tasks/:idOrKey/thread", "tasks:read"),
+            ("GET", "/api/w/:slug/tasks/:idOrKey/estimate-suggestion", "tasks:read"),
+            ("GET", "/api/w/:slug/decisions", "tasks:read"),
+        ];
+        for (method, route, expected) in table {
+            assert_eq!(perm(method, route).as_deref(), Some(expected), "{method} {route}");
+        }
+    }
+
+    #[test]
     fn maps_nested_artifact_routes_to_artifacts() {
         let table = [
             ("GET", "/api/w/:slug/tasks/:idOrKey/artifacts", "artifacts:read"),
@@ -286,7 +301,7 @@ mod tests {
         let tools: Vec<serde_json::Value> = serde_json::from_str(&raw).unwrap();
         assert!(tools.len() > 50);
         let removed = Regex::new(
-            r"^/(teams|customers|customer-|decisions|releases|input-requests|repositories|intake)",
+            r"^/(teams|customers|customer-|releases|input-requests|repositories|intake)",
         )
         .unwrap();
         let param = Regex::new(r"\{(\w+)\}").unwrap();
