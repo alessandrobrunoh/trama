@@ -3,10 +3,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use trama_contracts::threads::TimeEntrySource;
 use trama_core::AppError;
 use trama_core::time::to_iso;
 use trama_core::validation::{Checks, js_len};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::service::{ManualTimeEntry, Target};
 
@@ -46,7 +47,46 @@ pub struct ManualTimeEntryDto {
     pub ended_at: Option<Value>,
 }
 
-/// The persisted time-entry wire representation.
+/// `GET /time-entries` (`ListTimeEntriesQuery`): `source` is optional.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ListTimeEntriesQuery {
+    /// Only entries of this source; without it suggestions are left out.
+    #[param(inline)]
+    pub source: Option<TimeEntrySource>,
+}
+
+impl ListTimeEntriesQuery {
+    /// `@IsOptional() @IsIn(SOURCES) source`, from the raw query string. A repeated key is an
+    /// array in Express and fails the check.
+    ///
+    /// # Errors
+    ///
+    /// 400 `source must be one of the following values: timer, manual, suggested`.
+    pub fn parse(raw: Option<&str>) -> Result<Self, AppError> {
+        let values: Vec<String> = url::form_urlencoded::parse(raw.unwrap_or_default().as_bytes())
+            .filter(|(key, _)| key == "source")
+            .map(|(_, value)| value.into_owned())
+            .collect();
+        let mut c = Checks::new();
+        let source = match values.as_slice() {
+            [one] => TimeEntrySource::parse(one),
+            _ => None,
+        };
+        if !values.is_empty() {
+            let allowed: Vec<&str> = TimeEntrySource::ALL.iter().map(|s| s.as_str()).collect();
+            c.check(
+                source.is_some(),
+                format!("source must be one of the following values: {}", allowed.join(", ")),
+            );
+        }
+        c.finish()?;
+        Ok(Self { source })
+    }
+}
+
+/// The persisted time-entry wire representation (`TimeEntryEntity.toJSON()`: nulls are left
+/// out).
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeEntry {
@@ -56,15 +96,21 @@ pub struct TimeEntry {
     pub workspace_id: String,
     /// Owner user id.
     pub user_id: String,
-    /// Project id or null.
+    /// Project id, absent when none.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
-    /// Issue id or null.
+    /// Issue id, absent when none.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub issue_id: Option<String>,
     /// Description.
     pub description: String,
+    /// Where the entry came from: `timer`, `manual`, or `suggested` by `trama sync` (it counts
+    /// once its owner accepts it).
+    pub source: TimeEntrySource,
     /// Start instant in ISO-8601 UTC form.
     pub started_at: String,
-    /// End instant in ISO-8601 UTC form, or null while running.
+    /// End instant in ISO-8601 UTC form, absent while running.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ended_at: Option<String>,
     /// Creation instant.
     pub created_at: String,
@@ -154,6 +200,7 @@ impl From<&trama_entities::time_entries::Model> for TimeEntry {
             project_id: row.project_id.clone(),
             issue_id: row.issue_id.clone(),
             description: row.description.clone(),
+            source: TimeEntrySource::parse(&row.source).unwrap_or(TimeEntrySource::Manual),
             started_at: to_iso(&row.started_at),
             ended_at: row.ended_at.as_ref().map(to_iso),
             created_at: to_iso(&row.created_at),
@@ -207,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn wire_format_uses_camel_case_and_null_for_nullable_fields() {
+    fn wire_format_uses_camel_case_and_leaves_out_nulls() {
         let row = TimeEntry {
             id: "te_1".into(),
             workspace_id: "ws_1".into(),
@@ -215,6 +262,7 @@ mod tests {
             project_id: None,
             issue_id: None,
             description: String::new(),
+            source: TimeEntrySource::Suggested,
             started_at: "2026-10-28T10:00:00.000Z".into(),
             ended_at: None,
             created_at: "2026-10-28T10:00:00.000Z".into(),
@@ -222,8 +270,30 @@ mod tests {
         };
         let value = serde_json::to_value(row).unwrap();
         assert_eq!(value["workspaceId"], "ws_1");
+        assert_eq!(value["source"], "suggested");
         assert!(value.get("started_at").is_none());
-        assert!(value["endedAt"].is_null());
-        assert!(value["projectId"].is_null());
+        assert!(value.get("endedAt").is_none());
+        assert!(value.get("projectId").is_none());
+        assert!(value.get("issueId").is_none());
+    }
+
+    #[test]
+    fn the_list_query_accepts_a_source_and_refuses_anything_else() {
+        let parse = |raw: Option<&str>| ListTimeEntriesQuery::parse(raw);
+        assert_eq!(parse(None).unwrap().source, None);
+        assert_eq!(parse(Some("")).unwrap().source, None);
+        assert_eq!(parse(Some("other=1")).unwrap().source, None);
+        assert_eq!(
+            parse(Some("source=suggested")).unwrap().source,
+            Some(TimeEntrySource::Suggested)
+        );
+        assert_eq!(parse(Some("source=timer")).unwrap().source, Some(TimeEntrySource::Timer));
+        for bad in ["source=", "source=nope", "source=timer&source=manual"] {
+            assert_eq!(
+                parse(Some(bad)).unwrap_err().to_string(),
+                "400 Bad Request: source must be one of the following values: timer, manual, suggested",
+                "{bad}"
+            );
+        }
     }
 }

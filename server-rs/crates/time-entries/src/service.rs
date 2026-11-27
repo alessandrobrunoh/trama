@@ -5,6 +5,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use trama_auth::member_access::{current_access, project_hidden};
+use trama_contracts::threads::TimeEntrySource;
 use trama_core::ids::uid;
 use trama_core::{AppError, AppState};
 use trama_entities::{issues, time_entries};
@@ -35,8 +36,12 @@ pub struct ManualTimeEntry {
 
 const END_BEFORE_START: &str = "The end must be after the start";
 const NO_TIMER: &str = "No timer is running";
+const NOT_SUGGESTED: &str = "Only a suggested entry can be accepted";
 
 /// Returns up to 100 of the caller's own entries, hiding projects outside their access.
+///
+/// Suggestions (`source: suggested`) are not entries yet: they are listed only when asked for
+/// with `source`, and `source` lists just that source.
 ///
 /// # Errors
 /// A database error.
@@ -44,11 +49,17 @@ pub async fn list(
     state: &AppState,
     workspace_id: &str,
     user_id: &str,
+    source: Option<TimeEntrySource>,
 ) -> Result<Vec<TimeEntry>, AppError> {
     let access = current_access();
+    let by_source = match source {
+        Some(source) => time_entries::Column::Source.eq(source.as_str()),
+        None => time_entries::Column::Source.ne(TimeEntrySource::Suggested.as_str()),
+    };
     let rows = time_entries::Entity::find()
         .filter(time_entries::Column::WorkspaceId.eq(workspace_id))
         .filter(time_entries::Column::UserId.eq(user_id))
+        .filter(by_source)
         .order_by_desc(time_entries::Column::StartedAt)
         .limit(100)
         .all(&state.db)
@@ -75,13 +86,7 @@ pub async fn start(
 ) -> Result<TimeEntry, AppError> {
     let (project_id, issue_id, description) = resolve_target(state, workspace_id, target).await?;
     let now = Utc::now().fixed_offset();
-    let running = time_entries::Entity::find()
-        .filter(time_entries::Column::WorkspaceId.eq(workspace_id))
-        .filter(time_entries::Column::UserId.eq(user_id))
-        .filter(time_entries::Column::EndedAt.is_null())
-        .all(&state.db)
-        .await?;
-    for row in running {
+    for row in running(state, workspace_id, user_id).await? {
         let mut active: time_entries::ActiveModel = row.into();
         active.ended_at = Set(Some(now));
         active.updated_at = Set(now);
@@ -114,12 +119,10 @@ pub async fn stop(
     workspace_id: &str,
     user_id: &str,
 ) -> Result<TimeEntry, AppError> {
-    let row = time_entries::Entity::find()
-        .filter(time_entries::Column::WorkspaceId.eq(workspace_id))
-        .filter(time_entries::Column::UserId.eq(user_id))
-        .filter(time_entries::Column::EndedAt.is_null())
-        .one(&state.db)
+    let row = running(state, workspace_id, user_id)
         .await?
+        .into_iter()
+        .next()
         .ok_or_else(|| AppError::bad_request(NO_TIMER))?;
     let now = Utc::now().fixed_offset();
     if now < row.started_at {
@@ -164,6 +167,54 @@ pub async fn add(
     .insert(&state.db)
     .await?;
     Ok(TimeEntry::from(&row))
+}
+
+/// Turns a suggestion of the caller (from `trama sync`) into a plain entry. Another person's
+/// entry, and one in a project the caller cannot open, is not found.
+///
+/// # Errors
+/// 404 when the entry is absent, owned by another user or hidden; 400
+/// `Only a suggested entry can be accepted`; otherwise a database error.
+pub async fn accept(
+    state: &AppState,
+    workspace_id: &str,
+    user_id: &str,
+    id: &str,
+) -> Result<TimeEntry, AppError> {
+    let row = time_entries::Entity::find()
+        .filter(time_entries::Column::Id.eq(id))
+        .filter(time_entries::Column::WorkspaceId.eq(workspace_id))
+        .one(&state.db)
+        .await?
+        .filter(|row| row.user_id == user_id)
+        .ok_or_else(|| AppError::entity_not_found("Time entry", id))?;
+    if row.project_id.is_some()
+        && project_hidden(current_access().as_deref(), row.project_id.as_deref())
+    {
+        return Err(AppError::entity_not_found("Time entry", id));
+    }
+    if row.source != TimeEntrySource::Suggested.as_str() {
+        return Err(AppError::bad_request(NOT_SUGGESTED));
+    }
+    let mut active: time_entries::ActiveModel = row.into();
+    active.source = Set(TimeEntrySource::Manual.as_str().to_owned());
+    active.updated_at = Set(Utc::now().fixed_offset());
+    Ok(TimeEntry::from(&active.update(&state.db).await?))
+}
+
+/// The caller's open timers. A suggestion is always finished, so it never counts as one.
+async fn running(
+    state: &AppState,
+    workspace_id: &str,
+    user_id: &str,
+) -> Result<Vec<time_entries::Model>, AppError> {
+    Ok(time_entries::Entity::find()
+        .filter(time_entries::Column::WorkspaceId.eq(workspace_id))
+        .filter(time_entries::Column::UserId.eq(user_id))
+        .filter(time_entries::Column::EndedAt.is_null())
+        .filter(time_entries::Column::Source.ne(TimeEntrySource::Suggested.as_str()))
+        .all(&state.db)
+        .await?)
 }
 
 /// Deletes only a record owned by this user in this workspace; other people's records look absent.

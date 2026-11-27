@@ -1,20 +1,21 @@
 //! `TimeEntriesController`, mounted under `/api`.
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use trama_auth::{Ctx, Gate, Routes};
+use trama_contracts::threads::TimeEntrySource;
 use trama_core::{ApiJson, AppError, AppState};
 use utoipa::OpenApi;
 
-use crate::schemas::{ManualTimeEntryDto, TargetDto, TimeEntry};
+use crate::schemas::{ListTimeEntriesQuery, ManualTimeEntryDto, TargetDto, TimeEntry};
 use crate::service;
 
 /// This module's OpenAPI document.
 #[derive(OpenApi)]
 #[openapi(
-    paths(list, start, stop, add, remove),
-    components(schemas(ManualTimeEntryDto, TargetDto, TimeEntry))
+    paths(list, accept, start, stop, add, remove),
+    components(schemas(ManualTimeEntryDto, TargetDto, TimeEntry, TimeEntrySource))
 )]
 pub struct ApiDoc;
 
@@ -26,22 +27,53 @@ const USER: Gate =
 pub fn router() -> Routes {
     Routes::new()
         .get("/w/{slug}/time-entries", USER, list)
+        .post("/w/{slug}/time-entries/{id}/accept", USER, accept)
         .post("/w/{slug}/time-entries/start", USER, start)
         .post("/w/{slug}/time-entries/stop", USER, stop)
         .post("/w/{slug}/time-entries", USER, add)
         .delete("/w/{slug}/time-entries/{id}", USER, remove)
 }
 
-/// Lists the signed-in user's recent entries.
+/// Lists the signed-in user's recent entries. Without `source`, suggestions are left out;
+/// `?source=suggested` lists only those.
 #[utoipa::path(get, path = "/api/w/{slug}/time-entries", tag = "time-entries",
-    params(("slug" = String, Path, description = "Workspace slug")),
+    params(("slug" = String, Path, description = "Workspace slug"), ListTimeEntriesQuery),
     responses((status = 200, description = "The caller's time entries", body = [TimeEntry]),
+        (status = 400, description = "Unknown source"),
         (status = 401, description = "Not signed in"), (status = 404, description = "Unknown workspace or not a member")))]
-async fn list(ctx: Ctx, State(state): State<AppState>) -> Result<Json<Vec<TimeEntry>>, AppError> {
+async fn list(
+    ctx: Ctx,
+    State(state): State<AppState>,
+    RawQuery(raw): RawQuery,
+) -> Result<Json<Vec<TimeEntry>>, AppError> {
+    let query = ListTimeEntriesQuery::parse(raw.as_deref())?;
     service::list(
         &state,
         &ctx.workspace.id,
         ctx.user_id.as_deref().ok_or_else(AppError::unauthorized)?,
+        query.source,
+    )
+    .await
+    .map(Json)
+}
+
+/// Counts a suggestion (from `trama sync`) as the caller's own time. Dismiss one with DELETE.
+#[utoipa::path(post, path = "/api/w/{slug}/time-entries/{id}/accept", tag = "time-entries",
+    params(("slug" = String, Path, description = "Workspace slug"), ("id" = String, Path, description = "Entry id")),
+    responses((status = 200, description = "The accepted entry", body = TimeEntry),
+        (status = 400, description = "Only a suggested entry can be accepted"),
+        (status = 401, description = "Not signed in"),
+        (status = 404, description = "Entry absent or owned by another person")))]
+async fn accept(
+    ctx: Ctx,
+    State(state): State<AppState>,
+    Path((_slug, id)): Path<(String, String)>,
+) -> Result<Json<TimeEntry>, AppError> {
+    service::accept(
+        &state,
+        &ctx.workspace.id,
+        ctx.user_id.as_deref().ok_or_else(AppError::unauthorized)?,
+        &id,
     )
     .await
     .map(Json)
