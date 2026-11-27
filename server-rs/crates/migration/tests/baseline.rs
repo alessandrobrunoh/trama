@@ -30,8 +30,8 @@ async fn creates_the_schema_in_an_empty_database() {
 
     Migrator::up(&test.db, None).await.unwrap();
 
-    // 37 domain tables + TypeORM's `migrations`.
-    assert_eq!(public_tables(&test.db).await, 38);
+    // 40 domain tables + TypeORM's `migrations`.
+    assert_eq!(public_tables(&test.db).await, 41);
     let last = count(
         &test.db,
         &format!("SELECT count(*) FROM migrations WHERE name = '{LAST_TYPEORM_MIGRATION}'"),
@@ -41,7 +41,7 @@ async fn creates_the_schema_in_an_empty_database() {
 
     // Running again is a no-op.
     Migrator::up(&test.db, None).await.unwrap();
-    assert_eq!(public_tables(&test.db).await, 38);
+    assert_eq!(public_tables(&test.db).await, 41);
     test.drop().await;
 }
 

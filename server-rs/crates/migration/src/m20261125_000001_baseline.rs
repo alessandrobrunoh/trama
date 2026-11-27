@@ -11,7 +11,7 @@ use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::{ConnectionTrait, DbBackend, Statement};
 
 /// The newest TypeORM migration included in `baseline.sql`.
-pub const LAST_TYPEORM_MIGRATION: &str = "ExternalIdentities1794400000000";
+pub const LAST_TYPEORM_MIGRATION: &str = "TimeEntrySource1794700000000";
 
 const BASELINE_SQL: &str = include_str!("baseline.sql");
 

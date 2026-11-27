@@ -45,6 +45,8 @@ pub enum Relation {
     Milestones,
     #[sea_orm(has_many = "super::project_placements::Entity")]
     ProjectPlacements,
+    #[sea_orm(has_many = "super::project_updates::Entity")]
+    ProjectUpdates,
     #[sea_orm(has_many = "super::routing_rules::Entity")]
     RoutingRules,
     #[sea_orm(has_many = "super::time_entries::Entity")]
@@ -82,6 +84,12 @@ impl Related<super::milestones::Entity> for Entity {
 impl Related<super::project_placements::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ProjectPlacements.def()
+    }
+}
+
+impl Related<super::project_updates::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProjectUpdates.def()
     }
 }
 

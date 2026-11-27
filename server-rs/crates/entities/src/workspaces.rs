@@ -57,6 +57,8 @@ pub enum Relation {
     OutgoingWebhooks,
     #[sea_orm(has_many = "super::project_placements::Entity")]
     ProjectPlacements,
+    #[sea_orm(has_many = "super::project_updates::Entity")]
+    ProjectUpdates,
     #[sea_orm(has_many = "super::projects::Entity")]
     Projects,
     #[sea_orm(has_many = "super::routing_rule_items::Entity")]
@@ -65,6 +67,10 @@ pub enum Relation {
     RoutingRules,
     #[sea_orm(has_many = "super::saved_views::Entity")]
     SavedViews,
+    #[sea_orm(has_many = "super::task_decisions::Entity")]
+    TaskDecisions,
+    #[sea_orm(has_many = "super::task_thread_records::Entity")]
+    TaskThreadRecords,
     #[sea_orm(has_many = "super::time_entries::Entity")]
     TimeEntries,
     #[sea_orm(has_many = "super::tracker_credentials::Entity")]
@@ -193,6 +199,12 @@ impl Related<super::project_placements::Entity> for Entity {
     }
 }
 
+impl Related<super::project_updates::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProjectUpdates.def()
+    }
+}
+
 impl Related<super::projects::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Projects.def()
@@ -214,6 +226,18 @@ impl Related<super::routing_rules::Entity> for Entity {
 impl Related<super::saved_views::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::SavedViews.def()
+    }
+}
+
+impl Related<super::task_decisions::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TaskDecisions.def()
+    }
+}
+
+impl Related<super::task_thread_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TaskThreadRecords.def()
     }
 }
 

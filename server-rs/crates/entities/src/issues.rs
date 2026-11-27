@@ -79,6 +79,10 @@ pub enum Relation {
     Projects,
     #[sea_orm(has_many = "super::routing_rule_items::Entity")]
     RoutingRuleItems,
+    #[sea_orm(has_many = "super::task_decisions::Entity")]
+    TaskDecisions,
+    #[sea_orm(has_one = "super::task_thread_records::Entity")]
+    TaskThreadRecords,
     #[sea_orm(has_many = "super::time_entries::Entity")]
     TimeEntries,
     #[sea_orm(
@@ -114,6 +118,18 @@ impl Related<super::projects::Entity> for Entity {
 impl Related<super::routing_rule_items::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::RoutingRuleItems.def()
+    }
+}
+
+impl Related<super::task_decisions::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TaskDecisions.def()
+    }
+}
+
+impl Related<super::task_thread_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TaskThreadRecords.def()
     }
 }
 
