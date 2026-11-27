@@ -72,8 +72,19 @@ fn issue_kind(labels: &[String]) -> IssueKind {
 ///
 /// Database or issue-creation errors. The caller must authenticate the webhook before invoking
 /// this method.
-#[allow(clippy::too_many_lines)]
 pub async fn route_issue(
+    state: &AppState,
+    connection_id: &str,
+    provider: GitProvider,
+    repo: &RepoMeta,
+    candidate: &IssueCandidate,
+) -> Result<RoutedIssue, AppError> {
+    // Boxed for the same reason as `route_pull_request`.
+    Box::pin(place_issue(state, connection_id, provider, repo, candidate)).await
+}
+
+#[allow(clippy::too_many_lines)]
+async fn place_issue(
     state: &AppState,
     connection_id: &str,
     provider: GitProvider,
@@ -282,8 +293,20 @@ async fn record_success(state: &AppState, rule_id: &str) -> Result<(), AppError>
 /// # Errors
 ///
 /// Database, issue creation or artifact-linking errors.
-#[allow(clippy::too_many_lines)]
 pub async fn route_pull_request(
+    state: &AppState,
+    connection_id: &str,
+    provider: GitProvider,
+    repo: &RepoMeta,
+    candidate: &ArtifactCandidate,
+    meta: &ItemMeta,
+) -> Result<RoutedPullRequest, AppError> {
+    // Boxed: creating a task makes this future large, and every webhook handler awaits it.
+    Box::pin(place_pull_request(state, connection_id, provider, repo, candidate, meta)).await
+}
+
+#[allow(clippy::too_many_lines)]
+async fn place_pull_request(
     state: &AppState,
     connection_id: &str,
     provider: GitProvider,

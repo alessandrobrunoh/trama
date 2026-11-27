@@ -181,6 +181,7 @@ async fn handle(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn dispatch(
     state: &AppState,
     connection: &integration_connections::Model,
@@ -829,7 +830,7 @@ async fn process_issue(
     match routed.status {
         trama_routing::inbound::RoutedIssueStatus::Ignored | trama_routing::inbound::RoutedIssueStatus::Unchanged => Ok(accepted("nothing to change")),
         trama_routing::inbound::RoutedIssueStatus::Created => Ok((StatusCode::OK, Json(json!({"status":"processed","routed":"created","issues":routed.key.into_iter().collect::<Vec<_>>()}))).into_response()),
-        _ => Ok((StatusCode::OK, Json(json!({"status":"processed","routed":"updated","issues":routed.key.into_iter().collect::<Vec<_>>()}))).into_response()),
+        trama_routing::inbound::RoutedIssueStatus::Updated => Ok((StatusCode::OK, Json(json!({"status":"processed","routed":"updated","issues":routed.key.into_iter().collect::<Vec<_>>()}))).into_response()),
     }
 }
 
