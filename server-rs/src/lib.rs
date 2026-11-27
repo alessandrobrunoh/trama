@@ -42,6 +42,7 @@ fn routes() -> Routes {
         .merge(trama_sharing::router())
         .merge(trama_snapshot::router())
         .merge(trama_system::router())
+        .merge(trama_threads::router())
         .merge(trama_time_entries::router())
         .merge(trama_uploads::router())
         .merge(trama_views::router())

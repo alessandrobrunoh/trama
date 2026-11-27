@@ -78,6 +78,7 @@ trama-search = { path = "crates/search" }
 trama-sharing = { path = "crates/sharing" }
 trama-snapshot = { path = "crates/snapshot" }
 trama-system = { path = "crates/system" }
+trama-threads = { path = "crates/threads" }
 trama-time-entries = { path = "crates/time-entries" }
 trama-uploads = { path = "crates/uploads" }
 trama-views = { path = "crates/views" }
@@ -152,6 +153,7 @@ trama-search.workspace = true
 trama-sharing.workspace = true
 trama-snapshot.workspace = true
 trama-system.workspace = true
+trama-threads.workspace = true
 trama-time-entries.workspace = true
 trama-uploads.workspace = true
 trama-views.workspace = true

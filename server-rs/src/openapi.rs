@@ -33,7 +33,8 @@ use utoipa::openapi::OpenApi as Document;
         (name = "sharing", description = "Shared with me, Show in placements and project transfer"),
         (name = "snapshot", description = "Everything the client needs to boot a workspace in one call"),
         (name = "system", description = "Health and operations"),
-        (name = "time-entries", description = "Personal time entries and timers"),
+        (name = "threads", description = "The record an agent keeps of a task's thread: summary, files, decisions and estimate hints"),
+        (name = "time-entries",description = "Personal time entries and timers"),
         (name = "uploads", description = "Files stored in the workspace and attached to records"),
         (name = "views", description = "Saved views, sharing and the public link"),
         (name = "webhooks", description = "Verified inbound git provider webhooks"),
@@ -68,6 +69,7 @@ pub fn api_doc() -> Document {
     doc.merge(trama_sharing::invites::InviteApiDoc::openapi());
     doc.merge(trama_snapshot::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
+    doc.merge(trama_threads::ApiDoc::openapi());
     doc.merge(trama_time_entries::ApiDoc::openapi());
     doc.merge(trama_uploads::ApiDoc::openapi());
     doc.merge(trama_views::ApiDoc::openapi());
