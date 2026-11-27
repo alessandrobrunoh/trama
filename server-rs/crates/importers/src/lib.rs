@@ -5,6 +5,7 @@
 //! the NestJS module.
 pub mod adapter;
 pub mod credentials;
+mod external_links;
 mod github;
 pub mod github_adapter;
 pub mod linear_adapter;
