@@ -1,13 +1,18 @@
-//! Workspace-scoped issue-tracker imports.
+//! Workspace-scoped issue-tracker imports (`server/src/importers`).
 //!
-//! This first port covers safe workspace-scoped credential/job reads and the job lifecycle
-//! controls. Provider discovery, encrypted credential creation, and import execution remain
-//! separate follow-up slices; no route here exposes stored credential ciphertext.
-mod credentials;
+//! Credentials are stored encrypted and never returned. Preview, job creation, the import
+//! engine and its background runner, and links from existing tasks to external issues follow
+//! the NestJS module.
+pub mod adapter;
+pub mod credentials;
 mod github;
+pub mod github_adapter;
+pub mod linear_adapter;
+pub mod mapping;
 mod router;
 mod service;
 mod sink;
+pub mod types;
 
 pub use github::execute_github_job;
 pub use router::{ApiDoc, router};

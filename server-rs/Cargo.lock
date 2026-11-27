@@ -3645,6 +3645,7 @@ dependencies = [
  "async-trait",
  "axum",
  "chrono",
+ "regex",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -3658,6 +3659,7 @@ dependencies = [
  "trama-integrations",
  "trama-issues",
  "trama-migration",
+ "trama-routing",
  "url",
  "utoipa",
 ]
