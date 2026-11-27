@@ -8,7 +8,6 @@
 //     [filters]="filters()" (filtersChange)="filters.set($event)"
 //     [items]="items()" [ctx]="ctx()"                   <!-- what the value counts are taken from -->
 //     [locked]="scope()"                                <!-- a scope the user cannot remove (My tasks) -->
-//     [matchable]="true" [match]="match()" (matchChange)="match.set($event)"   <!-- All / Any -->
 //     [sort]="sort()" (sortChange)="setSort($event)"
 //     [groupBy]="group()" (groupByChange)="setGroup($event)">
 //     <div leading>…</div>                      <!-- optional, before the chips (layout switch) -->
@@ -29,7 +28,6 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { LucideDynamicIcon, LucideLock, LucidePlus } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import {
@@ -37,6 +35,7 @@ import {
   TramaStore,
   buildFilter,
   datePresetOf,
+  defaultOperator,
   describeDateToken,
   filterFields,
   operatorLabel,
@@ -52,7 +51,7 @@ import {
   type ViewEntity,
   type ViewFilter,
 } from '../../core';
-import { OptionLeading, type PickOption } from '../../features/views/option-controls';
+import { type PickOption } from '../../features/views/option-controls';
 import { fieldLabel, valueColor, valueGlyph, valueLabel } from '../../features/views/view-model';
 import { iconOfField, nounOfField } from './filter-fields';
 import { CHIP_SEGMENT, CHIP_SEGMENT_BUTTON, FilterChip } from './filter-chip';
@@ -97,6 +96,8 @@ interface Chip {
   label: string;
   icon: ReturnType<typeof iconOfField>;
   filter: ViewFilter;
+  /** A field offered up front with no filter on it yet: "Assignee any". */
+  placeholder: boolean;
   op: FilterOp;
   opText: string;
   ops: readonly { id: FilterOp; label: string }[];
@@ -124,8 +125,6 @@ interface ViewChip {
   imports: [
     HlmDropdownMenuImports,
     HlmPopoverImports,
-    LucideDynamicIcon,
-    OptionLeading,
     FilterChip,
     FilterMenu,
   ],
@@ -140,10 +139,10 @@ interface ViewChip {
         [removable]="v.active && canEdit()"
         (removed)="presetPick.emit({ field: v.field, id: v.presets[0].id })"
       >
-        <span [class]="segment">{{ v.label }}</span>
+        <span [class]="segment + ' text-muted-foreground'">{{ v.label }}</span>
         <button
           type="button"
-          [class]="segmentButton + ' border-l ' + (v.active ? 'border-primary/25' : 'border-border')"
+          [class]="segmentButton"
           [hlmDropdownMenuTrigger]="viewMenu"
           [disabled]="!canEdit()"
           [attr.aria-label]="v.label + ' view: ' + v.value"
@@ -175,63 +174,37 @@ interface ViewChip {
     @for (l of lockedChips(); track l.field) {
       <app-filter-chip [label]="l.aria" [active]="false" [removable]="false">
         <span [class]="segment" [attr.title]="'Always applied on this page'">
-          <svg [lucideIcon]="lockIcon" [size]="11" class="text-faint"></svg>
-          <svg [lucideIcon]="l.icon" [size]="12" class="text-muted-foreground"></svg>
           <span class="text-muted-foreground">{{ l.label }}</span>
         </span>
-        <span [class]="segment + ' border-border text-muted-foreground border-l'">{{ l.opText }}</span>
+        <span [class]="segment + ' text-foreground'">{{ l.opText }}</span>
         @if (l.hasValue) {
-          <span [class]="segment + ' border-border border-l'">
-            @if (l.lead; as lead) {
-              <app-option-leading [option]="lead" />
-            }
+          <span [class]="segment">
             <span class="text-foreground truncate">{{ l.valueText }}</span>
           </span>
         }
       </app-filter-chip>
     }
 
-    @if (matchable() && canEdit() && chips().length > 1) {
-      <span
-        class="border-border flex h-[22px] shrink-0 items-stretch border font-mono text-[11px]"
-        role="group"
-        aria-label="Match filters"
-      >
-        <span class="text-faint flex items-center px-1.5">Match</span>
-        @for (m of matchOptions; track m.id) {
-          <button
-            type="button"
-            class="border-border -ms-px flex items-center border-l px-2 outline-none focus-visible:underline"
-            [class]="match() === m.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="match() === m.id"
-            (click)="matchChange.emit(m.id)"
-          >
-            {{ m.label }}
-          </button>
-        }
-      </span>
-    }
-
     @for (c of chips(); track c.field) {
       <app-filter-chip
+        [class]="c.placeholder ? 'max-md:hidden' : ''"
         [label]="c.aria"
-        [active]="true"
-        [removable]="canEdit()"
+        [active]="!c.placeholder"
+        [removable]="!c.placeholder && canEdit()"
         (removed)="removeFilter(c.field)"
       >
-        <span [class]="segment">
-          <svg [lucideIcon]="c.icon" [size]="12" class="text-muted-foreground"></svg>
-          <span class="text-muted-foreground">{{ c.label }}</span>
-        </span>
+        <span [class]="segment + ' text-muted-foreground'">{{ c.label }}</span>
 
-        @if (c.editable && canEdit() && c.ops.length > 1) {
+        @if (c.placeholder) {
+          <!-- a field the bar offers up front: "Assignee any" -->
+        } @else if (c.editable && canEdit() && c.ops.length > 1) {
           <button
             type="button"
-            [class]="segmentButton + ' border-primary/25 border-l'"
+            [class]="segmentButton + ' text-foreground'"
             [hlmDropdownMenuTrigger]="opMenu"
             [attr.aria-label]="c.label + ' operator: ' + c.opText"
           >
-            <span class="text-muted-foreground">{{ c.opText }}</span>
+            <span>{{ c.opText }}</span>
           </button>
           <ng-template #opMenu>
             <hlm-dropdown-menu class="w-52">
@@ -250,7 +223,7 @@ interface ViewChip {
             </hlm-dropdown-menu>
           </ng-template>
         } @else {
-          <span [class]="segment + ' text-muted-foreground border-primary/25 border-l'">{{ c.opText }}</span>
+          <span [class]="segment + ' text-foreground'">{{ c.opText }}</span>
         }
 
         @if (c.hasValue) {
@@ -265,12 +238,9 @@ interface ViewChip {
               <button
                 hlmPopoverTrigger
                 type="button"
-                [class]="segmentButton + ' border-primary/25 border-l'"
+                [class]="segmentButton"
                 [attr.aria-label]="c.label + ' value: ' + c.valueText"
               >
-                @if (c.lead; as lead) {
-                  <app-option-leading [option]="lead" />
-                }
                 <span class="text-foreground truncate">{{ c.valueText }}</span>
               </button>
               <hlm-popover-content *hlmPopoverPortal class="w-72 gap-0 p-0">
@@ -287,10 +257,7 @@ interface ViewChip {
               </hlm-popover-content>
             </hlm-popover>
           } @else {
-            <span [class]="segment + ' border-primary/25 border-l'">
-              @if (c.lead; as lead) {
-                <app-option-leading [option]="lead" />
-              }
+            <span [class]="segment">
               <span class="text-foreground truncate">{{ c.valueText }}</span>
             </span>
           }
@@ -298,17 +265,8 @@ interface ViewChip {
       </app-filter-chip>
     }
 
-    @if (canEdit() && chips().length) {
-      <button
-        type="button"
-        class="text-faint hover:text-foreground hover:bg-hover inline-flex h-[22px] shrink-0 items-center px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
-        (click)="clear()"
-      >
-        Clear
-      </button>
-    }
-
     @if (canEdit() && fields().length) {
+      <!-- No visible "+" (the v3 bar has none): Filter · F opens this menu, anchored where the chips end. -->
       <hlm-popover
         class="contents"
         align="start"
@@ -319,13 +277,11 @@ interface ViewChip {
         <button
           hlmPopoverTrigger
           type="button"
-          class="text-faint hover:text-foreground hover:bg-hover aria-expanded:text-foreground inline-flex h-[22px] shrink-0 items-center gap-1 px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
+          class="sr-only"
+          tabindex="-1"
           aria-label="Add filter"
           aria-keyshortcuts="f"
-        >
-          <svg [lucideIcon]="plusIcon" [size]="11"></svg>
-          <span class="max-sm:hidden">Filter</span>
-        </button>
+        ></button>
         <hlm-popover-content *hlmPopoverPortal class="w-72 gap-0 p-0">
           <app-filter-menu
             [entity]="entity()"
@@ -339,7 +295,7 @@ interface ViewChip {
         </hlm-popover-content>
       </hlm-popover>
     }
-    @if (!chips().length && !lockedChips().length && !viewChips().length && !canEdit()) {
+    @if (!activeCount() && !lockedChips().length && !viewChips().length && !canEdit()) {
       <span class="text-faint font-mono text-[11px]">No filters</span>
     }
 
@@ -461,9 +417,8 @@ export class FilterBar {
   readonly ctx = input<QueryContext>({});
   /** A scope the user cannot remove, shown as locked chips before the others ("Assignee is me"). */
   readonly locked = input<readonly ViewFilter[]>([]);
-  /** Offer the All / Any switch once there are two filters. */
-  readonly matchable = input(false);
-  readonly match = input<FilterMatch>('all');
+  /** Fields shown up front as "Assignee any" chips until a filter is set on them (the v3 chip row). */
+  readonly suggested = input<readonly string[]>([]);
   /** Named views as chips of their own, by field. */
   readonly presets = input<Readonly<Record<string, readonly FilterPreset[]>>>({});
   /** The preset in force, by field (an id of `presets[field]`). */
@@ -472,17 +427,10 @@ export class FilterBar {
   readonly filtersChange = output<ViewFilter[]>();
   readonly sortChange = output<FilterBarSort | null>();
   readonly groupByChange = output<string | null>();
-  readonly matchChange = output<FilterMatch>();
   readonly presetPick = output<{ field: string; id: string }>();
 
-  protected readonly plusIcon = LucidePlus;
-  protected readonly lockIcon = LucideLock;
   protected readonly segment = CHIP_SEGMENT;
   protected readonly segmentButton = CHIP_SEGMENT_BUTTON;
-  protected readonly matchOptions: readonly { id: FilterMatch; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'any', label: 'Any' },
-  ];
 
   protected readonly addOpen = signal(false);
   /** The field whose value popover is open. */
@@ -517,7 +465,25 @@ export class FilterBar {
     }
     return out;
   });
-  protected readonly chips = computed<Chip[]>(() => this.filters().map((f) => this.chipOf(f)));
+  /** Filters that are on (`chips`) plus the suggested fields, which stay in the row as "Field any" until used. */
+  protected readonly chips = computed<Chip[]>(() => {
+    const on = this.filters();
+    const lockedFields = new Set(this.locked().map((f) => f.field));
+    const available = new Set(this.fields().map((d) => d.field));
+    const out: Chip[] = [];
+    if (this.canEdit()) {
+      for (const field of this.suggested()) {
+        if (lockedFields.has(field) || !available.has(field)) continue;
+        const f = on.find((x) => x.field === field);
+        out.push(f ? this.chipOf(f) : this.placeholderOf(field));
+      }
+    }
+    const shown = new Set(out.map((c) => c.field));
+    for (const f of on) if (!shown.has(f.field)) out.push(this.chipOf(f));
+    return out;
+  });
+  /** How many of `chips` have a filter on them. */
+  protected readonly activeCount = computed(() => this.chips().filter((c) => !c.placeholder).length);
   protected readonly lockedChips = computed<Chip[]>(() => this.locked().map((f) => this.chipOf(f)));
 
   /** Open the "add filter" menu (the F shortcut). */
@@ -539,6 +505,25 @@ export class FilterBar {
     );
   }
 
+  private placeholderOf(field: string): Chip {
+    const def = this.defOf(field);
+    const op = defaultOperator(def);
+    return {
+      field,
+      label: def.label,
+      icon: iconOfField(field),
+      filter: buildFilter(field, op, []),
+      placeholder: true,
+      op,
+      opText: 'any',
+      ops: [],
+      editable: true,
+      hasValue: true,
+      valueText: 'any',
+      aria: `${def.label} any`,
+    };
+  }
+
   private chipOf(filter: ViewFilter): Chip {
     const def = this.defOf(filter.field);
     const available = operatorsFor(def, this.extended());
@@ -554,6 +539,7 @@ export class FilterBar {
       label: def.label,
       icon: iconOfField(filter.field),
       filter,
+      placeholder: false,
       op,
       opText,
       ops: available.map((id) => ({ id, label: operatorMenuLabel(id, def.kind) })),
@@ -616,10 +602,6 @@ export class FilterBar {
 
   protected removeFilter(field: string): void {
     this.filtersChange.emit(replaceFilter(this.filters(), field, null));
-  }
-
-  protected clear(): void {
-    this.filtersChange.emit([]);
   }
 
   /** The operator segment: keep the values when the new operator reads them the same way, else start over. */

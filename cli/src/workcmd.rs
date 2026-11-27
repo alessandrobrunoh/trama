@@ -26,7 +26,27 @@ pub const EXTRA_ROWS: &[(&str, &str, &str, &str, &str, &str)] = &[
     ("timer", "timer list", "GET", "/time-entries", "user key", "Your latest time entries, optionally of one task, with durations"),
     ("timer", "timer add", "POST", "/time-entries", "user key", "Add a finished time entry"),
     ("timer", "timer delete", "DELETE", "/time-entries/{id}", "user key", "Delete one of your time entries"),
+    // The short verbs of `/trama` (`shortcmd.rs`).
+    ("task", "show", "GET", "/tasks/{id}/context", "tasks:read", "A task with its subtasks, decisions and thread record"),
+    ("task", "ls", "GET", "/tasks", "tasks:read", "Open tasks, yours with --mine"),
+    ("task", "link", "PATCH", "/tasks/{id}", "tasks:write", "Link the current thread to a task (one thread per task)"),
+    ("task", "sub", "POST", "/tasks", "tasks:write", "New subtask of a task, in its project, optionally linked to the thread"),
+    ("task", "status", "PATCH", "/tasks/{id}", "tasks:write", "Set a task's status (workspace status names work too)"),
+    ("thread", "sync", "POST", "/tasks/{id}/thread/sync", "tasks:write", "Update the task's thread record: summary, decisions, files, PR, active minutes"),
+    ("decision", "decisions", "GET", "/decisions", "tasks:read", "Past decisions, by file path or task"),
+    ("search", "ask", "GET", "/search", "search:read", "Decisions and thread records that match a question (no generated answer)"),
+    ("estimate", "estimate", "GET", "/tasks/{id}/estimate-suggestion", "tasks:read", "Points suggested from similar finished tasks (you decide)"),
+    ("time", "time start", "POST", "/time-entries/start", "user key", "Start your timer, on a task if given (same as `timer start`)"),
+    ("time", "time stop", "POST", "/time-entries/stop", "user key", "Stop your running timer"),
+    ("time", "time status", "GET", "/time-entries", "user key", "The running timer and its task"),
+    ("time", "time log", "POST", "/time-entries", "user key", "Log finished time on a task: 1h15, 45m, 90, 1:15"),
+    ("time", "time suggestions", "GET", "/time-entries", "user key", "Time that `sync` suggested, waiting for you; `accept <id>` takes it"),
+    ("time", "time accept", "POST", "/time-entries/{id}/accept", "user key", "Accept a suggested time entry"),
 ];
+
+/// Generated groups whose short verb replaces them in the command tree: `trama decisions` and
+/// `trama estimate` read the same routes as `decision list` and `estimate suggest`.
+pub const REPLACED_GROUPS: &[&str] = &["decision", "estimate"];
 
 // ───────────────────────────── command definitions ─────────────────────────────
 
@@ -130,11 +150,11 @@ pub fn timer_command() -> Command {
 
 // ───────────────────────────── helpers ─────────────────────────────
 
-fn get(path: String, query: Vec<(String, String)>) -> Call {
+pub(crate) fn get(path: String, query: Vec<(String, String)>) -> Call {
     Call { method: Method::Get, path, query, body: None }
 }
 
-fn task_call(reference: &str) -> Call {
+pub(crate) fn task_call(reference: &str) -> Call {
     get(format!("/tasks/{}", encode_segment(reference)), vec![])
 }
 
@@ -143,7 +163,7 @@ fn is_task_id(reference: &str) -> bool {
 }
 
 /// The id the API wants in a body: an id stays as it is, a key is looked up.
-async fn task_id(reference: &str, ctx: &Ctx) -> Result<String> {
+pub(crate) async fn task_id(reference: &str, ctx: &Ctx) -> Result<String> {
     if is_task_id(reference) {
         return Ok(reference.to_string());
     }
@@ -151,19 +171,21 @@ async fn task_id(reference: &str, ctx: &Ctx) -> Result<String> {
     task["id"].as_str().map(str::to_string).ok_or_else(|| CliError::internal("the API sent a task without an id"))
 }
 
-fn rows_of(value: Value) -> Vec<Value> {
+pub(crate) fn rows_of(value: Value) -> Vec<Value> {
     match value {
         Value::Array(items) => items,
+        // Some replies wrap their rows: `{ "results": [...] }`.
+        Value::Object(map) => ["results", "items"].iter().find_map(|k| map.get(*k).and_then(Value::as_array)).cloned().unwrap_or_default(),
         _ => vec![],
     }
 }
 
 /// Text rather than JSON: on a terminal or when a table is asked for.
-fn wants_text(ctx: &Ctx) -> bool {
+pub(crate) fn wants_text(ctx: &Ctx) -> bool {
     ctx.fmt.mode == Mode::Table || (ctx.fmt.mode == Mode::Auto && ctx.fmt.tty)
 }
 
-fn usage(message: String) -> CliError {
+pub(crate) fn usage(message: String) -> CliError {
     CliError::usage(message)
 }
 

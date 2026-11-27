@@ -54,8 +54,8 @@ const MARKER: Record<MilestoneState, string> = {
         <span class="bg-secondary absolute top-[52px] left-0 h-0.5 w-full"></span>
         @if (s.today !== null) {
           <span class="bg-muted-foreground absolute top-[52px] left-0 h-0.5" [style.width.%]="s.today"></span>
-          <span class="bg-primary absolute top-[36px] h-[34px] w-px" [style.left.%]="s.today"></span>
-          <span class="text-primary absolute top-[36px] ml-[5px] font-mono text-[9.5px] leading-3" [style.left.%]="s.today">TODAY</span>
+          <span class="bg-red absolute top-[36px] h-[34px] w-px" [style.left.%]="s.today"></span>
+          <span class="text-red absolute top-[36px] ml-[5px] font-mono text-[9.5px] leading-3" [style.left.%]="s.today">TODAY</span>
         }
         @for (m of s.marks; track m.id) {
           <span class="outline-background absolute top-[47px] size-3 outline-2 -outline-offset-1" [class]="m.cls" [style.left.%]="m.at"></span>

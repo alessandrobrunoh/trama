@@ -18,8 +18,6 @@ import { PageHeader } from '../../shared/page-header';
 import { Kbd } from '../../shared/kbd';
 import { V3SectionTitle, V3Status, V3Thread } from '../../shared/v3';
 import { HlmButton } from '@spartan-ng/helm/button';
-import { dailyFlow, weekTotals } from './flow-model';
-import { HomeFlow } from './home-flow';
 
 /** One "Working on now" card: an in-progress or in-review task of mine. */
 interface FocusCard {
@@ -69,8 +67,8 @@ function threadId(url: string): string {
 
 /**
  * `/:workspace/overview` (Home, v3 · 02): a personal start page. What I am working on now, with each task's Delta
- * thread record; what is next for me by due date; the few things only I can do; and the last four weeks of the
- * workspace (tasks closed against opened). Status is always moved by people.
+ * thread record; what is next for me by due date; and the few things only I can do. Status is always moved by
+ * people.
  *
  * Keyboard: J/K (or ↑/↓) move through cards and rows, ↵ opens the focused task or runs its Open, and each "Needs you"
  * key (⇧R, D, ?) runs the action of the focused row; ↵, ⇧R and D fall back to the first row offering them. `?` without
@@ -79,7 +77,7 @@ function threadId(url: string): string {
 @Component({
   selector: 'app-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, HomeFlow, Kbd, LucideDynamicIcon, PageHeader, RouterLink, V3SectionTitle, V3Status, V3Thread],
+  imports: [HlmButton, Kbd, LucideDynamicIcon, PageHeader, RouterLink, V3SectionTitle, V3Status, V3Thread],
   host: { class: 'block min-h-full' },
   template: `
     <app-page-header title="Home" />
@@ -227,12 +225,6 @@ function threadId(url: string): string {
           </ul>
         </section>
       </div>
-
-      <!-- the workspace, last four weeks -->
-      <section class="flex flex-col gap-3" aria-label="Last four weeks">
-        <v3-section-title title="Last four weeks" [caption]="flowCaption()" />
-        <app-home-flow [days]="flow()" [weeks]="weeks()" [slug]="slug()" />
-      </section>
     </div>
   `,
 })
@@ -292,24 +284,6 @@ export class HomePage {
     if (current) return current.keys === keys ? current : undefined;
     return fallback ? rows.find((n) => n.keys === keys) : undefined;
   }
-
-  protected readonly flow = computed(() => {
-    const statuses = this.store.settings().statuses;
-    return dailyFlow({
-      now: this.now(),
-      issues: this.store.issues(),
-      projects: this.store.projects(),
-      milestones: this.store.milestones(),
-      issueType: (s) => statusTypeOf(statuses.issue, s),
-      projectType: (s) => statusTypeOf(statuses.project, s),
-    });
-  });
-  protected readonly weeks = computed(() => weekTotals(this.flow()));
-  protected readonly flowCaption = computed(() => {
-    const closed = this.flow().reduce((n, d) => n + d.closed, 0);
-    const opened = this.flow().reduce((n, d) => n + d.created, 0);
-    return `workspace · ${closed} closed · ${opened} opened`;
-  });
 
   protected readonly slug = computed(() => this.store.workspace()?.slug ?? '');
   private readonly typeOf = (i: Issue) => statusTypeOf(this.store.settings().statuses.issue, i.status) ?? i.status;

@@ -3,7 +3,6 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import {
   LucideArrowRight,
   LucideCheck,
-  LucideCircleAlert,
   LucideDownload,
   LucideDynamicIcon,
   LucideGitBranch,
@@ -30,7 +29,7 @@ import {
   type ImportPreview,
   type IssueStatus,
 } from '../../../core/contracts/domain';
-import { ISSUE_KIND_META, ISSUE_KINDS, ISSUE_STATUS_META, ISSUE_STATUSES } from '../../../core/meta';
+import { ISSUE_STATUS_META, ISSUE_STATUSES } from '../../../core/meta';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
@@ -46,7 +45,7 @@ import {
   mappingFromDraft,
   type MappingDraft,
 } from './import-model';
-import { SECTION_KIT, SETTINGS_FIELD, type SegmentedOption, type StatCell } from './section-kit';
+import { SECTION_KIT, SETTINGS_FIELD, SETTINGS_SELECT, type SegmentedOption, type StatCell } from './section-kit';
 
 const POLL_MS = 2000;
 
@@ -63,13 +62,15 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
   selector: 'app-import-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AppSelect, HlmButtonImports, HlmCheckbox, LucideDynamicIcon, NgTemplateOutlet, RelativeTimePipe, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
+      flush
       title="Import"
-      description="Bring work from another tool. Nothing is written until you confirm. Trama only reads from the tracker, and running an import again skips what was already imported."
+      description="Bring work from another tool. Nothing is written until you confirm, and running an import again skips what exists."
     />
     @if (!canManage()) {
-      <app-readonly-note>Only admins can import. You can still see past imports.</app-readonly-note>
+      <app-readonly-note class="mb-0!">Only admins can import. You can still see past imports.</app-readonly-note>
     }
 
     <div class="flex flex-col gap-9">
@@ -84,7 +85,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                   {{ s.n }}
                 }
               </span>
-              <span class="text-[13px] whitespace-nowrap" [class]="step() >= s.n ? 'text-foreground' : 'text-faint'">{{ s.label }}</span>
+              <span class="text-[13px] leading-[normal] whitespace-nowrap" [class]="step() >= s.n ? 'text-foreground' : 'text-faint'">{{ s.label }}</span>
             </li>
             @if (!$last) {
               <li class="bg-border h-px min-w-4 flex-1" aria-hidden="true"></li>
@@ -134,22 +135,16 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
               <svg [lucideIcon]="p.provider === 'github' ? githubIcon : linearIcon" [size]="16"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span class="text-foreground truncate text-[13.5px]">{{ p.sourceLabel }}</span>
-              <span class="text-faint truncate font-mono text-[10.5px]">Read as {{ p.account }} · nothing has been written yet</span>
+              <span class="text-foreground truncate text-[13.5px] leading-[normal]">{{ p.sourceLabel }}</span>
+              <span class="text-faint truncate font-mono text-[10.5px] leading-[normal]">Read as {{ p.account }} · nothing has been written yet</span>
             </div>
-            <button type="button" class="text-muted-foreground hover:text-foreground shrink-0 text-[12.5px]" (click)="resetPreview()">Change</button>
+            <button type="button" class="text-muted-foreground hover:text-foreground shrink-0 text-[12.5px] leading-[normal]" (click)="resetPreview()">Change</button>
           </div>
 
-          <app-stat-strip large [cells]="statCells()" />
-
-          @for (w of p.warnings; track w) {
-            <p class="text-status-needs-input -mt-5 flex items-start gap-1.5 font-mono text-[10.5px]">
-              <svg [lucideIcon]="alert" [size]="13" class="mt-px shrink-0"></svg>{{ w }}
-            </p>
-          }
+          <app-stat-strip large valueFirst [cells]="statCells()" />
 
           @if (p.provider === 'linear') {
-            <app-settings-block title="Teams" description="Choose which Linear teams to read. Issues are imported as tasks and are not assigned to a team.">
+            <app-settings-block title="Teams">
               <app-settings-card>
                 @for (t of p.teams; track t.id) {
                   <app-card-row [label]="t.name + (t.key ? ' (' + t.key + ')' : '')" [description]="t.count !== undefined ? t.count + ' issues' : ''">
@@ -166,8 +161,9 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           }
 
           <div class="grid items-start gap-x-5 gap-y-9 lg:grid-cols-2">
-            <app-settings-block title="Status" description="Each state of the tracker becomes one of Trama’s statuses.">
-              <app-settings-card>
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2"><h3 class="text-foreground text-[13px] leading-[normal] font-medium">Status</h3></div>
+              <div class="bg-card border-border divide-border divide-y border" [class]="selectField">
                 @for (s of p.statuses; track s.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -182,16 +178,20 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 }
-              </app-settings-card>
-            </app-settings-block>
+              </div>
+            </section>
 
-            <app-settings-block title="People" description="Matched by email, then by login or name. An assignee left unmatched leaves the issue unassigned.">
-              @if (unmatched() > 0) {
-                <span aside class="text-primary flex items-center gap-1.5 font-mono text-[10.5px]">
-                  <svg [lucideIcon]="warnIcon" [size]="12"></svg>{{ unmatched() }} not matched
-                </span>
-              }
-              <app-settings-card class="max-h-96 overflow-y-auto">
+            <section class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-foreground text-[13px] leading-[normal] font-medium">People</h3>
+                <span class="flex-1"></span>
+                @if (unmatched() > 0) {
+                  <span class="text-primary flex items-center gap-1.5 font-mono text-[10.5px] leading-[normal]">
+                    <svg [lucideIcon]="warnIcon" [size]="12"></svg>{{ unmatched() }} not matched
+                  </span>
+                }
+              </div>
+              <div class="bg-card border-border divide-border max-h-96 divide-y overflow-y-auto border" [class]="selectField">
                 @for (u of p.users; track u.id) {
                   <ng-container
                     [ngTemplateOutlet]="mapRow"
@@ -206,99 +206,16 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                     }"
                   />
                 } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No people to map.</p>
+                  <p class="text-faint px-3.5 py-3 font-mono text-[10.5px]">No people to map.</p>
                 }
-              </app-settings-card>
-            </app-settings-block>
-
-            <app-settings-block
-              title="Projects"
-              [description]="p.provider === 'github' ? 'Milestones of the repository become milestones of this project (' + p.counts.milestones + ').' : 'Linear projects and their milestones.'"
-            >
-              <app-settings-card>
-                @for (x of p.projects; track x.id) {
-                  <ng-container
-                    [ngTemplateOutlet]="mapRow"
-                    [ngTemplateOutletContext]="{
-                      name: x.name,
-                      hint: '',
-                      options: projectOptions(),
-                      value: draft().projects[x.id] ?? '',
-                      label: 'Trama project for ' + x.name,
-                      kind: 'projects',
-                      id: x.id
-                    }"
-                  />
-                } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No projects in the source.</p>
-                }
-              </app-settings-card>
-            </app-settings-block>
-
-            <app-settings-block
-              title="Labels"
-              [caption]="'' + p.labels.length"
-              description="A tracker label can reuse a Trama label, become a new one or be dropped. Labels named bug, security, incident, chore or idea also pick the issue kind."
-            >
-              <app-settings-card class="max-h-96 overflow-y-auto">
-                @for (l of p.labels; track l.id) {
-                  <ng-container
-                    [ngTemplateOutlet]="mapRow"
-                    [ngTemplateOutletContext]="{
-                      name: l.name,
-                      hint: '',
-                      options: labelOptions(),
-                      value: draft().labels[l.id] ?? '',
-                      label: 'Trama label for ' + l.name,
-                      kind: 'labels',
-                      id: l.id
-                    }"
-                  />
-                } @empty {
-                  <p class="text-faint px-4 py-3 font-mono text-[10.5px]">No labels in the source.</p>
-                }
-              </app-settings-card>
-            </app-settings-block>
-          </div>
-
-          @if (p.sample.length) {
-            <app-settings-block title="First issues" [caption]="'' + p.sample.length">
-              <app-settings-card>
-                @for (s of p.sample; track s.key) {
-                  <div class="flex items-baseline gap-2 px-4 py-2 text-[13px]">
-                    <span class="text-faint w-14 shrink-0 font-mono text-[11px]">{{ s.key }}</span>
-                    <span class="min-w-0 flex-1 truncate">{{ s.title }}</span>
-                    <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ s.state }}</span>
-                  </div>
-                }
-              </app-settings-card>
-            </app-settings-block>
-          }
-
-          <div class="border-border flex flex-wrap items-center gap-x-6 gap-y-3 border px-3.5 py-3">
-            <div class="flex items-center gap-2">
-              <hlm-checkbox [checked]="options().includeComments" aria-label="Import comments" (checkedChange)="setOption({ includeComments: $event })" />
-              <span class="text-[12.5px]" title="Copy each issue’s comments. They appear as written by you, with the original author and date in the text.">Import comments</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <hlm-checkbox [checked]="options().includeClosed" aria-label="Import closed issues" (checkedChange)="setOption({ includeClosed: $event })" />
-              <span class="text-[12.5px]">Include closed issues</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[12.5px]">Default kind</span>
-              <div class="w-[140px]">
-                <app-select size="sm" label="Default kind" [options]="kindOptions" [value]="options().defaultKind" (valueChange)="setOption({ defaultKind: $any($event) })" />
               </div>
-            </div>
+            </section>
           </div>
 
-          <div class="-mt-3 flex flex-wrap items-center gap-2">
-            <span class="text-faint font-mono text-[10.5px]">
-              @if (p.counts.issues !== null) { About {{ p.counts.issues }} issues. } Imported issues keep their dates and link back to the original.
-            </span>
+          <div class="flex flex-wrap items-center gap-2">
             <span class="flex-1"></span>
-            <button hlmBtn size="sm" variant="outline" (click)="resetPreview()">Back</button>
-            <button hlmBtn size="sm" [disabled]="busy() || !!active()" (click)="start()">
+            <button hlmBtn variant="outline" (click)="resetPreview()">Back</button>
+            <button hlmBtn [disabled]="busy() || !!active()" (click)="start()">
               @if (active()) {
                 Another import is running
               } @else {
@@ -309,17 +226,13 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           </div>
         } @else {
           <!-- step 1: source -->
-          <app-settings-block title="Source" description="Where the issues are read from.">
+          <app-settings-block title="Source">
             <app-settings-card>
               <app-card-row label="Tracker">
                 <app-segmented aria-label="Tracker" [options]="providerOptions" [value]="provider()" (valueChange)="setProvider($any($event))" />
               </app-card-row>
 
-              <app-card-row
-                label="Credential"
-                [description]="provider() === 'github' ? 'A public repository needs none (60 requests an hour). Use a token for a private one.' : 'A Linear personal API key (Linear → Settings → Security & access).'"
-                wide
-              >
+              <app-card-row label="Credential" wide>
                 <div class="flex w-full items-center gap-2">
                   <app-select
                     class="min-w-0 flex-1"
@@ -348,7 +261,6 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                       (input)="token.set($any($event.target).value)"
                       [placeholder]="provider() === 'github' ? 'github_pat_… (needs read access to issues)' : 'lin_api_…'"
                     />
-                    <p class="text-faint font-mono text-[10.5px]">Stored encrypted on the server and only used to read. It is never shown again.</p>
                   </div>
                   @if (provider() === 'github') {
                     <div class="flex flex-col gap-1.5">
@@ -368,10 +280,6 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
                   <svg [lucideIcon]="keyIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
                   <div class="min-w-0 flex-1 text-[13px]">
                     <span class="text-foreground">{{ c.account }}</span>
-                    <span class="text-faint font-mono text-[10.5px]">
-                      @if (c.baseUrl) { · {{ c.baseUrl }} }
-                      · added {{ c.createdAt | relativeTime }}@if (c.lastUsedAt) { · used {{ c.lastUsedAt | relativeTime }} }
-                    </span>
                   </div>
                   <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Delete the credential of ' + c.account" (click)="confirmRemoveCredential(c)">
                     <svg [lucideIcon]="trash" [size]="14"></svg>
@@ -380,7 +288,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
               }
 
               @if (provider() === 'github') {
-                <app-card-row label="Repository" description="owner/name, or paste the repository URL." wide>
+                <app-card-row label="Repository" wide>
                   <input
                     [class]="field + ' font-mono'"
                     placeholder="acme/api"
@@ -393,7 +301,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
               }
 
               <div class="flex items-center justify-end gap-2 px-4 py-3">
-                <button hlmBtn size="sm" [disabled]="!canPreview() || busy()" (click)="runPreview()">
+                <button hlmBtn [disabled]="!canPreview() || busy()" (click)="runPreview()">
                   @if (busy() && !preview()) { Reading… } @else { Preview }
                 </button>
               </div>
@@ -404,7 +312,7 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
 
       <app-settings-block title="History" [caption]="'' + jobs().length">
         <div class="bg-card border-border border">
-          <div class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] md:grid md:grid-cols-[minmax(0,1fr)_96px_minmax(0,200px)_104px_64px]">
+          <div class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] md:grid md:grid-cols-[minmax(0,1fr)_90px_180px_90px_60px]">
             <span>SOURCE</span>
             <span>WHEN</span>
             <span>RESULT</span>
@@ -413,13 +321,13 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
           </div>
           @for (j of jobs(); track j.id) {
             <div class="border-border hover:bg-secondary flex flex-col gap-1.5 border-t px-4 py-2.5 first:border-t-0 md:first:border-t">
-              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:grid-cols-[minmax(0,1fr)_96px_minmax(0,200px)_104px_64px]">
-                <span class="text-foreground min-w-0 truncate text-[13px]">{{ j.sourceLabel }}</span>
-                <span class="text-muted-foreground font-mono text-[10.5px]">{{ j.createdAt | relativeTime }}</span>
-                <span class="text-foreground/80 truncate font-mono text-[10.5px] tabular-nums">
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:grid-cols-[minmax(0,1fr)_90px_180px_90px_60px]">
+                <span class="text-foreground min-w-0 truncate text-[13px] leading-[normal]">{{ j.sourceLabel }}</span>
+                <span class="text-muted-foreground font-mono text-[10.5px] leading-[normal]">{{ j.createdAt | relativeTime }}</span>
+                <span class="text-text-2 truncate font-mono text-[10.5px] leading-[normal] tabular-nums">
                   {{ j.progress.created }} created · {{ j.progress.skipped }} skipped@if (j.progress.failed) { · {{ j.progress.failed }} failed }
                 </span>
-                <span class="border-border text-foreground/80 inline-flex w-fit items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px]">
+                <span class="border-border text-text-2 inline-flex w-fit items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[normal]">
                   <span class="size-1.5" [class]="dotClass(j)"></span>{{ statusText[j.status] }}
                 </span>
                 <span class="flex items-center justify-end gap-1">
@@ -458,9 +366,9 @@ type MapKind = 'projects' | 'labels' | 'users' | 'statuses';
     <ng-template #mapRow let-name="name" let-hint="hint" let-options="options" let-value="value" let-label="label" let-kind="kind" let-id="id">
       <div class="flex items-center gap-4 px-3.5 py-2">
         <div class="flex min-w-0 flex-1 items-center gap-2">
-          <span class="text-foreground/80 truncate font-mono text-[12px]">{{ name }}</span>
+          <span class="text-text-2 truncate font-mono text-[12px] leading-[normal]">{{ name }}</span>
           @if (hint) {
-            <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ hint }}</span>
+            <span class="text-faint shrink-0 font-mono text-[10.5px] leading-[normal]">{{ hint }}</span>
           }
         </div>
         <svg [lucideIcon]="arrow" [size]="13" class="text-faint shrink-0"></svg>
@@ -479,6 +387,7 @@ export class ImportSection {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly field = SETTINGS_FIELD;
+  protected readonly selectField = SETTINGS_SELECT;
   protected readonly steps = [
     { n: 1, label: 'Source' },
     { n: 2, label: 'Map and preview' },
@@ -489,13 +398,11 @@ export class ImportSection {
     label: EXTERNAL_PROVIDER_META[p].label,
   }));
   protected readonly statusOptions: Option[] = ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label }));
-  protected readonly kindOptions: Option[] = ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label }));
   protected readonly statusText = STATUS_TEXT;
   protected readonly plus = LucidePlus;
   protected readonly trash = LucideTrash2;
   protected readonly close = LucideX;
   protected readonly keyIcon = LucideKeyRound;
-  protected readonly alert = LucideCircleAlert;
   protected readonly warnIcon = LucideTriangleAlert;
   protected readonly spinner = LucideRefreshCw;
   protected readonly retryIcon = LucideRotateCw;
@@ -506,8 +413,6 @@ export class ImportSection {
   protected readonly linearIcon = LucideLayers;
 
   protected readonly canManage = computed(() => this.store.allowed('manageIntegrations'));
-  protected readonly projects = computed(() => this.store.projects().slice().sort((a, b) => a.name.localeCompare(b.name)));
-  protected readonly labels = computed(() => this.store.settings().labels.filter((l) => l.scope === 'issue' && !l.archived));
   protected readonly members = computed(() => this.store.members().map((m) => ({ id: m.user.id, name: m.user.name })));
   protected readonly githubConnections = computed(() => this.store.integrations().filter((c) => c.provider === 'github'));
 
@@ -519,16 +424,6 @@ export class ImportSection {
       ...(github ? this.githubConnections().map((c) => ({ value: `n:${c.id}`, label: `GitHub integration · ${c.account}` })) : []),
     ];
   });
-  protected readonly projectOptions = computed<Option[]>(() => [
-    { value: 'create', label: 'Create project' },
-    { value: 'skip', label: 'No project' },
-    ...this.projects().map((p) => ({ value: `map:${p.id}`, label: p.name })),
-  ]);
-  protected readonly labelOptions = computed<Option[]>(() => [
-    { value: 'create', label: 'Create label' },
-    { value: 'skip', label: 'Drop it' },
-    ...this.labels().map((l) => ({ value: `map:${l.id}`, label: l.name })),
-  ]);
   protected readonly memberOptions = computed<Option[]>(() => [
     { value: '', label: 'Leave unassigned' },
     ...this.members().map((m) => ({ value: m.id, label: m.name })),
@@ -548,7 +443,8 @@ export class ImportSection {
   protected readonly excludedTeams = signal<ReadonlySet<string>>(new Set());
   /** Teams the current preview was read with (to know when "refresh" is needed). */
   private readonly previewedTeams = signal<readonly string[]>([]);
-  protected readonly options = signal<ImportOptions>({ includeComments: false, includeClosed: true, defaultKind: 'feature' });
+  /** The frame has no option toggles: comments and closed issues come along, kinds default to feature. */
+  protected readonly options = signal<ImportOptions>({ includeComments: true, includeClosed: true, defaultKind: 'feature' });
   protected readonly busy = signal(false);
 
   protected readonly jobs = signal<readonly ImportJob[]>([]);
@@ -786,9 +682,6 @@ export class ImportSection {
       if (kind === 'statuses') return { ...d, statuses: { ...d.statuses, [id]: value as IssueStatus } };
       return { ...d, [kind]: { ...d[kind], [id]: value } };
     });
-  }
-  protected setOption(change: Partial<ImportOptions>): void {
-    this.options.update((o) => ({ ...o, ...change }));
   }
 
   // ───── run

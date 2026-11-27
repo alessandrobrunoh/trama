@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn removed_resources_are_not_commands() {
         let reg = registry();
-        for gone in ["workstream", "criterion", "dependency", "team", "repository", "decision", "customer", "input-request", "release", "document", "project-update"] {
+        for gone in ["workstream", "criterion", "dependency", "team", "repository", "customer", "input-request", "release", "document", "project-update"] {
             assert!(!reg.entries.iter().any(|entry| entry.group == gone), "{gone}");
         }
         assert!(reg.find("project", Some("context")).is_none());

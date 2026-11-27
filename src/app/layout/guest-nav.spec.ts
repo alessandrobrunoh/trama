@@ -1,5 +1,13 @@
 import { guestMayOpenSettings, settingsGroupsFor } from '../features/settings/settings-nav';
-import { ALL_NAV, MORE_NAV, PRIMARY_NAV, guestMayOpen, navForRole } from './nav';
+import {
+  ALL_NAV,
+  MORE_NAV,
+  PRIMARY_NAV,
+  SIDEBAR_MAIN_NAV,
+  SIDEBAR_WORKSPACE_NAV,
+  guestMayOpen,
+  navForRole,
+} from './nav';
 
 describe('what a guest gets in the app', () => {
   it('keeps everything for everyone else', () => {
@@ -16,6 +24,13 @@ describe('what a guest gets in the app', () => {
   it('filters the two sidebar lists independently', () => {
     expect(navForRole(PRIMARY_NAV, true).some((n) => n.segment === 'assistant')).toBe(false);
     expect(navForRole(MORE_NAV, true).some((n) => n.segment === 'connect')).toBe(false);
+  });
+
+  it('the desktop sidebar rows follow the design and a guest loses Ask', () => {
+    expect(SIDEBAR_MAIN_NAV.map((n) => n.segment)).toEqual(['overview', 'inbox', 'timer', 'assistant']);
+    expect(SIDEBAR_WORKSPACE_NAV.map((n) => n.segment)).toEqual(['tasks']);
+    expect(navForRole(SIDEBAR_MAIN_NAV, true).map((n) => n.segment)).toEqual(['overview', 'inbox', 'timer']);
+    expect(navForRole(SIDEBAR_WORKSPACE_NAV, true).map((n) => n.segment)).toEqual(['tasks']);
   });
 
   it('opens a path segment unless it is one of the hidden ones', () => {

@@ -42,6 +42,9 @@ import type {
   ProjectAiKind,
   ProjectAiResult,
   ProjectPlacement,
+  ProjectUpdate,
+  CreateProjectUpdateInput,
+  UpdateProjectUpdateInput,
   ProjectTransferPreview,
   ProjectTransferResult,
   GitProvider,
@@ -52,6 +55,8 @@ import type {
   ProjectInviteResult,
   ProjectShare,
   Role,
+  ThreadDecision,
+  ThreadRecord,
   SharedProject,
   PublicView,
   SavedView,
@@ -428,6 +433,21 @@ export class ApiClient {
       this.post<ProjectTransferResult>(`${this.w(slug)}/projects/${id}/transfer`, { target }),
   };
 
+  /** Written status updates of a project (Project · Updates), newest first. Posting needs `manageProjects`. */
+  readonly projectUpdates = {
+    list: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.get<ProjectUpdate[]>(`${this.w(slug)}/projects/${projectId}/updates`, undefined, o),
+    /** A health in the input also sets the project's health. */
+    create: (slug: string, projectId: ID, input: CreateProjectUpdateInput, o?: RequestOptions) =>
+      this.post<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates`, input, o),
+    /** Author only. */
+    update: (slug: string, projectId: ID, updateId: ID, input: UpdateProjectUpdateInput, o?: RequestOptions) =>
+      this.patch<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${updateId}`, input, o),
+    /** Author, or anyone who can manage projects. */
+    remove: (slug: string, projectId: ID, updateId: ID, o?: RequestOptions) =>
+      this.del(`${this.w(slug)}/projects/${projectId}/updates/${updateId}`, o),
+  };
+
   /** Projects shared with the signed-in person (they are a guest there), and where they show them. */
   readonly shared = {
     list: () => this.get<SharedProject[]>('/shared/projects', undefined, { quiet: true }),
@@ -487,6 +507,19 @@ export class ApiClient {
 
   readonly artifacts = {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
+  };
+
+  /** What `trama sync` keeps for a task: the thread record (read-only here) and the decisions agents recorded. */
+  readonly threads = {
+    /** The record of the task's thread; rejects with a 404 `ApiError` when the task was never synced. */
+    record: (slug: string, idOrKey: string, o?: RequestOptions) =>
+      this.get<ThreadRecord>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/thread`, undefined, o),
+    /** Decisions, newest first. `path` keeps those that cover a file, `issue` those of one task. */
+    decisions: (
+      slug: string,
+      query: { path?: string; issue?: string; limit?: number } = {},
+      o?: RequestOptions,
+    ) => this.get<ThreadDecision[]>(`${this.w(slug)}/decisions`, query, o),
   };
 
   readonly uploads = {
@@ -684,6 +717,12 @@ export class ApiClient {
       this.post<TimeEntry>(`${this.w(slug)}/time-entries`, input, o),
     remove: (slug: string, id: ID, o?: RequestOptions) =>
       this.del(`${this.w(slug)}/time-entries/${id}`, o),
+    /** Entries `trama sync` suggested from a thread's active time. They count only once accepted. */
+    suggestions: (slug: string, o?: RequestOptions) =>
+      this.get<TimeEntry[]>(`${this.w(slug)}/time-entries`, { source: 'suggested' }, o),
+    /** Turns a suggestion into a manual entry (the owner only). */
+    accept: (slug: string, id: ID, o?: RequestOptions) =>
+      this.post<TimeEntry>(`${this.w(slug)}/time-entries/${id}/accept`, {}, o),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

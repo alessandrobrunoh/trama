@@ -1,14 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import { Not, type Repository } from 'typeorm';
 import { currentAccess, projectHidden } from '../auth/member-access.js';
 import { notFound, uid } from '../common/util.js';
+import type { TimeEntrySource } from '../contracts/domain.js';
 import { IssueEntity } from '../database/entities/index.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { TimeEntryEntity } from './time-entry.entity.js';
 
 const END_BEFORE_START = 'The end must be after the start';
 const NO_TIMER = 'No timer is running';
+const NOT_SUGGESTED = 'Only a suggested entry can be accepted';
 
 export interface TimeEntryInput {
   description?: string;
@@ -27,11 +29,14 @@ export class TimeEntriesService {
     private readonly projects: ProjectsService,
   ) {}
 
-  /** The caller's own entries. Time logged on a project they can no longer open is not listed. */
-  async list(workspaceId: string, userId: string) {
+  /**
+   * The caller's own entries. Time logged on a project they can no longer open is not listed.
+   * Suggestions (`source: suggested`) are not entries yet: they are listed only when asked for.
+   */
+  async list(workspaceId: string, userId: string, source?: TimeEntrySource) {
     const access = currentAccess();
     const rows = await this.entries.find({
-      where: { workspaceId, userId },
+      where: { workspaceId, userId, source: source ?? Not<TimeEntrySource>('suggested') },
       order: { startedAt: 'DESC' },
       take: 100,
     });
@@ -42,9 +47,7 @@ export class TimeEntriesService {
   async start(workspaceId: string, userId: string, input: TimeEntryInput = {}) {
     const target = await this.resolveTarget(workspaceId, input);
     const now = new Date();
-    const running = (await this.entries.find({ where: { workspaceId, userId } })).filter(
-      (row) => row.endedAt == null,
-    );
+    const running = await this.running(workspaceId, userId);
     for (const row of running) {
       row.endedAt = now;
       row.updatedAt = now;
@@ -58,6 +61,7 @@ export class TimeEntriesService {
         projectId: target.projectId,
         issueId: target.issueId,
         description: target.description,
+        source: 'timer',
         startedAt: now,
         endedAt: null,
         createdAt: now,
@@ -67,10 +71,7 @@ export class TimeEntriesService {
   }
 
   async stop(workspaceId: string, userId: string) {
-    const running = (await this.entries.find({ where: { workspaceId, userId } })).filter(
-      (row) => row.endedAt == null,
-    );
-    const row = running[0];
+    const row = (await this.running(workspaceId, userId))[0];
     if (!row || row.userId !== userId) throw new BadRequestException(NO_TIMER);
     const now = new Date();
     if (now < row.startedAt) throw new BadRequestException(END_BEFORE_START);
@@ -93,11 +94,30 @@ export class TimeEntriesService {
         projectId: target.projectId,
         issueId: target.issueId,
         description: target.description,
+        source: 'manual',
         startedAt,
         endedAt,
         createdAt: now,
         updatedAt: now,
       }),
+    );
+  }
+
+  /** Turns a suggestion of the caller into a plain entry. Another person's entry is not found. */
+  async accept(workspaceId: string, userId: string, id: string) {
+    const row = await this.entries.findOneBy({ id, workspaceId });
+    if (!row || row.userId !== userId) throw notFound('Time entry', id);
+    if (row.projectId && projectHidden(currentAccess(), row.projectId)) throw notFound('Time entry', id);
+    if (row.source !== 'suggested') throw new BadRequestException(NOT_SUGGESTED);
+    row.source = 'manual';
+    row.updatedAt = new Date();
+    return this.entries.save(row);
+  }
+
+  /** The caller's open timers. A suggestion is always finished, so it never counts as one. */
+  private async running(workspaceId: string, userId: string) {
+    return (await this.entries.find({ where: { workspaceId, userId } })).filter(
+      (row) => row.endedAt == null && row.source !== 'suggested',
     );
   }
 

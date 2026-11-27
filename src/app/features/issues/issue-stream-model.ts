@@ -2,6 +2,7 @@
 // consecutive events folded into a single muted line ("Changed status 3 times, edited labels"). No Angular
 // here, so the grouping is cheap to test.
 import { ISSUE_STATUS_META, type Comment, type DomainEvent, type IssueStatus } from '../../core';
+import { threadSyncVerb } from '../../shared/thread-sync-event';
 
 export type EventKind = 'created' | 'status' | 'update' | 'other';
 
@@ -74,6 +75,8 @@ export function describeEvent(ev: DomainEvent): EventView | null {
     }
     case 'issue.linked':
       return { kind: 'other', verb: 'recorded a legacy task link', fields: [] };
+    case 'issue.thread_synced':
+      return { kind: 'other', verb: threadSyncVerb(d), fields: [] };
     case 'comment.created':
       return null;
     default:

@@ -72,8 +72,8 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
           @case ('status') {
             @if (chip()) {
               <v3-status [status]="i.status" />
-              @if (canEdit()) {
-                <svg [lucideIcon]="chevron" [size]="14" class="text-faint" aria-hidden="true"></svg>
+              @if (canEdit() && caret()) {
+                <svg [lucideIcon]="chevron" [size]="12" class="text-faint" aria-hidden="true"></svg>
               }
             } @else {
               <app-status-icon [status]="i.status" entity="issue" [size]="size()" />
@@ -130,6 +130,8 @@ export class IssueProp {
   readonly showLabel = input(false, { transform: booleanAttribute });
   /** v3 look for the property column: the status / priority atoms (hairline box, bars) instead of the glyph. */
   readonly chip = input(false, { transform: booleanAttribute });
+  /** The status chip's chevron: the property column keeps it, the subtask rows leave it out. */
+  readonly caret = input(true, { transform: booleanAttribute });
   readonly size = input(14);
   readonly avatarSize = input(18);
 
@@ -174,12 +176,12 @@ export class IssueProp {
       description="Pick a value; Esc closes."
       [state]="listOpen() ? 'open' : 'closed'"
       (stateChange)="$event === 'closed' && listOpen() && actions.closePrompt()"
-      dialogContentClass="sm:max-w-[420px] top-[14%] sm:top-[20%] translate-y-0 max-sm:max-w-[calc(100%-1rem)]"
+      dialogContentClass="grid-cols-[minmax(0,1fr)] fixed top-[14svh] left-2 w-[calc(100vw-1rem)] max-w-none translate-y-0 sm:top-[20svh] sm:left-[calc(50vw-150px)] sm:w-[300px] sm:max-w-none mx-0"
     >
       @if (prompt(); as p) {
         @if (p.field !== 'estimate') {
           <div class="text-muted-foreground flex items-center gap-2.5 px-3 pt-2.5 pb-2 text-xs">
-            <span class="bg-secondary border-border text-muted-foreground border px-1.5 py-px font-mono text-[10.5px]">{{ actions.subject(p.ids) }}</span>
+            <span class="bg-secondary border-border text-muted-foreground shrink-0 border px-1.5 py-px font-mono text-[10.5px] whitespace-nowrap">{{ actions.subject(p.ids) }}</span>
             @if (p.ids.length === 1) {
               <span class="truncate">{{ firstTitle() }}</span>
             }

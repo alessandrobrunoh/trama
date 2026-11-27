@@ -7,11 +7,22 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { LucideDynamicIcon, LucideSearch, LucideX } from '@lucide/angular';
+import {
+  LucideCrown,
+  LucideDynamicIcon,
+  LucideEllipsis,
+  LucideFolderLock,
+  LucideMail,
+  LucideSearch,
+  LucideShield,
+  LucideUserPlus,
+  LucideX,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
-import { HlmInputImports } from '@spartan-ng/helm/input';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
 import { TramaStore } from '../../../core/stores/trama.store';
@@ -32,15 +43,21 @@ import {
   type WorkspaceInvite,
 } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
-import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
+import { ago } from '../../../shared/ago';
 import { AppSelect, type Option } from '../../create/form-kit';
 import { MemberAccessEditor } from './member-access-editor';
 import { MembersInviteDialog } from './members-invite-dialog';
 import { memberRules, type MemberUiRules } from './member-permissions';
-import { SECTION_KIT } from './section-kit';
+import { SECTION_KIT, SETTINGS_SELECT } from './section-kit';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ANY = 'any';
+
+interface MemberTab {
+  value: string;
+  label: string;
+  count: number;
+}
 
 /** People in the workspace: invite by email, change roles and project access, remove. Guests are listed with their projects. */
 @Component({
@@ -49,107 +66,119 @@ const ANY = 'any';
   imports: [
     HlmButtonImports,
     HlmCheckbox,
-    HlmInputImports,
+    HlmDropdownMenuImports,
     LucideDynamicIcon,
     ActorAvatar,
     AppSelect,
     MemberAccessEditor,
     MembersInviteDialog,
-    V3Segmented,
+    NgTemplateOutlet,
     ...SECTION_KIT,
   ],
-  host: { class: 'flex flex-col gap-8' },
+  host: { class: 'flex flex-col gap-9' },
   template: `
-    <div>
-      <app-section-header
-        title="Members"
-        description="People in this workspace. Members get the projects their role and access allow; guests only see the projects they were invited to."
-      >
-        @if (canInvite()) {
-          <button actions hlmBtn size="sm" type="button" (click)="inviting.set(true)">
-            Invite people
+    <app-section-header
+      flush
+      title="Members"
+      description="People in {{ store.slug() ?? 'this workspace' }}. Members get the projects their role and access allow; guests only see the projects they were invited to."
+    >
+      @if (canInvite()) {
+        <button actions hlmBtn size="sm" type="button" (click)="inviting.set(true)">
+          <svg [lucideIcon]="userPlusIcon" [size]="13"></svg> Invite people
+        </button>
+      }
+    </app-section-header>
+
+    @if (sent(); as s) {
+      <div class="border-border bg-card border px-3.5 py-3" role="status">
+        <p class="text-[13px] leading-snug">
+          @if (s.link.emailed) {
+            Invitation emailed to
+            <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
+            >. You can also share this link:
+          } @else {
+            Email is not set up on this server. Share this link with
+            <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
+            >:
+          }
+        </p>
+        <app-copy-field class="mt-2" [value]="s.link.url" label="Invite link" />
+      </div>
+    }
+
+    <div class="flex flex-col gap-3.5">
+      <div class="border-border flex flex-wrap gap-x-[18px] border-b" role="tablist" aria-label="Show">
+        @for (t of tabs(); track t.value) {
+          <button
+            type="button"
+            role="tab"
+            class="focus-visible:ring-ring/50 -mb-px flex items-center gap-1.5 border-b-2 pb-[9px] text-[13px] leading-[normal] outline-none focus-visible:ring-2"
+            [class]="t.value === tab() ? 'text-foreground border-primary' : 'text-muted-foreground hover:text-foreground border-transparent'"
+            [attr.aria-selected]="t.value === tab()"
+            (click)="tab.set(t.value)"
+          >
+            {{ t.label }}
+            <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ t.count }}</span>
           </button>
         }
-      </app-section-header>
+      </div>
 
-      @if (sent(); as s) {
-        <div class="border-border bg-secondary mb-5 border px-3.5 py-3" role="status">
-          <p class="text-[13px] leading-snug">
-            @if (s.link.emailed) {
-              Invitation emailed to
-              <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
-              >. You can also share this link:
-            } @else {
-              Email is not set up on this server. Share this link with
-              <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
-              >:
-            }
-          </p>
-          <app-copy-field class="mt-2" [value]="s.link.url" label="Invite link" />
-          <p class="text-faint mt-1.5 font-mono text-[10.5px]">
-            It works for 7 days and only for that email address. Sending again replaces it.
-          </p>
-        </div>
-      }
-
-      <div class="mb-3 flex flex-wrap items-center gap-3">
-        <v3-segmented aria-label="Show" [options]="tabOptions()" [(value)]="tab" />
-        <span class="flex-1"></span>
-        @if (tab() !== 'pending') {
-          <div class="relative w-48">
-            <svg
-              [lucideIcon]="searchIcon"
-              [size]="13"
-              class="text-muted-foreground pointer-events-none absolute top-1/2 left-2 -translate-y-1/2"
-            ></svg>
+      @if (tab() !== 'pending') {
+        <div class="flex flex-wrap items-center gap-2 ${SETTINGS_SELECT}">
+          <label
+            class="bg-background border-border focus-within:border-primary flex w-full items-center gap-2 border px-[9px] py-1.5 sm:w-[280px]"
+          >
+            <svg [lucideIcon]="searchIcon" [size]="13" class="text-faint shrink-0"></svg>
             <input
-              hlmInput
-              class="h-8 w-full pl-7 text-xs"
+              class="text-foreground placeholder:text-faint min-w-0 flex-1 bg-transparent text-[13px] leading-[normal] outline-none"
               placeholder="Search name or email"
               aria-label="Search members"
               [value]="query()"
               (input)="query.set($any($event.target).value)"
             />
-          </div>
+          </label>
           @if (projectOptions().length > 1) {
-            <div class="w-36">
+            <div class="w-40">
               <app-select size="sm" label="Project" [options]="projectOptions()" [(value)]="projectFilter" />
             </div>
           }
-          <div class="w-32">
+          <div class="w-[140px]">
             <app-select size="sm" label="Role" [options]="roleFilterOptions()" [(value)]="roleFilter" />
           </div>
-        }
-      </div>
+          <span class="flex-1"></span>
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ counts().members }} members · {{ counts().guests }} guests</span>
+        </div>
+      }
+    </div>
 
-      @if (tab() !== 'pending') {
-        <div class="border-border border-t">
-          <div
-            class="text-faint border-border hidden items-center gap-3 border-b px-1 py-1.5 font-mono text-[10px] tracking-[1px] uppercase sm:flex"
-          >
-            <span class="min-w-0 flex-1">Member</span>
-            <span class="w-32">Role</span>
-            <span class="w-44">Access</span>
-            <span class="w-20"></span>
-          </div>
-          @for (m of shown(); track m.membership.id) {
-            <div class="border-border hover:bg-secondary flex min-h-13 flex-wrap items-center gap-3 border-b px-1 py-2.5">
-              <app-actor-avatar [actor]="{ type: 'user', id: m.user.id }" [size]="22" />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1.5 text-[13px]">
-                  <span class="text-foreground truncate">{{ m.user.name }}</span>
+    @if (tab() !== 'pending') {
+      <div class="bg-card border-border border">
+        <div
+          class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] uppercase sm:flex"
+        >
+          <span class="min-w-0 flex-1">Member</span>
+          <span class="w-[150px] shrink-0">Role</span>
+          <span class="w-[170px] shrink-0">Access</span>
+          <span class="w-[14px] shrink-0"></span>
+        </div>
+        @for (m of shown(); track m.membership.id) {
+          @let rules = rulesFor(m.membership);
+          <div class="border-border flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-2.5 sm:flex-nowrap">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+              <app-actor-avatar [actor]="{ type: 'user', id: m.user.id }" [size]="26" />
+              <div class="flex min-w-0 flex-col gap-0.5">
+                <div class="truncate text-[13px] leading-[normal]">
+                  <span class="text-foreground">{{ m.user.name }}</span>
                   @if (m.user.id === meId()) {
-                    <span class="border-border text-faint border px-1.5 font-mono text-[10px] leading-[14px]">you</span>
-                  }
-                  @if (m.membership.role === guestId) {
-                    <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[14px]">guest</span>
+                    <span class="text-faint"> · you</span>
                   }
                 </div>
-                <div class="text-faint truncate font-mono text-[10.5px]">{{ m.user.email }}</div>
+                <div class="text-faint truncate font-mono text-[10.5px] leading-[normal]">{{ m.user.email }}</div>
               </div>
-              @let rules = rulesFor(m.membership);
+            </div>
+            <div class="flex w-[150px] shrink-0 items-center gap-2">
               @if (canAdmin() && !rules.roleLocked) {
-                <div class="w-32">
+                <div class="w-[130px] min-w-0 ${SETTINGS_SELECT}">
                   <app-select
                     size="sm"
                     [options]="roleOptionsFor(m.membership.role)"
@@ -159,155 +188,168 @@ const ANY = 'any';
                   />
                 </div>
               } @else {
+                @if (m.membership.role === 'owner') {
+                  <svg [lucideIcon]="crownIcon" [size]="12" class="text-primary shrink-0"></svg>
+                }
                 <span
-                  class="text-muted-foreground w-32 font-mono text-[11px]"
+                  class="text-text-2 text-[13px] leading-[normal]"
                   [class.cursor-help]="!!rules.roleLocked"
                   [attr.title]="rules.roleLocked"
                   [attr.tabindex]="rules.roleLocked ? 0 : null"
                   >{{ roleName(m.membership.role) }}</span
                 >
               }
-              <span class="text-muted-foreground w-44 truncate font-mono text-[11px]" [attr.title]="accessLabel(m.membership)">
-                {{ accessLabel(m.membership) }}
-              </span>
-              <span class="flex w-20 justify-end gap-1">
-                @if (canAdmin()) {
-                  @if (rules.canTransfer) {
-                    <button
-                      hlmBtn
-                      variant="ghost"
-                      size="sm"
-                      class="text-muted-foreground h-7 text-xs"
-                      title="Make this person the workspace owner. You stay an owner."
-                      (click)="transfer(m.membership.id, m.user.name)"
-                    >
-                      Owner
-                    </button>
-                  }
-                  @if (m.membership.role !== 'owner' && !rules.roleLocked) {
-                    <button
-                      hlmBtn
-                      variant="ghost"
-                      size="sm"
-                      class="text-muted-foreground h-7 text-xs"
-                      (click)="openAccess(m.membership)"
-                    >
-                      Access
-                    </button>
-                  }
-                  <span [attr.title]="rules.removeLocked">
-                    <button
-                      hlmBtn
-                      variant="ghost"
-                      size="icon-sm"
-                      class="text-muted-foreground"
-                      [disabled]="!!rules.removeLocked"
-                      [attr.aria-label]="'Remove ' + m.user.name"
-                      (click)="remove(m.membership.id, m.user.name)"
-                    >
-                      <svg [lucideIcon]="xIcon" [size]="14"></svg>
-                    </button>
-                  </span>
-                }
-              </span>
             </div>
-            @if (editingId() === m.membership.id) {
-              <div class="border-border bg-secondary border-b px-3.5 py-3">
-                @if (m.membership.role !== guestId) {
-                  <label class="flex items-start gap-2 text-[13px]">
-                    <hlm-checkbox class="mt-0.5" [checked]="draftCustom()" (checkedChange)="setDraftCustom(m.membership, $event)" />
-                    <span>
-                      <span class="text-foreground">Adjust {{ m.user.name }}</span>
-                      <span class="text-muted-foreground block text-[12px] leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you limit projects or add actions.</span>
-                    </span>
-                  </label>
-                }
-                @if (draftCustom() || m.membership.role === guestId) {
-                  <app-member-access-editor class="mt-3" [role]="m.membership.role" [locked]="baseline(m.membership.role)" [projects]="projectChoices()" [disabled]="busy()" [(value)]="draft" />
-                }
-                <div class="mt-3 flex gap-2">
-                  <button hlmBtn size="sm" type="button" [disabled]="busy() || !draftValid(m.membership)" (click)="saveAccess(m.membership.id)">Save access</button>
-                  <button hlmBtn size="sm" variant="ghost" type="button" (click)="editingId.set(null)">Cancel</button>
-                </div>
-              </div>
-            }
-          } @empty {
-            <div class="text-muted-foreground border-border border-b px-4 py-6 text-center text-[13px]">
-              @if (filtering()) {
-                No one matches these filters.
-              } @else if (tab() === 'guests') {
-                No guests yet. Guests are added from a project's Share button.
-              } @else {
-                No one here yet.
+            <div class="text-text-2 flex w-[170px] shrink-0 items-center gap-2 text-[12.5px] leading-[normal]" [attr.title]="accessLabel(m.membership)">
+              @if (m.membership.role === guestId) {
+                <svg [lucideIcon]="folderLockIcon" [size]="12" class="text-muted-foreground shrink-0"></svg>
+              }
+              <span class="min-w-0 truncate">{{ accessLabel(m.membership) }}</span>
+            </div>
+            <div class="flex w-[14px] shrink-0 items-center justify-center">
+              @if (canAdmin() && (rules.canTransfer || (m.membership.role !== 'owner' && !rules.roleLocked) || !rules.removeLocked)) {
+                <button
+                  type="button"
+                  class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -m-2 p-2 outline-none focus-visible:ring-2"
+                  [hlmDropdownMenuTrigger]="rowMenu"
+                  [attr.aria-label]="'Actions for ' + m.user.name"
+                >
+                  <svg [lucideIcon]="ellipsisIcon" [size]="14"></svg>
+                </button>
+                <ng-template #rowMenu>
+                  <hlm-dropdown-menu class="w-44">
+                    @if (rules.canTransfer) {
+                      <button hlmDropdownMenuItem (triggered)="transfer(m.membership.id, m.user.name)">Make owner</button>
+                    }
+                    @if (m.membership.role !== 'owner' && !rules.roleLocked) {
+                      <button hlmDropdownMenuItem (triggered)="openAccess(m.membership)">Edit access</button>
+                    }
+                    @if (!rules.removeLocked) {
+                      <hlm-dropdown-menu-separator />
+                      <button hlmDropdownMenuItem variant="destructive" (triggered)="remove(m.membership.id, m.user.name)">
+                        <svg [lucideIcon]="xIcon" [size]="14"></svg> Remove
+                      </button>
+                    }
+                  </hlm-dropdown-menu>
+                </ng-template>
               }
             </div>
-          }
-        </div>
-        <p class="text-muted-foreground mt-3 max-w-[720px] text-[12px] leading-snug">
-          Guests are added from a project's Share button. To give a guest more projects, share another project with them or open their Access. Promoting a guest to a member is just a role change.
-        </p>
-      } @else {
-        @if (pending().length) {
-          <div class="border-border border-t">
-            @for (i of pending(); track i.id) {
-              <div class="border-border hover:bg-secondary flex min-h-13 flex-wrap items-center gap-3 border-b px-1 py-2.5">
-                <div class="min-w-0 flex-1">
-                  <div class="text-foreground truncate text-[13px]">{{ i.email }}</div>
-                  <div class="text-faint font-mono text-[10.5px]" [class.text-red]="expired(i)">
-                    {{ roleName(i.role) }} · {{ inviteAccess(i) }} · {{ expiry(i) }}
-                  </div>
-                </div>
-                <button hlmBtn variant="outline" size="sm" [disabled]="busy()" (click)="resend(i)">Resend</button>
-                <button
-                  hlmBtn
-                  variant="ghost"
-                  size="icon-sm"
-                  class="text-muted-foreground"
-                  [attr.aria-label]="'Revoke invitation for ' + i.email"
-                  (click)="confirmRevoke(i)"
-                >
-                  <svg [lucideIcon]="xIcon" [size]="14"></svg>
-                </button>
-              </div>
-            }
           </div>
-        } @else {
-          <div class="text-muted-foreground border-border border-y px-4 py-6 text-center text-[13px]">
-            No invitations waiting.
-          </div>
-        }
-      }
-    </div>
-
-    @if (tab() !== 'pending' && canInvite() && pending().length) {
-      <app-settings-group title="Pending invitations" [caption]="pending().length + ' waiting'">
-        @for (i of pending(); track i.id) {
-          <div class="border-border hover:bg-secondary flex min-h-13 flex-wrap items-center gap-3 border-b px-1 py-2.5">
-            <div class="min-w-0 flex-1">
-              <div class="text-foreground truncate text-[13px]">{{ i.email }}</div>
-              <div class="text-faint font-mono text-[10.5px]" [class.text-red]="expired(i)">
-                Joins as {{ roleName(i.role) }} · {{ inviteAccess(i) }} · {{ expiry(i) }}
+          @if (editingId() === m.membership.id) {
+            <div class="border-border bg-bg-deep border-t px-4 py-3.5">
+              @if (m.membership.role !== guestId) {
+                <label class="flex items-start gap-2 text-[13px]">
+                  <hlm-checkbox class="mt-0.5" [checked]="draftCustom()" (checkedChange)="setDraftCustom(m.membership, $event)" />
+                  <span>
+                    <span class="text-foreground">Adjust {{ m.user.name }}</span>
+                    <span class="text-muted-foreground block text-[12px] leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you limit projects or add actions.</span>
+                  </span>
+                </label>
+              }
+              @if (draftCustom() || m.membership.role === guestId) {
+                <app-member-access-editor class="mt-3" [role]="m.membership.role" [locked]="baseline(m.membership.role)" [projects]="projectChoices()" [disabled]="busy()" [(value)]="draft" />
+              }
+              <div class="mt-3 flex gap-2">
+                <button hlmBtn size="sm" type="button" [disabled]="busy() || !draftValid(m.membership)" (click)="saveAccess(m.membership.id)">Save access</button>
+                <button hlmBtn size="sm" variant="ghost" type="button" (click)="editingId.set(null)">Cancel</button>
               </div>
             </div>
-            <button hlmBtn variant="outline" size="sm" [disabled]="busy()" (click)="resend(i)">Resend</button>
-            <button
-              hlmBtn
-              variant="ghost"
-              size="icon-sm"
-              class="text-muted-foreground"
-              [attr.aria-label]="'Revoke invitation for ' + i.email"
-              (click)="confirmRevoke(i)"
-            >
-              <svg [lucideIcon]="xIcon" [size]="14"></svg>
-            </button>
+          }
+        } @empty {
+          <div class="text-muted-foreground border-border border-t px-4 py-6 text-center text-[13px]">
+            @if (filtering()) {
+              No one matches these filters.
+            } @else if (tab() === 'guests') {
+              No guests yet. Guests are added from a project's Share button.
+            } @else {
+              No one here yet.
+            }
           </div>
         }
-      </app-settings-group>
+      </div>
+
+      <div class="bg-card border-border flex gap-2.5 border px-3.5 py-2.5">
+        <svg [lucideIcon]="folderLockIcon" [size]="14" class="text-text-2 mt-[3px] shrink-0"></svg>
+        <p class="text-text-2 text-[12.5px] leading-[19px]">
+          Guests are added from a project's Share menu. To give a guest more projects, invite them to another project or open their row. Promoting a guest to member is just a role change.
+        </p>
+      </div>
+
+      @if (canInvite() && pending().length) {
+        <app-settings-block title="Pending invitations" [caption]="'' + pending().length">
+          <ng-container *ngTemplateOutlet="inviteTable" />
+        </app-settings-block>
+      }
+    } @else {
+      @if (pending().length) {
+        <ng-container *ngTemplateOutlet="inviteTable" />
+      } @else {
+        <div class="bg-card text-muted-foreground border-border border px-4 py-6 text-center text-[13px]">
+          No invitations waiting.
+        </div>
+      }
     }
 
-    <p class="text-muted-foreground max-w-[720px] text-[12px] leading-snug">
-      Removing someone keeps their tasks, comments and time entries. Projects belong to the workspace, so nothing leaves with them. Their agents, API tokens and personal connections stop working here at once.
-    </p>
+    <div class="bg-card border-border flex gap-2.5 border px-3.5 py-2.5">
+      <svg [lucideIcon]="shieldIcon" [size]="14" class="text-text-2 mt-[3px] shrink-0"></svg>
+      <p class="text-text-2 text-[12.5px] leading-[19px]">
+        Removing someone keeps their tasks, comments and time entries. Projects belong to the workspace, so nothing leaves with them. Their agents, API tokens and personal connections stop working here at once.
+      </p>
+    </div>
+
+    <ng-template #inviteTable>
+      <div class="bg-card border-border border">
+        <div
+          class="bg-bg-deep text-faint hidden items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-[normal] uppercase sm:flex"
+        >
+          <span class="min-w-0 flex-1">Email</span>
+          <span class="w-[200px] shrink-0">Joins as</span>
+          <span class="w-[230px] shrink-0">Invited by</span>
+          <span class="w-[110px] shrink-0"></span>
+        </div>
+        @for (i of pending(); track i.id) {
+          <div class="border-border flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-2 sm:flex-nowrap">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+              <svg [lucideIcon]="mailIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
+              <span class="text-foreground truncate text-[13px] leading-[normal]">{{ i.email }}</span>
+            </div>
+            <span class="text-text-2 w-[200px] shrink-0 truncate font-mono text-[10.5px] leading-[normal]">
+              {{ roleName(i.role) }} · {{ inviteAccess(i) }}
+            </span>
+            <span
+              class="text-muted-foreground w-[230px] shrink-0 truncate font-mono text-[10.5px] leading-[normal]"
+              [class.text-red]="expired(i)"
+            >
+              {{ inviter(i) }} · {{ createdAgo(i) }} · {{ expiry(i) }}
+            </span>
+            <div class="flex w-[110px] shrink-0 items-center justify-end">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="sm"
+                type="button"
+                class="text-text-2"
+                [disabled]="busy()"
+                (click)="resend(i)"
+              >
+                Resend
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-text-2"
+                [attr.aria-label]="'Revoke invitation for ' + i.email"
+                (click)="confirmRevoke(i)"
+              >
+                <svg [lucideIcon]="xIcon" [size]="13"></svg>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </ng-template>
 
     <app-members-invite-dialog [open]="inviting()" (closed)="inviting.set(false)" />
   `,
@@ -321,6 +363,12 @@ export class MembersSection {
   protected readonly guestId = GUEST_ROLE_ID;
   protected readonly searchIcon = LucideSearch;
   protected readonly xIcon = LucideX;
+  protected readonly crownIcon = LucideCrown;
+  protected readonly ellipsisIcon = LucideEllipsis;
+  protected readonly folderLockIcon = LucideFolderLock;
+  protected readonly mailIcon = LucideMail;
+  protected readonly shieldIcon = LucideShield;
+  protected readonly userPlusIcon = LucideUserPlus;
   protected readonly inviting = signal(false);
   /** `all` · `members` · `guests` · `pending` */
   protected readonly tab = signal<string>('all');
@@ -349,14 +397,14 @@ export class MembersSection {
     const guests = rows.filter((m) => m.membership.role === GUEST_ROLE_ID).length;
     return { all: rows.length, guests, members: rows.length - guests, pending: this.pending().length };
   });
-  protected readonly tabOptions = computed<V3SegmentOption[]>(() => {
+  protected readonly tabs = computed<MemberTab[]>(() => {
     const c = this.counts();
-    const tabs: V3SegmentOption[] = [
-      { value: 'all', label: `All ${c.all}` },
-      { value: 'members', label: `Members ${c.members}` },
-      { value: 'guests', label: `Guests ${c.guests}` },
+    const tabs: MemberTab[] = [
+      { value: 'all', label: 'All', count: c.all },
+      { value: 'members', label: 'Members', count: c.members },
+      { value: 'guests', label: 'Guests', count: c.guests },
     ];
-    if (this.canInvite()) tabs.push({ value: 'pending', label: `Pending ${c.pending}` });
+    if (this.canInvite()) tabs.push({ value: 'pending', label: 'Pending', count: c.pending });
     return tabs;
   });
   protected readonly projectOptions = computed<Option[]>(() => [
@@ -449,14 +497,26 @@ export class MembersSection {
     return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ');
   }
 
+  /** Who sent the invitation ("You" for me). */
+  protected inviter(i: WorkspaceInvite): string {
+    if (!i.invitedByUserId) return 'Someone';
+    if (i.invitedByUserId === this.meId()) return 'You';
+    return this.store.userById().get(i.invitedByUserId)?.name ?? 'Someone';
+  }
+
+  protected createdAgo(i: WorkspaceInvite): string {
+    const when = ago(i.createdAt);
+    return when === 'now' ? 'now' : `${when} ago`;
+  }
+
   protected expired(i: WorkspaceInvite): boolean {
     return new Date(i.expiresAt).getTime() < Date.now();
   }
   protected expiry(i: WorkspaceInvite): string {
     const days = Math.ceil((new Date(i.expiresAt).getTime() - Date.now()) / DAY_MS);
-    if (days < 0) return 'expired, resend to renew';
+    if (days < 0) return 'expired';
     if (days === 0) return 'expires today';
-    return days === 1 ? 'expires tomorrow' : `expires in ${days} days`;
+    return `expires in ${days}d`;
   }
 
   protected roleName(role: Role): string {

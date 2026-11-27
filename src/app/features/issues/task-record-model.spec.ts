@@ -1,5 +1,14 @@
-import type { ActorRef } from '../../core';
-import { artifactName, linkedBy, threadId } from './task-record-model';
+import type { ActorRef, DomainEvent } from '../../core';
+import { buildStream } from './issue-stream-model';
+import {
+  artifactName,
+  linkedBy,
+  recordEvents,
+  recordFiles,
+  recordSize,
+  syncedText,
+  threadId,
+} from './task-record-model';
 
 const actor: ActorRef = { type: 'user', id: 'u1' };
 
@@ -40,5 +49,47 @@ describe('artifactName', () => {
 
   it('keeps the title of other artifacts', () => {
     expect(artifactName({ kind: 'document', repository: 'acme/web', externalId: '', title: 'Spec' })).toBe('Spec');
+  });
+});
+
+describe('syncedText', () => {
+  const now = Date.parse('2026-01-01T12:00:00Z');
+
+  it('says how long ago the agent synced', () => {
+    expect(syncedText('2026-01-01T11:56:00Z', now)).toBe('synced 4m ago');
+    expect(syncedText('2026-01-01T11:59:50Z', now)).toBe('synced just now');
+    expect(syncedText(undefined, now)).toBe('');
+  });
+});
+
+describe('recordSize', () => {
+  it('reports turns and files, leaving out what is unknown', () => {
+    expect(recordSize({ turns: 38, files: ['a', 'b', 'c', 'd', 'e', 'f'] })).toBe('38 turns · 6 files');
+    expect(recordSize({ turns: 1, files: ['a'] })).toBe('1 turn · 1 file');
+    expect(recordSize({ turns: null, files: ['a', 'b'] })).toBe('2 files');
+    expect(recordSize({ turns: null, files: [] })).toBe('');
+  });
+});
+
+describe('recordFiles', () => {
+  it('keeps the first files and counts the rest', () => {
+    expect(recordFiles(['a', 'b', 'c'], 2)).toEqual({ shown: ['a', 'b'], more: 1 });
+    expect(recordFiles(['a'], 2)).toEqual({ shown: ['a'], more: 0 });
+  });
+});
+
+describe('recordEvents', () => {
+  it('reads a record sync as one line with what it added', () => {
+    const ev = {
+      id: 'ev1',
+      workspaceId: 'w',
+      at: '2026-01-01T10:00:00Z',
+      actor,
+      type: 'issue.thread_synced',
+      subject: { type: 'issue', id: 'i1' },
+      data: { decisions: 2, files: 3 },
+    } as DomainEvent;
+    const lines = recordEvents(buildStream([ev], []), () => 'Agent', []);
+    expect(lines.map((l) => l.text)).toEqual(['Agent synced the record · 2 decisions · 3 files']);
   });
 });

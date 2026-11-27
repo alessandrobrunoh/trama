@@ -13,9 +13,10 @@
       "get_artifact",
       "list_task_artifacts",
       "list_comments",
-      "list_tasks"
+      "list_tasks",
+      "list_decisions"
     ],
-    "description": "Read one task or artifact by key or id. Task context comes from the task context endpoint (it includes parentId, estimate and threadUrl, the link to the thread working on the task). Pass comments:true to include the task thread, subtasks:true to include its subtasks as a nested tree of any depth (subtasks), depth to stop at that many levels. The wire type stays issue. Example: {\"id\":\"CORA-142\",\"subtasks\":true}.",
+    "description": "Read one task or artifact by key or id. Task context comes from the task context endpoint (it includes parentId, estimate and threadUrl, the link to the thread working on the task) and its decisions. Pass comments:true to include the task thread, subtasks:true to include its subtasks as a nested tree of any depth (subtasks), depth to stop at that many levels. The wire type stays issue. Example: {\"id\":\"CORA-142\",\"subtasks\":true}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -299,7 +300,7 @@
     "name": "update_task",
     "summary": "Change a task's status, priority, assignee, labels, parent, duplicate marker…",
     "kind": "catalog",
-    "description": "Update one task: status, priority, assignee, labels, estimate (points; null clears), title/body, project, milestoneIds, threadUrl (link to the thread working on it; null clears), parentId (moves it under another task as a subtask, or null for a root task), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another task). Changing project re-keys the task and keeps its old key as an alias. Sub-tasks keep independent statuses and can be nested. There is no team. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several tasks at once: triage_tasks. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
+    "description": "Update one task: status, priority, assignee, labels, estimate (points; null clears), title/body, project, milestoneIds, threadUrl (null unlinks; link with link_thread), parentId (moves it under another task as a subtask, or null for a root task), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another task). Changing project re-keys the task and keeps its old key as an alias. Sub-tasks keep independent statuses and can be nested. There is no team. null clears an optional field. People own the status: an agent only sets in_progress. Several tasks at once: triage_tasks. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_progress\"}."
   },
   {
     "name": "start_work",
@@ -448,6 +449,172 @@
           "description": "One factual comment on the task."
         }
       },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "link_thread",
+    "summary": "Link the thread you work in to a task (one thread per task)",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": [
+      "tasks:write"
+    ],
+    "uses": [
+      "get_task",
+      "update_task"
+    ],
+    "description": "Link the thread you work in to a task. A task has one thread: if it links another, this fails with thread_already_linked and changes nothing; ask the person, then create_task {parentId, threadUrl} and work on the subtask. Example: {\"issue\":\"TRM-128\",\"threadUrl\":\"https://delta.example/t/th_1\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "type": "string",
+          "description": "Task key or id."
+        },
+        "threadUrl": {
+          "type": "string",
+          "description": "Full http(s) link of the thread you work in."
+        }
+      },
+      "required": [
+        "issue",
+        "threadUrl"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "sync_thread",
+    "summary": "Update the task's thread record: summary, decisions, files, PR, active minutes",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": [
+      "tasks:write"
+    ],
+    "uses": [
+      "sync_thread"
+    ],
+    "description": "After each turn that edits files, update your thread's record on the task with what changed: summary (replaces), decisions (appended), files (merged), pullRequestUrl (attached as an artifact), activeMinutes (a suggestion the person accepts). Never changes the status. Example: {\"issue\":\"TRM-128.3\",\"summary\":\"Retry alert wired\",\"files\":[\"src/auth/refresh.ts\"]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "type": "string",
+          "description": "Task key or id."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Where the work stands (max 4000 chars)."
+        },
+        "decisions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The decision and why."
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Files, directories (src/auth/) or globs it applies to."
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Files touched, relative to the repo root."
+        },
+        "pullRequestUrl": {
+          "type": "string",
+          "description": "The PR or MR you opened."
+        },
+        "activeMinutes": {
+          "type": "integer",
+          "description": "Active minutes since the last sync, 1-720."
+        },
+        "turns": {
+          "type": "integer",
+          "description": "Turns of the thread so far."
+        },
+        "threadUrl": {
+          "type": "string",
+          "description": "Links it if the task has none."
+        }
+      },
+      "required": [
+        "issue"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "find_decisions",
+    "summary": "Past decisions, by file path or task: read them before touching a file",
+    "kind": "composite",
+    "readOnly": true,
+    "visibleIf": [
+      "tasks:read"
+    ],
+    "uses": [
+      "list_decisions"
+    ],
+    "description": "Recorded decisions, newest first. Before editing a file pass its path: decisions on that file, a directory above it or a matching glob. issue: one task's decisions. Follow them; if one looks wrong, tell the person. Example: {\"path\":\"src/auth/refresh.ts\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "A file path relative to the repository root."
+        },
+        "issue": {
+          "type": "string",
+          "description": "Task key or id."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "1-200, default 50."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "suggest_estimate",
+    "summary": "Suggest points from similar finished tasks; you never set the estimate",
+    "kind": "composite",
+    "readOnly": true,
+    "visibleIf": [
+      "tasks:read"
+    ],
+    "uses": [
+      "suggest_estimate"
+    ],
+    "description": "Points suggested from similar finished tasks, with the basis and a reason to relay. Writes nothing: the person decides. Example: {\"issue\":\"TRM-128.3\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "type": "string",
+          "description": "Task key or id."
+        }
+      },
+      "required": [
+        "issue"
+      ],
       "additionalProperties": false
     }
   },

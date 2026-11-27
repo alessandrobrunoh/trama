@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import {
   LucideDynamicIcon,
+  LucideEllipsis,
   LucideInfo,
   LucidePencil,
   LucidePlus,
@@ -9,6 +10,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
   STATUS_CATALOG_KEY,
   STATUS_COLOR,
@@ -62,13 +64,13 @@ type Dialog =
 @Component({
   selector: 'app-workflow-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, LucideDynamicIcon, V3DialogFoot, V3DialogHead, ...SECTION_KIT],
+  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, HlmDropdownMenuImports, LucideDynamicIcon, V3DialogFoot, V3DialogHead, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
       flush
       title="Workflow"
-      description="The statuses a task moves through. The category decides how a status counts. Statuses are set by people: linking a thread or opening a PR never changes one on its own."
+      description="The statuses a task moves through. The category decides how a status counts."
     >
       <app-segmented actions aria-label="Status catalogs" [options]="subjectOptions" [value]="current()" (valueChange)="setSubject($event)" />
     </app-section-header>
@@ -88,7 +90,7 @@ type Dialog =
         </div>
         <div class="flex flex-wrap gap-x-4 gap-y-1">
           @for (s of flow(); track s.id) {
-            <span class="text-muted-foreground inline-flex items-center gap-[5px] font-mono text-[10.5px] leading-normal">
+            <span class="text-muted-foreground inline-flex items-center gap-[5px] font-mono text-[10.5px] leading-[normal]">
               <span class="size-1.5 shrink-0" [style.background]="s.color" aria-hidden="true"></span>
               {{ s.name }} {{ s.count }}
             </span>
@@ -101,13 +103,13 @@ type Dialog =
       @for (g of groups(); track g.id) {
         <section [attr.aria-label]="g.title">
           <div class="bg-bg-deep flex items-center gap-2.5 px-3 py-2.5">
-            <span class="text-text-2 font-mono text-[10.5px] leading-normal">{{ g.title }}</span>
-            <span class="text-faint min-w-0 truncate font-mono text-[10.5px] leading-normal">{{ g.caption }}</span>
+            <span class="text-text-2 font-mono text-[10.5px] leading-[normal]">{{ g.title }}</span>
+            <span class="text-faint min-w-0 truncate font-mono text-[10.5px] leading-[normal]">{{ g.caption }}</span>
             <span class="flex-1"></span>
             @if (canManage()) {
               <button
                 type="button"
-                class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 font-mono text-[10.5px] leading-normal outline-none focus-visible:ring-2"
+                class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 font-mono text-[10.5px] leading-[normal] outline-none focus-visible:ring-2"
                 (click)="openAdd(g.types[0])"
               >
                 <svg [lucideIcon]="plus" [size]="12"></svg>
@@ -116,7 +118,7 @@ type Dialog =
             }
           </div>
           @for (entry of g.entries; track entry.id) {
-            <div class="border-border hover:bg-hover/40 flex items-center gap-3 border-t py-[9px] pr-3 pl-3.5">
+            <div class="border-border hover:bg-hover/40 flex items-center gap-3 border-t py-[9px] pr-3 pl-4">
               <span class="flex w-[15px] shrink-0 items-center justify-center" [style.color]="entry.color" aria-hidden="true">
                 @if (emoji(entry.icon); as e) {
                   <span class="text-[13px] leading-none">{{ e }}</span>
@@ -124,28 +126,35 @@ type Dialog =
                   <svg [lucideIcon]="iconFor(entry.icon)" [size]="15"></svg>
                 }
               </span>
-              <span class="text-foreground w-[132px] shrink-0 truncate text-[13px] sm:w-[180px]">{{ entry.name }}</span>
-              <span class="text-muted-foreground hidden min-w-0 flex-1 truncate text-[12.5px] sm:block">{{ hint(entry) }}</span>
+              <span class="text-foreground w-[132px] shrink-0 truncate text-[13px] leading-[normal] sm:w-[180px]">{{ entry.name }}</span>
+              <span class="text-muted-foreground hidden min-w-0 flex-1 truncate text-[12.5px] leading-[normal] sm:block">{{ hint(entry) }}</span>
               <span class="flex-1 sm:hidden"></span>
-              <span class="text-faint shrink-0 font-mono text-[10.5px] leading-normal">{{ usage(entry) }} {{ subjectNoun() }}</span>
+              <span class="text-faint shrink-0 font-mono text-[10.5px] leading-[normal]">{{ usage(entry) }} {{ subjectNoun() }}</span>
               @if (canManage()) {
-                <span class="flex shrink-0 items-center">
-                  <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Edit ' + entry.name" (click)="openEdit(entry)">
-                    <svg [lucideIcon]="pencil" [size]="13"></svg>
-                  </button>
-                  <button
-                    hlmBtn
-                    variant="ghost"
-                    size="icon-sm"
-                    class="text-muted-foreground size-6"
-                    [disabled]="!canRemove(entry)"
-                    [attr.aria-label]="'Remove ' + entry.name"
-                    [attr.title]="removeHint(entry)"
-                    (click)="openDelete(entry)"
-                  >
-                    <svg [lucideIcon]="trash" [size]="13"></svg>
-                  </button>
-                </span>
+                <button
+                  type="button"
+                  class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -m-1 shrink-0 p-1 outline-none focus-visible:ring-2"
+                  [hlmDropdownMenuTrigger]="statusMenu"
+                  [attr.aria-label]="'Actions for ' + entry.name"
+                >
+                  <svg [lucideIcon]="ellipsis" [size]="14"></svg>
+                </button>
+                <ng-template #statusMenu>
+                  <hlm-dropdown-menu class="w-40">
+                    <button hlmDropdownMenuItem (triggered)="openEdit(entry)">
+                      <svg [lucideIcon]="pencil" [size]="14" class="text-muted-foreground"></svg> Edit
+                    </button>
+                    <button
+                      hlmDropdownMenuItem
+                      variant="destructive"
+                      [disabled]="!canRemove(entry)"
+                      [attr.title]="removeHint(entry)"
+                      (triggered)="openDelete(entry)"
+                    >
+                      <svg [lucideIcon]="trash" [size]="14"></svg> Remove
+                    </button>
+                  </hlm-dropdown-menu>
+                </ng-template>
               }
             </div>
           }
@@ -156,7 +165,7 @@ type Dialog =
     <div class="bg-card border-border flex items-start gap-2.5 border px-3.5 py-2.5">
       <svg [lucideIcon]="info" [size]="14" class="text-muted-foreground mt-[3px] shrink-0"></svg>
       <p class="text-text-2 flex-1 text-[12.5px] leading-[19px]">
-        Canceled isn't Trash: canceled {{ subjectNoun() }} stay in lists and search, closed. A status can only be removed once nothing uses it.
+        Canceled isn't Trash: canceled {{ subjectNoun() }} stay in lists and search, closed.
       </p>
     </div>
 
@@ -248,6 +257,7 @@ export class WorkflowSection {
   protected readonly nameMax = STATUS_NAME_MAX;
   protected readonly iconChoices = [...STATUS_LUCIDE.keys()];
   protected readonly plus = LucidePlus;
+  protected readonly ellipsis = LucideEllipsis;
   protected readonly pencil = LucidePencil;
   protected readonly trash = LucideTrash2;
   protected readonly info = LucideInfo;

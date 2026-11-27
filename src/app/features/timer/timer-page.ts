@@ -11,28 +11,23 @@ import {
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
-  LucideCalendar,
   LucideChevronLeft,
   LucideChevronRight,
   LucideCornerDownRight,
   LucideDynamicIcon,
   LucidePlus,
-  LucideTrash2,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { addDays, format } from 'date-fns';
 import { usePageShortcuts } from '../../core/keyboard';
 import { TimeEntriesStore } from '../../core/stores/time-entries.store';
 import { TramaStore } from '../../core/stores/trama.store';
-import { UiStore } from '../../core/stores/ui.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { AppSelect, type Option } from '../../shared/app-select';
-import { DatePicker } from '../../shared/date-picker';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { atTime, entryProblem } from '../issues/task-time-model';
+import { LogTimeDialog, LogTimeDialogService } from './log-time-dialog';
 import {
   HOUR,
   WEEK_START_DAY,
@@ -44,15 +39,15 @@ import {
   hoursMinutes,
   mondayOf,
   segments,
+  suggestionCards,
   toCsv,
   weekDays,
   weekTitle,
   type DayEntry,
   type WeekDay,
 } from './time-model';
-import { TimeTabs } from './time-nav';
 
-type Composer = 'closed' | 'start' | 'log';
+type Composer = 'closed' | 'start';
 
 /**
  * `/:workspace/timer` (v3 "23 · Time · Timesheet"): the week as a grid of tasks by day, with the timer on top and
@@ -61,10 +56,10 @@ type Composer = 'closed' | 'start' | 'log';
  *   timer     what is running (or a start button), Switch task and Stop
  *   week      ‹ › through the weeks; the tracked total against the week before
  *   grid      one row per task worked on (subtasks under their parent), one column per day, day and week totals
- *   rail      the entries of the selected day (today by default), each one deletable
+ *   rail      the entries of the selected day (today by default)
  *
  * Time is your own; the API returns only the signed-in person's entries. Keyboard: T starts or stops, ⇧T switches
- * task, L logs a past session, E exports the week as CSV.
+ * task, L logs a past session (the Log time dialog), E exports the week as CSV.
  */
 @Component({
   selector: 'app-timer-page',
@@ -75,23 +70,22 @@ type Composer = 'closed' | 'start' | 'log';
     LucideDynamicIcon,
     HlmButtonImports,
     HlmInputImports,
-    HlmTooltip,
     PageHeader,
     TopBarActions,
-    TimeTabs,
     Kbd,
     AppSelect,
-    DatePicker,
+    LogTimeDialog,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <app-page-header title="Time" />
 
     <ng-template appTopBarActions>
-      <app-time-tabs />
       <button hlmBtn variant="outline" type="button" (click)="exportWeek()">Export <app-kbd keys="e" /></button>
-      <button hlmBtn type="button" (click)="open('log')">Log time <app-kbd keys="l" /></button>
+      <button hlmBtn type="button" (click)="logTime()">Log time <app-kbd keys="l" /></button>
     </ng-template>
+
+    <app-log-time-dialog />
 
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
       <div class="flex min-w-0 flex-1 flex-col gap-5 px-4 py-6 sm:px-8 lg:overflow-y-auto">
@@ -105,7 +99,7 @@ type Composer = 'closed' | 'start' | 'log';
             <span class="bg-red size-2.5 shrink-0" aria-hidden="true"></span>
             <div class="flex flex-col gap-0.5">
               <span class="text-red font-mono text-[10px] leading-[13px]">RUNNING · SINCE {{ run.start | date: 'HH:mm' }}</span>
-              <span class="text-foreground font-mono text-[30px] leading-[38px] tabular-nums" role="timer">{{ elapsed() }}</span>
+              <span class="text-foreground font-mono text-[30px] leading-[normal] tabular-nums" role="timer">{{ elapsed() }}</span>
             </div>
             <div class="flex min-w-0 flex-1 basis-60 flex-col gap-[3px]">
               <span class="text-faint truncate font-mono text-[10.5px] leading-[13px]">{{ runningMeta() }}</span>
@@ -119,7 +113,7 @@ type Composer = 'closed' | 'start' | 'log';
             <span class="border-faint size-2.5 shrink-0 border" aria-hidden="true"></span>
             <div class="flex flex-col gap-0.5">
               <span class="text-faint font-mono text-[10px] leading-[13px]">NOT TRACKING</span>
-              <span class="text-muted-foreground font-mono text-[30px] leading-[38px] tabular-nums" role="timer">00:00:00</span>
+              <span class="text-muted-foreground font-mono text-[30px] leading-[normal] tabular-nums" role="timer">00:00:00</span>
             </div>
             <div class="flex min-w-0 flex-1 basis-60 flex-col gap-[3px]">
               <span class="text-faint truncate font-mono text-[10.5px] leading-[13px]">no timer running</span>
@@ -133,13 +127,13 @@ type Composer = 'closed' | 'start' | 'log';
         @if (composer() !== 'closed') {
           <form
             class="bg-card border-border grid gap-3 border p-4 sm:grid-cols-2"
-            [attr.aria-label]="composer() === 'log' ? 'Log time' : 'Start a timer'"
+            aria-label="Start a timer"
             (submit)="submit($event)"
             (keydown.escape)="composer.set('closed')"
           >
             <div class="flex items-center gap-3 sm:col-span-2">
               <span class="text-foreground font-mono text-[10px] leading-[13px]">
-                {{ composer() === 'log' ? 'LOG A PAST SESSION' : running() ? 'SWITCH TASK' : 'START A TIMER' }}
+                {{ running() ? 'SWITCH TASK' : 'START A TIMER' }}
               </span>
               <span class="flex-1"></span>
               <app-kbd keys="esc" />
@@ -163,42 +157,38 @@ type Composer = 'closed' | 'start' | 'log';
               <label for="timer-issue" class="text-faint font-mono text-[10.5px] uppercase">Task</label>
               <app-select controlId="timer-issue" [options]="issueChoices()" [(value)]="issueId" />
             </div>
-            @if (composer() === 'log') {
-              <div class="flex flex-wrap items-end gap-3 sm:col-span-2">
-                <div class="grid gap-1.5">
-                  <span class="text-faint font-mono text-[10.5px] uppercase">Day</span>
-                  <app-date-picker
-                    label="Day of the session"
-                    triggerClass="border-input h-8 gap-2 border px-2.5 text-sm"
-                    [value]="manualDate().toISOString()"
-                    (dateChange)="manualDate.set($event ? $event : today())"
-                  >
-                    <svg [lucideIcon]="calendarIcon" [size]="13" class="text-muted-foreground"></svg>
-                    <span>{{ manualDate() | date: 'EEE, MMM d' }}</span>
-                  </app-date-picker>
-                </div>
-                <div class="grid gap-1.5">
-                  <label for="manual-start" class="text-faint font-mono text-[10.5px] uppercase">From</label>
-                  <input id="manual-start" hlmInput class="h-8 w-28" type="time" required [value]="manualStart()" (input)="manualStart.set($any($event.target).value)" />
-                </div>
-                <div class="grid gap-1.5">
-                  <label for="manual-end" class="text-faint font-mono text-[10.5px] uppercase">To</label>
-                  <input id="manual-end" hlmInput class="h-8 w-28" type="time" required [value]="manualEnd()" (input)="manualEnd.set($any($event.target).value)" />
-                </div>
-              </div>
-            }
             <div class="flex items-center gap-2 sm:col-span-2">
               <button hlmBtn type="submit" [disabled]="timers.busy()">
-                {{ composer() === 'log' ? 'Add entry' : running() ? 'Switch' : 'Start timer' }} <app-kbd keys="enter" />
+                {{ running() ? 'Switch' : 'Start timer' }} <app-kbd keys="enter" />
               </button>
               <button hlmBtn variant="outline" type="button" (click)="composer.set('closed')">Cancel</button>
             </div>
           </form>
         }
 
+        <!-- time suggested from a thread's active time (v3 mobile "10 My time"): it counts once you add it -->
+        @if (suggestions().length) {
+          <div class="flex flex-col gap-3 md:hidden">
+            @for (s of suggestions(); track s.id) {
+              <div class="bg-card border-delta-line flex flex-col gap-2 border border-l-2 px-3.5 py-3" role="group" aria-label="Suggested time">
+                <div class="flex items-center gap-2">
+                  <span class="text-delta font-mono text-[10px] leading-[13px]">SUGGESTED{{ issueKey(s.issueId) ? ' · ' + issueKey(s.issueId) : '' }}</span>
+                  <span class="flex-1"></span>
+                  <span class="text-foreground text-[14px] leading-[18px] font-semibold">{{ s.amount }}</span>
+                </div>
+                <p class="text-text-2 text-[13px] leading-[18px]">{{ s.when }}</p>
+                <div class="flex gap-2">
+                  <button hlmBtn type="button" class="h-9 flex-1" [disabled]="timers.busy()" (click)="timers.accept(s.id)">Add</button>
+                  <button hlmBtn variant="outline" type="button" class="h-9 flex-1" [disabled]="timers.busy()" (click)="timers.dismiss(s.id)">Dismiss</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
         <!-- week -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div class="border-border flex border">
+          <div class="outline-border flex outline-1 -outline-offset-1">
             <button
               type="button"
               class="text-muted-foreground hover:text-foreground flex h-[26px] w-7 items-center justify-center"
@@ -217,11 +207,6 @@ type Composer = 'closed' | 'start' | 'log';
             </button>
           </div>
           <h2 class="font-title text-foreground text-[19px] leading-6">{{ title() }}</h2>
-          @if (offset() !== 0) {
-            <button type="button" class="text-muted-foreground hover:text-foreground font-mono text-[11px]" (click)="offset.set(0)">
-              This week
-            </button>
-          }
           <span class="flex-1"></span>
           <div class="flex items-center gap-2">
             <span class="text-foreground text-[14px] leading-[18px] font-semibold">{{ totalText() }}</span>
@@ -242,8 +227,8 @@ type Composer = 'closed' | 'start' | 'log';
                   type="button"
                   class="border-border flex items-center justify-center border-l font-mono text-[9.5px]"
                   [class]="d.today ? 'text-red bg-red/8' : d.weekend ? 'text-faint' : 'text-muted-foreground'"
-                  [class.underline]="railDay().from === d.from"
-                  [class.underline-offset-4]="railDay().from === d.from"
+                  [class.underline]="railDay().from === d.from && !d.today"
+                  [class.underline-offset-4]="railDay().from === d.from && !d.today"
                   role="columnheader"
                   [attr.aria-pressed]="railDay().from === d.from"
                   (click)="selected.set(d.from)"
@@ -309,7 +294,7 @@ type Composer = 'closed' | 'start' | 'log';
             <button
               type="button"
               class="text-faint hover:text-muted-foreground border-border flex h-[38px] w-full items-center gap-2 border-b px-3.5 text-[12.5px]"
-              (click)="open('log')"
+              (click)="logTime()"
             >
               <svg [lucideIcon]="plusIcon" [size]="12"></svg> Add a task to this week
             </button>
@@ -340,7 +325,7 @@ type Composer = 'closed' | 'start' | 'log';
           <span class="text-foreground text-[10.5px]">{{ railTotal() }}</span>
         </div>
         @for (e of railEntries(); track e.seg.id) {
-          <div class="group border-border flex min-h-[34px] items-center gap-2.5 border-t py-2">
+          <div class="border-border flex min-h-[34px] items-center gap-2.5 border-t py-2">
             <span class="text-faint w-[92px] shrink-0 font-mono text-[10.5px]">{{ range(e) }}</span>
             <span class="h-[18px] w-[3px] shrink-0" [class]="e.seg.running ? 'bg-red' : 'bg-faint'" aria-hidden="true"></span>
             @if (issueKey(e.seg.issueId); as key) {
@@ -356,20 +341,6 @@ type Composer = 'closed' | 'start' | 'log';
             <span class="flex-1"></span>
             @if (e.seg.running) {
               <span class="text-red font-mono text-[9.5px]">running</span>
-            } @else {
-              <button
-                hlmBtn
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                class="text-muted-foreground size-5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-lg:opacity-100"
-                hlmTooltip="Delete entry"
-                aria-label="Delete entry"
-                [disabled]="timers.busy()"
-                (click)="confirmRemove(e)"
-              >
-                <svg [lucideIcon]="trashIcon" [size]="12"></svg>
-              </button>
             }
             <span class="text-foreground w-9 shrink-0 text-end font-mono text-[11px]">{{ hm(e.ms) }}</span>
           </div>
@@ -389,27 +360,21 @@ type Composer = 'closed' | 'start' | 'log';
 export class TimerPage {
   protected readonly store = inject(TramaStore);
   protected readonly timers = inject(TimeEntriesStore);
-  private readonly ui = inject(UiStore);
+  private readonly logDialog = inject(LogTimeDialogService);
 
   protected readonly cols = 'grid-cols-[minmax(240px,1fr)_repeat(7,54px)_76px]';
-  protected readonly calendarIcon = LucideCalendar;
   protected readonly prevIcon = LucideChevronLeft;
   protected readonly nextIcon = LucideChevronRight;
   protected readonly subIcon = LucideCornerDownRight;
   protected readonly plusIcon = LucidePlus;
-  protected readonly trashIcon = LucideTrash2;
   protected readonly hm = hm;
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly composer = signal<Composer>('closed');
-  protected readonly localError = signal('');
-  protected readonly failure = computed(() => this.localError() || this.timers.error());
+  protected readonly failure = computed(() => this.timers.error());
   protected readonly description = signal('');
   protected readonly projectId = signal('');
   protected readonly issueId = signal('');
-  protected readonly manualDate = signal(new Date());
-  protected readonly manualStart = signal('');
-  protected readonly manualEnd = signal('');
   /** Weeks away from the current one (0 = this week, -1 = last week). */
   protected readonly offset = signal(0);
   /** Start of the day whose entries the rail lists; null follows today (or the week's first day). */
@@ -436,6 +401,8 @@ export class TimerPage {
     segments(this.timers.entries(), this.running() ? this.now() : this.dayStamp()),
   );
   private readonly issuesById = computed(() => new Map(this.store.issues().map((i) => [i.id, i])));
+  /** Time `trama sync` suggested; shown on phones only, as in the mobile "My time" frame. */
+  protected readonly suggestions = computed(() => suggestionCards(this.timers.suggestions()));
   protected readonly grid = computed(() => buildGrid(this.segs(), this.days(), this.issuesById()));
   private readonly lastWeekTotal = computed(() => {
     const prev = weekDays(addDays(this.monday(), -7).getTime(), this.dayStamp());
@@ -499,18 +466,17 @@ export class TimerPage {
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
     effect(() => {
       if (!this.slug() || !this.store.ready()) return;
-      untracked(() => void this.timers.load());
+      untracked(() => {
+        void this.timers.load();
+        void this.timers.loadSuggestions();
+      });
     });
     usePageShortcuts([
       { keys: 't', label: 'Start or stop the timer', run: () => this.toggle() },
       { keys: 'shift+t', label: 'Switch task', run: () => this.open('start') },
-      { keys: 'l', label: 'Log time', run: () => this.open('log') },
+      { keys: 'l', label: 'Log time', run: () => this.logTime() },
       { keys: 'e', label: 'Export the week as CSV', run: () => this.exportWeek() },
     ]);
-  }
-
-  protected today(): Date {
-    return new Date();
   }
 
   protected shift(by: number): void {
@@ -532,12 +498,16 @@ export class TimerPage {
   }
 
   protected open(mode: Exclude<Composer, 'closed'>): void {
-    this.localError.set('');
-    if (mode === 'log') {
-      const day = this.railDay();
-      this.manualDate.set(day.future ? new Date() : new Date(day.from));
-    }
     this.composer.set(mode);
+  }
+
+  /** The Log time dialog, on the day the rail shows. */
+  protected logTime(): void {
+    const day = this.railDay();
+    this.logDialog.open({
+      date: day.future ? new Date() : new Date(day.from),
+      onLogged: () => void this.timers.load({ force: true }),
+    });
   }
 
   /** T: stop what runs, or start (asking for the task first when the form is closed). */
@@ -561,47 +531,16 @@ export class TimerPage {
 
   protected async submit(event: Event): Promise<void> {
     event.preventDefault();
-    if (this.composer() === 'log') await this.addManual();
-    else await this.start();
+    await this.start();
   }
 
   private async start(): Promise<void> {
-    this.localError.set('');
     if (await this.timers.start(this.target())) {
       this.description.set('');
       this.composer.set('closed');
       this.offset.set(0);
       this.selected.set(null);
     }
-  }
-
-  private async addManual(): Promise<void> {
-    const day = this.manualDate();
-    const problem = entryProblem(day, this.manualStart(), this.manualEnd(), Date.now());
-    if (problem) {
-      this.localError.set(problem);
-      return;
-    }
-    this.localError.set('');
-    const ok = await this.timers.add({
-      ...this.target(),
-      startedAt: atTime(day, this.manualStart()).toISOString(),
-      endedAt: atTime(day, this.manualEnd()).toISOString(),
-    });
-    if (ok) {
-      this.manualStart.set('');
-      this.manualEnd.set('');
-      this.composer.set('closed');
-      this.description.set('');
-    }
-  }
-
-  protected confirmRemove(e: DayEntry): void {
-    this.ui.setConfirmDelete({
-      title: 'Delete this time entry?',
-      description: `${hoursMinutes(e.ms)} of tracked time is removed. This cannot be undone.`,
-      onConfirm: () => void this.timers.remove(e.seg.id),
-    });
   }
 
   /** The week's entries as a CSV file: one line per entry (a running timer counts up to now). */

@@ -38,7 +38,7 @@ const STATUS_DOT: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'border-border text-foreground inline-flex shrink-0 items-center gap-1.5 border px-2 py-[3px] font-mono text-[11px] leading-[13px] whitespace-nowrap',
+      'border-border text-foreground inline-flex shrink-0 items-center gap-1.5 border px-2 py-[3px] font-mono text-[11px] leading-[14px] whitespace-nowrap',
   },
   template: `<span class="size-[7px] shrink-0" [style.background]="color()" aria-hidden="true"></span>{{ label() }}`,
 })
@@ -66,7 +66,7 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   selector: 'v3-priority',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] leading-none whitespace-nowrap',
+    class: 'inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] whitespace-nowrap',
     '[class.text-red]': "priority() === 'urgent'",
     '[class.text-muted-foreground]': "priority() !== 'urgent'",
     '[attr.aria-label]': "'Priority: ' + text()",
@@ -415,7 +415,7 @@ export const V3_KBD =
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'border-border flex shrink-0 items-center gap-2.5 border-b px-[18px] py-3.5 [&_h2]:font-title [&_h2]:text-foreground [&_h2]:m-0 [&_h2]:text-[20px] [&_h2]:leading-normal [&_h2]:font-normal [&_h2]:tracking-normal',
+      'border-border flex shrink-0 items-center gap-2.5 border-b px-[18px] py-3.5 [&_h2]:font-title [&_h2]:text-foreground [&_h2]:m-0 [&_h2]:text-[20px] [&_h2]:leading-[20px] [&_h2]:font-normal [&_h2]:tracking-normal',
   },
   template: `
     @if (kicker()) {
@@ -429,6 +429,7 @@ export const V3_KBD =
         type="button"
         class="bg-secondary border-border text-muted-foreground hover:text-foreground inline-flex items-center border px-[5px] py-px font-mono text-[10.5px] leading-[14px]"
         aria-label="Close"
+        tabindex="-1"
         (click)="dismiss.emit()"
       >
         esc

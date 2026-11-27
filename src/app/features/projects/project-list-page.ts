@@ -2,10 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { Router, RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { TramaStore, UiStore, statusTypeOf } from '../../core';
+import { TramaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
-import { StatusBar } from '../../layout/status-bar';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
@@ -42,7 +41,6 @@ import { SearchInput } from '../../shared/search-input';
     EmptyState,
     TopBarActions,
     ActorAvatar,
-    StatusBar,
     FullDatePipe,
     ProjectGlyph,
     V3Priority,
@@ -58,23 +56,6 @@ import { SearchInput } from '../../shared/search-input';
     </ng-template>
 
     <app-page-header title="Projects" [description]="description()" />
-
-    <app-status-bar>
-      <span class="tabular-nums">{{ total() }} {{ total() === 1 ? 'project' : 'projects' }} · {{ inProgress() }} in progress</span>
-      @if (hasFilters()) {
-        <span class="truncate">{{ rows().length }} shown</span>
-      }
-      @if (hasFilters()) {
-        <button
-          end
-          type="button"
-          class="hover:text-foreground underline-offset-2 hover:underline"
-          (click)="clearFilters()"
-        >
-          Clear filters
-        </button>
-      }
-    </app-status-bar>
 
     <div class="border-border flex min-h-[41.5px] flex-wrap items-center gap-x-2.5 gap-y-2 border-b px-4 py-2.5 sm:px-5">
       <app-search-input noun="projects" [(value)]="search" />
@@ -276,14 +257,6 @@ export class ProjectListPage {
       }))
       .filter((g) => g.rows.length > 0);
   });
-
-  protected readonly inProgress = computed(
-    () =>
-      this.store
-        .projects()
-        .filter((p) => statusTypeOf(this.store.settings().statuses.project, p.status) === 'in_progress')
-        .length,
-  );
 
   protected readonly description = computed(() => {
     const n = this.total();

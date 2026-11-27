@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import { FindOperator, type Repository } from 'typeorm';
 import { describe, expect, it } from 'vitest';
 import { notFound } from '../common/util.js';
 import { IssueEntity } from '../database/entities/index.js';
@@ -11,8 +11,13 @@ const PROJECTS = ['pj_1'];
 const ISSUES: Record<string, string | null> = { in_1: 'pj_1', in_2: 'pj_2' };
 
 type Where = Record<string, unknown>;
+/** Equality, plus the one operator the service uses: `Not(value)`. */
 const matches = (row: object, where: Where) =>
-  Object.entries(where).every(([key, value]) => (row as Record<string, unknown>)[key] === value);
+  Object.entries(where).every(([key, value]) => {
+    const actual = (row as Record<string, unknown>)[key];
+    if (value instanceof FindOperator && value.type === 'not') return actual !== value.value;
+    return actual === value;
+  });
 
 function fakeRepo<T extends object>(rows: T[], make: (x: Partial<T>) => T, key: (row: T) => string) {
   return {
@@ -86,6 +91,75 @@ describe('TimeEntriesService', () => {
     expect(rows).toHaveLength(1);
     expect(await service.list('ws_1', 'usr_b')).toEqual([]);
     expect(await service.list('ws_1', 'usr_a')).toHaveLength(1);
+  });
+
+  function suggestion(rows: TimeEntryEntity[], userId: string, id = 'te_s'): TimeEntryEntity {
+    const row = Object.assign(new TimeEntryEntity(), {
+      id,
+      workspaceId: 'ws_1',
+      userId,
+      projectId: null,
+      issueId: null,
+      description: '',
+      source: 'suggested',
+      startedAt: new Date('2026-10-28T10:00:00.000Z'),
+      endedAt: new Date('2026-10-28T10:47:00.000Z'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    rows.push(row);
+    return row;
+  }
+
+  it('tags entries by how they were made', async () => {
+    const { service } = setup();
+    expect((await service.start('ws_1', 'usr_a')).source).toBe('timer');
+    const added = await service.add('ws_1', 'usr_a', {
+      startedAt: '2026-10-28T10:00:00.000Z',
+      endedAt: '2026-10-28T11:00:00.000Z',
+    });
+    expect(added.source).toBe('manual');
+  });
+
+  it('leaves suggestions out of the list until they are asked for', async () => {
+    const { service, rows } = setup();
+    await service.add('ws_1', 'usr_a', {
+      startedAt: '2026-10-28T10:00:00.000Z',
+      endedAt: '2026-10-28T11:00:00.000Z',
+    });
+    suggestion(rows, 'usr_a');
+    expect((await service.list('ws_1', 'usr_a')).map((row) => row.source)).toEqual(['manual']);
+    expect((await service.list('ws_1', 'usr_a', 'suggested')).map((row) => row.id)).toEqual(['te_s']);
+  });
+
+  it('a suggestion is never a running timer', async () => {
+    const { service, rows } = setup();
+    const row = suggestion(rows, 'usr_a');
+    row.endedAt = null;
+    const started = await service.start('ws_1', 'usr_a');
+    expect(row.endedAt).toBeNull();
+    expect(started.endedAt).toBeNull();
+    const err = await service.stop('ws_1', 'usr_b').catch((error: unknown) => error);
+    expect(err).toBeInstanceOf(BadRequestException);
+  });
+
+  it('only the owner accepts a suggestion, and only a suggestion can be accepted', async () => {
+    const { service, rows } = setup();
+    suggestion(rows, 'usr_a');
+    const stranger = await service.accept('ws_1', 'usr_b', 'te_s').catch((error: unknown) => error);
+    expect(stranger).toBeInstanceOf(NotFoundException);
+    const accepted = await service.accept('ws_1', 'usr_a', 'te_s');
+    expect(accepted.source).toBe('manual');
+    expect((await service.list('ws_1', 'usr_a')).map((row) => row.id)).toEqual(['te_s']);
+    const again = await service.accept('ws_1', 'usr_a', 'te_s').catch((error: unknown) => error);
+    expect(again).toBeInstanceOf(BadRequestException);
+  });
+
+  it('dismissing a suggestion deletes it', async () => {
+    const { service, rows } = setup();
+    suggestion(rows, 'usr_a');
+    await service.remove('ws_1', 'usr_a', 'te_s');
+    expect(rows).toHaveLength(0);
   });
 
   it('starts and stops a timer on a task', async () => {

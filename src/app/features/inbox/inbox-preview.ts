@@ -1,7 +1,6 @@
 // The Inbox preview column (v3 "03 · Inbox", right side): kicker · serif title · key, status, source and owner ·
 // a "what changed" table · one line on what Trama will (not) do · the actions, each with its key.
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
   LucideCircleCheck,
   LucideCircleX,
@@ -21,7 +20,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { AgoPipe } from '../../shared/ago';
 import { Kbd } from '../../shared/kbd';
 import { V3Source, V3Status } from '../../shared/v3';
-import { artifactRef, laterLabel, type InboxEntry } from './inbox-model';
+import { artifactRef, type InboxEntry } from './inbox-model';
 
 interface ChangeRow {
   label: string;
@@ -48,16 +47,16 @@ function requestLine(a: Artifact): string {
 @Component({
   selector: 'app-inbox-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmButton, ActorAvatar, AgoPipe, Kbd, V3Source, V3Status],
+  imports: [LucideDynamicIcon, HlmButton, ActorAvatar, AgoPipe, Kbd, V3Source, V3Status],
   host: { class: 'flex min-w-0 flex-col gap-5 px-9 py-7' },
   template: `
     @let e = entry();
     @let i = issue();
     <header class="flex flex-col gap-2">
-      <p class="text-delta font-mono text-[10.5px] leading-[13px] uppercase">
+      <p class="text-delta font-mono text-[10.5px] leading-[14px] uppercase">
         {{ e.kicker }} · {{ e.at | ago }} ago
       </p>
-      <h2 class="font-title text-foreground text-[30px] leading-[36px] tracking-[-0.3px]">
+      <h2 class="font-title text-foreground text-[30px] leading-[30px] tracking-[-0.3px]">
         {{ i?.title ?? e.sentence }}
       </h2>
       @if (i) {
@@ -66,7 +65,7 @@ function requestLine(a: Artifact): string {
           <v3-status [status]="i.status" />
           <v3-source [issue]="i" />
           @if (i.assigneeId) {
-            <app-actor-avatar [actor]="{ type: 'user', id: i.assigneeId }" [size]="20" />
+            <app-actor-avatar [actor]="{ type: 'user', id: i.assigneeId }" [size]="22" />
           }
         </div>
       }
@@ -108,14 +107,6 @@ function requestLine(a: Artifact): string {
             >{{ e.primary.label }} ↗</a
           >
         }
-        @case ('done') {
-          @if (!moveToReview()) {
-            <button hlmBtn type="button" (click)="markDone.emit()">Mark done <app-kbd keys="d" /></button>
-          }
-        }
-        @case ('restore') {
-          <button hlmBtn type="button" (click)="restore.emit()">Restore <app-kbd keys="r" /></button>
-        }
         @case ('open') {
           @if (!moveToReview()) {
             <button hlmBtn type="button" (click)="open.emit()">
@@ -134,34 +125,22 @@ function requestLine(a: Artifact): string {
           >Open in Delta ↗ <app-kbd keys="o"
         /></a>
       }
-      @if (e.canMarkDone && e.primary.type !== 'done') {
-        <button hlmBtn variant="outline" type="button" (click)="markDone.emit()">Mark done <app-kbd keys="d" /></button>
-      }
       @if (e.canMarkRead) {
         <button hlmBtn variant="outline" type="button" (click)="markRead.emit()">Mark read <app-kbd keys="e" /></button>
       }
       @if (e.canDismiss) {
-        <button hlmBtn variant="outline" type="button" (click)="dismiss.emit()">Dismiss <app-kbd keys="e" /></button>
-      }
-      @if (e.canSnooze) {
-        <button hlmBtn variant="outline" type="button" (click)="snooze.emit()">Snooze <app-kbd keys="h" /></button>
-      }
-      @if (!i && e.source === 'attention' && e.section === 'action') {
-        <a hlmBtn variant="ghost" [routerLink]="['/', slug(), 'tasks']" [queryParams]="{ status: 'backlog' }">Backlog</a>
+        <!-- an item that waits on you is set aside with the same key and name as an update (v3 "Mark read E") -->
+        <button hlmBtn variant="outline" type="button" (click)="dismiss.emit()">Mark read <app-kbd keys="e" /></button>
       }
     </div>
   `,
 })
 export class InboxPreview {
   readonly entry = input.required<InboxEntry>();
-  readonly slug = input.required<string>();
 
   readonly open = output<void>();
-  readonly markDone = output<void>();
   readonly markRead = output<void>();
   readonly dismiss = output<void>();
-  readonly snooze = output<void>();
-  readonly restore = output<void>();
   readonly toReview = output<void>();
 
   private readonly store = inject(TramaStore);
@@ -258,9 +237,6 @@ export class InboxPreview {
     const e = this.entry();
     const i = this.issue();
     const state = i ? (resolveStatusEntry(this.store.settings().statuses.issue, i.status)?.name ?? i.status) : '';
-    if (e.section === 'later' && e.attention) {
-      return `${laterLabel(e.attention)}. Restore it to bring it back to the inbox.`;
-    }
     switch (e.attention?.kind) {
       case 'review_requested':
         return 'Someone is waiting on your review. Review it at the provider — the task status stays as it is until a person moves it.';

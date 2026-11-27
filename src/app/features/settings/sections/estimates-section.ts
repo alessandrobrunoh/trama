@@ -20,7 +20,7 @@ import { SECTION_KIT } from './section-kit';
     <app-section-header
       flush
       title="Estimates"
-      description="How big is a task? Pick one scale for the whole workspace. Switching scale never rewrites a task: a value that is not on the new scale stays visible and selectable."
+      description="How big is a task? Pick one scale for the whole workspace. Switching never rewrites a task."
     />
 
     @if (!canAdmin()) {
@@ -53,14 +53,14 @@ import { SECTION_KIT } from './section-kit';
               }
             </span>
             <span class="flex w-[110px] shrink-0 flex-col gap-0.5 sm:w-[150px]">
-              <span class="text-foreground text-[13.5px] leading-normal">{{ d.label }}</span>
-              <span class="text-faint font-mono text-[10.5px] leading-normal">{{ d.sub }}</span>
+              <span class="text-foreground text-[13.5px] leading-[normal]">{{ d.label }}</span>
+              <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ d.sub }}</span>
             </span>
             <span class="flex min-w-0 flex-1 flex-wrap gap-1">
               @if (d.options.length) {
                 @for (o of d.options; track o.value) {
                   <span
-                    class="border-border flex min-w-[30px] items-start justify-center border px-1 py-[3px] font-mono text-[11.5px] leading-normal"
+                    class="border-border flex min-w-[30px] items-start justify-center border px-1 py-[3px] font-mono text-[11.5px] leading-[normal]"
                     [class]="scale() === d.id ? 'bg-secondary text-foreground' : 'text-muted-foreground'"
                     >{{ o.label }}</span
                   >
@@ -74,31 +74,27 @@ import { SECTION_KIT } from './section-kit';
       </div>
 
       <div class="flex w-full shrink-0 flex-col gap-2.5 lg:w-[280px]">
-        <span class="text-faint font-mono text-[10.5px] leading-normal">PREVIEW · ESTIMATE PICKER</span>
+        <span class="text-faint font-mono text-[10.5px] leading-[normal]">PREVIEW · ESTIMATE PICKER</span>
         @if (options().length) {
           <div class="bg-popover border-border-strong border" aria-hidden="true">
             <div class="border-border flex items-center gap-2 border-b px-2.5 py-[9px]">
               <svg [lucideIcon]="triangle" [size]="14" class="text-muted-foreground shrink-0"></svg>
-              <span class="text-faint text-[13px]">Set estimate…</span>
+              <span class="text-faint text-[13px] leading-[normal]">Set estimate…</span>
             </div>
             <div class="flex flex-col py-1">
               <div class="flex items-center px-2.5 py-1.5">
-                <span class="text-foreground flex-1 text-[13px]">No estimate</span>
-                <span class="text-faint font-mono text-[10.5px]">0</span>
+                <span class="text-foreground flex-1 text-[13px] leading-[normal]">No estimate</span>
+                <span class="text-faint font-mono text-[10.5px] leading-[normal]">0</span>
               </div>
               @for (o of options(); track o.value; let i = $index) {
                 <div class="flex items-center px-2.5 py-1.5" [class.bg-selected]="i === highlighted()">
-                  <span class="text-foreground flex-1 text-[13px]">{{ optionText(o) }}</span>
-                  <span class="text-faint font-mono text-[10.5px]">{{ i + 1 }}</span>
+                  <span class="text-foreground flex-1 text-[13px] leading-[normal]">{{ optionText(o) }}</span>
+                  <span class="text-faint font-mono text-[10.5px] leading-[normal]">{{ i + 1 }}</span>
                 </div>
               }
             </div>
           </div>
-          <span class="text-faint font-mono text-[10.5px] leading-normal">Shortcut&nbsp;&nbsp;E&nbsp;&nbsp;on any task</span>
-        } @else {
-          <p class="text-muted-foreground text-[12.5px] leading-[19px]">
-            With this scale a task has no estimate field. Values already set are kept and come back if you pick a scale again.
-          </p>
+          <span class="text-faint font-mono text-[10.5px] leading-[normal]">Shortcut&nbsp;&nbsp;E&nbsp;&nbsp;on any task</span>
         }
       </div>
     </div>

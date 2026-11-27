@@ -9,6 +9,7 @@ import {
 import { RouterLink } from '@angular/router';
 import {
   LucideActivity,
+  LucideBookOpen,
   LucideBot,
   LucideDynamicIcon,
   LucideFlag,
@@ -37,6 +38,7 @@ import { EntityChip, type EntityChipType } from './entity-chip';
 import { FullDatePipe } from './pipes';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 import { AgoPipe } from './ago';
+import { threadSyncParts } from './thread-sync-event';
 
 /** Coarse event family, used by the Activity page filters. */
 export type EventCategory = 'issue' | 'artifact' | 'comment' | 'other';
@@ -207,6 +209,15 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
           : 'This event predates Issue-only associations.',
       };
     }
+    case 'issue.thread_synced': {
+      const parts = threadSyncParts(d);
+      return {
+        icon: LucideBot,
+        verb: 'synced the record of',
+        subject: issueRef(),
+        detail: parts.length ? parts.join(' · ') : undefined,
+      };
+    }
     case 'dependency.added':
     case 'dependency.removed':
       return {
@@ -239,6 +250,15 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
           projectId && store.getProject(projectId) ? ['/', slug, 'projects', projectId] : undefined,
       };
     }
+    case 'project.update_posted':
+      return {
+        icon: LucideBookOpen,
+        verb: 'posted an update on',
+        text: store.getProject(e.subject.id)?.name ?? str(d['name']),
+        detail: str(d['excerpt']),
+        link: store.getProject(e.subject.id) ? ['/', slug, 'projects', e.subject.id] : undefined,
+        query: { tab: 'updates' },
+      };
     case 'project.created':
     case 'project.updated':
     case 'project.status_changed':

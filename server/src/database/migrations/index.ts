@@ -52,6 +52,9 @@ import { PersonalWorkspaces1794100000000 } from './1794100000000-PersonalWorkspa
 import { ConnectionOwnership1794200000000 } from './1794200000000-ConnectionOwnership.js';
 import { RoutingRules1794300000000 } from './1794300000000-RoutingRules.js';
 import { ExternalIdentities1794400000000 } from './1794400000000-ExternalIdentities.js';
+import { ProjectUpdates1794500000000 } from './1794500000000-ProjectUpdates.js';
+import { ThreadRecords1794600000000 } from './1794600000000-ThreadRecords.js';
+import { TimeEntrySource1794700000000 } from './1794700000000-TimeEntrySource.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -109,4 +112,7 @@ export const MIGRATIONS = [
   ConnectionOwnership1794200000000,
   RoutingRules1794300000000,
   ExternalIdentities1794400000000,
+  ProjectUpdates1794500000000,
+  ThreadRecords1794600000000,
+  TimeEntrySource1794700000000,
 ];

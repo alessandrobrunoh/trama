@@ -18,7 +18,10 @@ export class TimeEntriesStore {
   private readonly api = inject(ApiClient);
   private readonly store = inject(TramaStore);
 
+  /** The entries that count. Suggested entries (from `trama sync`) are never in here: see `suggestions`. */
   readonly entries = signal<readonly TimeEntry[]>([]);
+  /** Time `trama sync` suggested from a thread's active time, newest first. They count once accepted. */
+  readonly suggestions = signal<readonly TimeEntry[]>([]);
   readonly state = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
   /** The timer running now, on any task (or none). */
@@ -39,13 +42,16 @@ export class TimeEntriesStore {
     const fresh = this.loadedSlug === slug && Date.now() - this.loadedAt < FRESH_MS;
     if (!options.force && fresh) return Promise.resolve();
     if (this.inflight) return this.inflight;
-    if (this.loadedSlug !== slug) this.entries.set([]);
+    if (this.loadedSlug !== slug) {
+      this.entries.set([]);
+      this.suggestions.set([]);
+    }
     this.state.set(this.loadedSlug === slug && this.entries().length ? 'ready' : 'loading');
     this.inflight = this.api.timeEntries
       .list(slug, { quiet: true })
       .then((list) => {
         if (this.store.slug() !== slug) return;
-        this.entries.set(list);
+        this.entries.set(list.filter((e) => e.source !== 'suggested'));
         this.loadedSlug = slug;
         this.loadedAt = Date.now();
         this.state.set('ready');
@@ -57,6 +63,37 @@ export class TimeEntriesStore {
         this.inflight = null;
       });
     return this.inflight;
+  }
+
+  /** Fetch the suggested entries. A failure keeps the previous list: they are optional help, not data to lose. */
+  async loadSuggestions(): Promise<void> {
+    const slug = this.store.slug();
+    if (!slug) return;
+    try {
+      const list = await this.api.timeEntries.suggestions(slug, { quiet: true });
+      if (this.store.slug() !== slug) return;
+      this.suggestions.set(
+        list
+          .filter((e) => e.source === 'suggested' && !!e.endedAt)
+          .sort((a, b) => (a.endedAt! < b.endedAt! ? 1 : -1)),
+      );
+    } catch {
+      // The suggestions stay as they were.
+    }
+  }
+
+  /** Accept a suggestion: it becomes a manual entry and counts from then on. */
+  async accept(id: string): Promise<boolean> {
+    const ok = await this.change((slug) => this.api.timeEntries.accept(slug, id, { quiet: true }));
+    await this.loadSuggestions();
+    return ok;
+  }
+
+  /** Dismiss a suggestion: it is deleted and never counted. */
+  async dismiss(id: string): Promise<boolean> {
+    const ok = await this.remove(id);
+    await this.loadSuggestions();
+    return ok;
   }
 
   /** Start the timer (this stops one that is already running). */

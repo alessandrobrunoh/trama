@@ -78,7 +78,6 @@ describe('Task artifacts', () => {
       })
       .expect(404);
     await owner.client.get(`${base}/projects/${project.id}/context`).expect(404);
-    await owner.client.get(`${base}/projects/${project.id}/updates`).expect(404);
     await owner.client.get(`${base}/documents`).expect(404);
 
     await owner.client.delete(`${base}/tasks/${issue.key}`).expect(204);

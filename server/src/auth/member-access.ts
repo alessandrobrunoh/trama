@@ -19,6 +19,7 @@ const API_TO_MEMBER: Record<string, MemberResource | undefined> = {
   milestones: 'milestones',
   issues: 'issues',
   tasks: 'issues',
+  decisions: 'issues',
   artifacts: 'artifacts',
   views: 'views',
   comments: 'comments',

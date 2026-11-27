@@ -17,7 +17,6 @@ import { AssistantStore, type AssistantChat } from '../../core/ai/assistant.stor
 import type { ActivityStep } from '../../core/ai/ai-api';
 import { usePageShortcuts } from '../../core/keyboard/keyboard-shortcuts.service';
 import { TramaStore } from '../../core/stores/trama.store';
-import { UiStore } from '../../core/stores/ui.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { ago } from '../../shared/ago';
 import { EntityRefs } from '../../shared/entity-ref';
@@ -26,12 +25,6 @@ import { Markdown } from '../../shared/markdown';
 import { PageHeader } from '../../shared/page-header';
 import { ActivitySteps } from './activity-steps';
 import { AskTurn, type AskTurnData } from './ask-turn';
-
-const SUGGESTIONS: readonly string[] = [
-  'What is blocked right now?',
-  'Which tasks have no linked thread?',
-  'What changed in the last week?',
-];
 
 /** History time as the v3 frame writes it: 2m, 3h, yesterday, Nov 21. */
 function savedAt(time: number, now = Date.now()): string {
@@ -103,13 +96,6 @@ function savedAt(time: number, now = Date.now()): string {
           <h2 class="text-foreground flex-1 font-mono text-[10.5px] leading-[13px] uppercase">
             Saved answers
           </h2>
-          <button
-            type="button"
-            class="text-faint hover:text-foreground font-mono text-[10.5px] leading-[13px] outline-none focus-visible:underline"
-            (click)="newQuestion()"
-          >
-            + New
-          </button>
         </div>
         <div #historyList class="min-h-0 flex-1 overflow-y-auto">
           @for (chat of ai.chats(); track chat.id) {
@@ -122,16 +108,11 @@ function savedAt(time: number, now = Date.now()): string {
               (click)="openChat(chat)"
             >
               <span
-                class="w-full truncate text-[13px] leading-4"
+                class="w-full truncate text-[13px] leading-[normal]"
                 [class]="chat.id === ai.activeId() ? 'text-foreground' : 'text-muted-foreground'"
                 >{{ chat.title }}</span
               >
-              <span class="text-faint flex items-center gap-1.5 font-mono text-[10px] leading-3">
-                @if (chat.unread) {
-                  <span class="bg-primary size-1.5" role="img" aria-label="Unread"></span>
-                }
-                {{ time(chat) }}
-              </span>
+              <span class="text-faint font-mono text-[10px] leading-[normal]">{{ time(chat) }}</span>
             </button>
           } @empty {
             <p class="text-faint px-4 py-4 font-mono text-[11px] leading-4">
@@ -149,13 +130,6 @@ function savedAt(time: number, now = Date.now()): string {
       >
         <div #scroller class="min-h-0 flex-1 overflow-y-auto px-4 pt-6 md:px-16 md:pt-9">
           <div class="mx-auto flex w-full max-w-[860px] flex-col gap-6 pb-6">
-            <button
-              type="button"
-              class="text-muted-foreground border-border -mb-2 w-fit border px-2 py-[3px] font-mono text-[11px] md:hidden"
-              (click)="toggleHistory()"
-            >
-              Saved answers
-            </button>
             <div class="border-border flex w-full items-center gap-2.5 border px-3.5 py-2.5">
               <svg
                 [lucideIcon]="infoIcon"
@@ -163,19 +137,17 @@ function savedAt(time: number, now = Date.now()): string {
                 class="text-muted-foreground shrink-0"
                 aria-hidden="true"
               ></svg>
-              <p class="text-faint m-0 font-mono text-[11px] leading-4">
-                Answers are built from your tasks and their linked threads. They are saved in this
-                browser, per workspace. Answers can be wrong: check the sources.
+              <p class="text-faint m-0 font-mono text-[11px] leading-[normal]">
+                Built from your tasks and their threads, saved in this browser. Answers can be wrong:
+                check the sources.
               </p>
             </div>
 
-            @for (turn of turns(); track $index; let first = $first; let last = $last) {
+            @for (turn of turns(); track $index; let last = $last) {
               <app-ask-turn
                 [turn]="turn"
                 [asker]="asker()"
                 [when]="last && !ai.busy() ? savedWhen() : null"
-                [canDelete]="first && !!ai.active()"
-                (remove)="deleteActive()"
               />
             }
 
@@ -206,21 +178,6 @@ function savedAt(time: number, now = Date.now()): string {
                   What do you want to know?
                 </h2>
               </div>
-              @if (ai.ready()) {
-                <ul class="border-border divide-border w-full divide-y border" aria-label="Suggestions">
-                  @for (s of suggestions; track s) {
-                    <li>
-                      <button
-                        type="button"
-                        class="hover:bg-secondary text-muted-foreground hover:text-foreground w-full px-3.5 py-2.5 text-start text-[13px] outline-none focus-visible:underline"
-                        (click)="ai.draft.set(s); focusComposer()"
-                      >
-                        {{ s }}
-                      </button>
-                    </li>
-                  }
-                </ul>
-              }
             }
           </div>
         </div>
@@ -243,7 +200,7 @@ function savedAt(time: number, now = Date.now()): string {
                 rows="1"
                 maxlength="8000"
                 name="message"
-                class="placeholder:text-faint text-foreground field-sizing-content max-h-40 min-h-5 w-full resize-none bg-transparent text-[14px] leading-5 outline-none"
+                class="placeholder:text-faint text-foreground field-sizing-content max-h-40 min-h-[18px] w-full resize-none bg-transparent text-[14px] leading-[normal] outline-none"
                 placeholder="Ask anything about your tasks and their linked threads…"
                 [ngModel]="ai.draft()"
                 (ngModelChange)="ai.draft.set($event)"
@@ -309,12 +266,10 @@ export class AssistantPage {
   protected readonly ai = inject(AssistantStore);
   protected readonly refs = inject(EntityRefs);
   private readonly store = inject(TramaStore);
-  private readonly ui = inject(UiStore);
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private readonly historyList = viewChild<ElementRef<HTMLElement>>('historyList');
   protected readonly infoIcon = LucideInfo;
-  protected readonly suggestions = SUGGESTIONS;
   protected readonly live = this.ai.live;
   /** Phones show either the answer or the saved answers; wider screens show both. */
   protected readonly historyOpen = signal(false);
@@ -438,22 +393,6 @@ export class AssistantPage {
   protected openChat(chat: AssistantChat): void {
     this.ai.openChat(chat.id);
     this.historyOpen.set(false);
-  }
-
-  protected newQuestion(): void {
-    this.ai.newChat();
-    this.historyOpen.set(false);
-    queueMicrotask(() => this.focusComposer());
-  }
-
-  protected deleteActive(): void {
-    const chat = this.ai.active();
-    if (!chat) return;
-    this.ui.setConfirmDelete({
-      title: `Delete “${chat.title}”?`,
-      description: 'The answer is removed from this device. This cannot be undone.',
-      onConfirm: () => this.ai.deleteChat(chat.id),
-    });
   }
 
   protected focusComposer(): void {

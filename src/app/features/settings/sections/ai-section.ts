@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { LucideBot, LucideDynamicIcon, LucideSparkles, LucideZap } from '@lucide/angular';
+import { LucideBot, LucideCopy, LucideDynamicIcon, LucideMessageCircle, LucideServer, LucideSparkles } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../../core/ai/assistant.store';
 import { UiStore } from '../../../core/stores/ui.store';
@@ -25,7 +25,7 @@ const ENV_LINES: readonly string[] = [
   selector: 'app-ai-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, Kbd, LucideDynamicIcon, NgTemplateOutlet, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
@@ -41,7 +41,6 @@ const ENV_LINES: readonly string[] = [
         <app-settings-card class="min-w-0 flex-1">
           <app-card-row label="Open Ask" description="From the status bar on every page.">
             <app-kbd keys="mod+j" />
-            <button hlmBtn size="sm" variant="outline" [disabled]="!ai.ready()" (click)="ai.open.set(true)">Open</button>
           </app-card-row>
           <app-card-row label="Answer with" [description]="answerHint()">
             <span class="text-foreground font-mono text-[12px]">{{ answerWith() }}</span>
@@ -72,7 +71,7 @@ const ENV_LINES: readonly string[] = [
         <div class="bg-bg-deep flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="bot" [size]="15"></svg>
+              <svg [lucideIcon]="server" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
@@ -87,37 +86,36 @@ const ENV_LINES: readonly string[] = [
                 }
               </span>
             </div>
-            <button hlmBtn size="sm" variant="outline" [disabled]="ai.loadingStatus()" (click)="ai.refreshStatus()">Refresh status</button>
+            @if (!ai.ready()) {
+              <button hlmBtn size="sm" variant="outline" (click)="copyEnv()">
+                <svg [lucideIcon]="copy" [size]="13"></svg>
+                {{ copied() ? 'Copied' : 'Copy env' }}
+              </button>
+            }
           </div>
           @if (!ai.ready()) {
             <div class="pl-[42px]">
               <div class="bg-bg-deep border-border flex flex-col gap-1 border px-3.5 py-3">
                 @for (line of envLines; track line) {
-                  <code class="font-mono text-[11.5px] leading-[17px]" [class]="line.startsWith('#') ? 'text-faint' : 'text-foreground/80'">{{ line }}</code>
+                  <code class="font-mono text-[11.5px] leading-[17px]" [class]="line.startsWith('#') ? 'text-faint' : 'text-text-2'">{{ line }}</code>
                 }
-                <div class="mt-1 flex justify-end">
-                  <button hlmBtn size="sm" variant="ghost" (click)="copyEnv()">{{ copied() ? 'Copied' : 'Copy env' }}</button>
-                </div>
               </div>
             </div>
           }
-          <p class="text-faint pl-[42px] font-mono text-[10.5px] leading-snug">
-            Configured means the server has credentials; the provider is contacted only when you request a suggestion or send a message.
-          </p>
         </div>
 
         <!-- SuperGrok -->
         <div class="flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="zap" [size]="15"></svg>
+              <svg [lucideIcon]="bot" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-foreground text-[13.5px]">SuperGrok</span>
                 <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ text: grokBadge().text, tone: grokBadge().tone }" />
               </div>
-              <span class="text-muted-foreground text-[12px]">Use your own subscription, with the official Grok Build device authorization flow.</span>
+              <span class="text-muted-foreground text-[12px]">Use your own subscription.</span>
             </div>
             @if (ai.status()?.supergrok?.connected) {
               <button hlmBtn size="sm" variant="outline" (click)="disconnectSuperGrok()">Disconnect</button>
@@ -140,22 +138,13 @@ const ENV_LINES: readonly string[] = [
               }
             </div>
           }
-          @if (!ai.status()?.supergrok?.available) {
-            <p class="text-muted-foreground pl-[42px] text-[12.5px] leading-snug">
-              Install the official <code class="font-mono">@xai-official/grok</code> CLI in the API container and set
-              <code class="font-mono">GROK_HOME_DIR</code> to a persistent private volume.
-            </p>
-          }
-          <p class="text-faint pl-[42px] font-mono text-[10.5px] leading-snug">
-            Each Trama account gets a separate Grok home directory. The official CLI stores its own credentials there; protect the configured volume and its backups.
-          </p>
         </div>
 
         <!-- ChatGPT -->
         <div class="flex flex-col gap-3 px-4 py-3.5">
           <div class="flex items-center gap-3">
             <span class="bg-secondary border-border text-muted-foreground grid size-[30px] shrink-0 place-items-center border">
-              <svg [lucideIcon]="sparkles" [size]="15"></svg>
+              <svg [lucideIcon]="chat" [size]="15"></svg>
             </span>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
@@ -164,28 +153,8 @@ const ENV_LINES: readonly string[] = [
               </div>
               <span class="text-muted-foreground text-[12px]">Sign in with your OpenAI account.</span>
             </div>
-            <button hlmBtn size="sm" variant="outline" disabled aria-describedby="chatgpt-availability">Connect</button>
+            <button hlmBtn size="sm" variant="outline" disabled>Connect</button>
           </div>
-          <p id="chatgpt-availability" class="text-muted-foreground pl-[42px] text-[12.5px] leading-snug">
-            Connecting a ChatGPT subscription to a remotely hosted app requires OpenAI approval. The public local-app login cannot be used on this server. No ChatGPT account is connected.
-            <a
-              href="https://developers.openai.com/siwc/token-sharing-open-source"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-foreground underline underline-offset-4"
-              >OpenAI eligibility and access information</a
-            >
-          </p>
-        </div>
-      </app-settings-card>
-    </app-settings-block>
-
-    <app-settings-block title="What AI can see">
-      <app-settings-card>
-        <div class="text-muted-foreground px-4 py-3.5 text-[12.5px] leading-[19px]">
-          Suggestions send your draft to your connected SuperGrok account, if available, or the server provider. Chat sends your messages and,
-          when selected, details of the item you have open. Conversations are kept only in this browser tab and cleared when you leave the
-          workspace or sign out. The assistant cannot change workspace data.
         </div>
       </app-settings-card>
     </app-settings-block>
@@ -203,7 +172,9 @@ export class AiSection {
 
   protected readonly sparkles = LucideSparkles;
   protected readonly bot = LucideBot;
-  protected readonly zap = LucideZap;
+  protected readonly server = LucideServer;
+  protected readonly copy = LucideCopy;
+  protected readonly chat = LucideMessageCircle;
   protected readonly envLines = ENV_LINES;
   protected readonly copied = signal(false);
 

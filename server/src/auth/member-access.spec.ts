@@ -41,6 +41,18 @@ describe('requiredMemberGrant', () => {
     expect(requiredMemberGrant('GET', '/api/w/:slug/uploads/:id')).toBeNull();
   });
 
+  it('treats the thread record like the task it belongs to', () => {
+    expect(
+      requiredMemberGrant('POST', '/api/w/:slug/tasks/:idOrKey/thread/sync'),
+    ).toBe('issues:update');
+    expect(
+      requiredMemberGrant('GET', '/api/w/:slug/tasks/:idOrKey/thread'),
+    ).toBe('issues:view');
+    expect(requiredMemberGrant('GET', '/api/w/:slug/decisions')).toBe(
+      'issues:view',
+    );
+  });
+
   it('leaves workspace administration to the role', () => {
     expect(requiredMemberGrant('POST', '/api/w/:slug/members')).toBeNull();
     expect(requiredMemberGrant('GET', '/api/w/:slug/snapshot')).toBeNull();

@@ -102,6 +102,11 @@ export class ProjectsService {
     );
   }
 
+  /** The catalog id of a project health (a legacy enum value resolves to the seeded one); 400 when unknown. */
+  async resolveHealth(workspaceId: string, stored: string): Promise<string> {
+    return (await this.projectHealth(workspaceId, stored)).id;
+  }
+
   async list(workspaceId: string, f: ProjectFilter = {}) {
     const qb = this.repo
       .createQueryBuilder('p')

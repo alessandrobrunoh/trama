@@ -59,7 +59,7 @@ interface Plan {
 }
 
 /**
- * Moves a project, with its milestones, issues, time entries, comments, artifacts and history, to another
+ * Moves a project, with its milestones, issues, time entries, comments, artifacts, thread records and history, to another
  * workspace. The caller must be able to administer both workspaces. Issue keys are kept (so the project tag
  * must be free in the target), statuses and labels are mapped to the target's by type and name, guests are
  * carried over as limited members, and anything that pointed at a person who is not in the target is cleared.
@@ -332,6 +332,25 @@ export class ProjectTransferService {
 
     await m.query(`UPDATE "milestones" SET "workspaceId" = $1 WHERE "projectId" = $2`, [sub.tgt, project.id]);
 
+    // written updates move with the project; the health each reported follows the mapping, or is dropped
+    // when the target has no such health
+    const targetHealth = new Set(target.resolved().statuses.projectHealth.map((entry) => entry.id));
+    const reported = (
+      (await m.query(
+        `SELECT DISTINCT "health" FROM "project_updates" WHERE "projectId" = $1 AND "health" IS NOT NULL`,
+        [project.id],
+      )) as { health: string }[]
+    ).map((row) => row.health);
+    for (const health of reported) {
+      const next = mapping.statuses.project_health.get(health) ?? health;
+      await m.query(`UPDATE "project_updates" SET "health" = $3 WHERE "projectId" = $1 AND "health" = $2`, [
+        project.id,
+        health,
+        targetHealth.has(next) ? next : null,
+      ]);
+    }
+    await m.query(`UPDATE "project_updates" SET "workspaceId" = $1 WHERE "projectId" = $2`, [sub.tgt, project.id]);
+
     await m.update(ProjectEntity, { id: project.id }, {
       workspaceId: target.id,
       status: (mapping.statuses.project.get(project.status) ?? project.status) as ProjectStatus,
@@ -350,6 +369,20 @@ export class ProjectTransferService {
         [sub.tgt, sub.src, project.id, issueIds],
       ),
     );
+
+    // the thread record and the decisions of a task go with the task
+    if (issueIds.length) {
+      await m.query(`UPDATE "task_thread_records" SET "workspaceId" = $1 WHERE "workspaceId" = $2 AND "issueId" = ANY($3)`, [
+        sub.tgt,
+        sub.src,
+        issueIds,
+      ]);
+      await m.query(`UPDATE "task_decisions" SET "workspaceId" = $1 WHERE "workspaceId" = $2 AND "issueId" = ANY($3)`, [
+        sub.tgt,
+        sub.src,
+        issueIds,
+      ]);
+    }
 
     const artifactIds = firstColumn(
       await m.query(

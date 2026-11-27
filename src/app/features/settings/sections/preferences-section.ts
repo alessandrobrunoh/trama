@@ -1,6 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { BRANCH_FORMATS, type BranchFormat } from '../../../core/branch-name';
 import { BranchNames } from '../../../core/branch-prefs';
 import {
@@ -37,7 +36,8 @@ const THEMES: { id: ThemeMode; label: string; hint: string }[] = [
 ];
 
 const FONT_LABELS: Record<FontSize, string> = { small: 'Small', default: 'Default', large: 'Large', xlarge: 'X-large' };
-const SEND_LABELS: Record<SendKey, string> = { 'mod-enter': '⌘ / Ctrl + Enter', enter: 'Enter' };
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const SEND_LABELS: Record<SendKey, string> = { 'mod-enter': MAC ? '⌘ ↵' : 'Ctrl ↵', enter: '↵' };
 const MOTION_LABELS: Record<MotionMode, string> = { system: 'System', reduce: 'On', full: 'Off' };
 const BRANCH_LABELS: Record<BranchFormat, string> = {
   'user/key-title': '{user}/{id}-{title}',
@@ -52,16 +52,14 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
 @Component({
   selector: 'app-preferences-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, HlmButtonImports, AppSelect, Kbd, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-9' },
+  imports: [NgTemplateOutlet, AppSelect, Kbd, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9 leading-[normal]' },
   template: `
     <app-section-header
       flush
       title="Preferences"
       description="How Trama looks and behaves for you. Only you see these; they stay in this browser."
-    >
-      <button actions hlmBtn variant="ghost" size="sm" (click)="prefs.reset()">Reset to defaults</button>
-    </app-section-header>
+    />
 
     <app-settings-block title="Theme">
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">
@@ -109,7 +107,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
 
     <app-settings-block title="Layout">
       <app-settings-card>
-        <app-card-row label="Font size" description="Scales text and spacing across the app.">
+        <app-card-row label="Font size">
           <app-segmented
             aria-label="Font size"
             [options]="fontOptions"
@@ -131,8 +129,9 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
     <app-settings-block title="Working">
       <app-settings-card>
         <app-card-row label="Home view" description="What opens when you start Trama.">
-          <div class="w-44">
+          <div class="w-[180px]">
             <app-select
+              size="sm"
               label="Home view"
               [options]="homeOptions"
               [value]="prefs.homeView()"
@@ -140,7 +139,7 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             />
           </div>
         </app-card-row>
-        <app-card-row label="Send comments with" description="With Enter, use Shift + Enter for a new line.">
+        <app-card-row label="Send comments with">
           <app-segmented
             aria-label="Send comments with"
             [options]="sendOptions"
@@ -155,9 +154,10 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             (checkedChange)="prefs.emojiShortcodes.set($event)"
           />
         </app-card-row>
-        <app-card-row label="Git branch format" description="Used by Copy branch name on a task. Stored in this browser only.">
-          <div class="w-56">
+        <app-card-row label="Git branch format" description="Used by Copy branch name on a task.">
+          <div class="w-[240px]">
             <app-select
+              size="sm"
               label="Git branch format"
               [options]="branchOptions"
               [value]="branches.format()"
@@ -165,9 +165,9 @@ const BRANCH_LABELS: Record<BranchFormat, string> = {
             />
           </div>
         </app-card-row>
-        <div class="bg-bg-deep flex items-center gap-6 px-4 py-3">
+        <div class="bg-bg-deep flex items-center gap-6 px-4 py-3.5">
           <span class="text-foreground flex-1 text-[13.5px]">Preview</span>
-          <code class="text-text-2 min-w-0 truncate font-mono text-[12px]">{{ branches.name(sample.key, sample.title) }}</code>
+          <code class="text-text-2 min-w-0 truncate font-mono text-[11.5px]">{{ branches.name(sample.key, sample.title) }}</code>
         </div>
       </app-settings-card>
     </app-settings-block>
@@ -235,7 +235,7 @@ export class PreferencesSection {
 
   protected readonly homeOptions: Option[] = HOME_VIEWS.map((v) => ({ value: v, label: HOME_VIEW_LABELS[v] }));
   protected readonly sendOptions: SegmentedOption[] = SEND_KEYS.map((v) => ({ value: v, label: SEND_LABELS[v] }));
-  protected readonly fontOptions: SegmentedOption[] = FONT_SIZES.map((v) => ({ value: v, label: FONT_LABELS[v] }));
+  protected readonly fontOptions: SegmentedOption[] = FONT_SIZES.filter((v) => v !== 'xlarge').map((v) => ({ value: v, label: FONT_LABELS[v] }));
   protected readonly motionOptions: SegmentedOption[] = MOTION_MODES.map((v) => ({ value: v, label: MOTION_LABELS[v] }));
   protected readonly branchOptions: Option[] = BRANCH_FORMATS.map((v) => ({ value: v, label: BRANCH_LABELS[v] }));
 

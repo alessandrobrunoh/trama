@@ -54,7 +54,11 @@ export class EventsController {
       if (!type || !id) throw new BadRequestException('subject must be "<type>:<id>"');
       qb.andWhere("e.subject->>'type' = :st AND e.subject->>'id' = :sid", { st: type, sid: id });
     }
-    if (q.type) qb.andWhere('e.type LIKE :type', { type: `${q.type.replace(/[%_]/g, '')}%` });
+    // Escape LIKE wildcards rather than dropping them: many event types contain `_`.
+    if (q.type)
+      qb.andWhere("e.type LIKE :type ESCAPE '\\'", {
+        type: `${q.type.replace(/[\\%_]/g, (c) => `\\${c}`)}%`,
+      });
     if (q.before) {
       const before = new Date(q.before);
       if (Number.isNaN(before.getTime())) throw new BadRequestException('before must be an ISO date');

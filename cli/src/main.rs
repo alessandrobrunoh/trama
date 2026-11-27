@@ -37,6 +37,7 @@ mod exec;
 mod http;
 mod mcp_cmd;
 mod output;
+mod shortcmd;
 mod skill;
 mod update;
 mod util;
@@ -136,7 +137,14 @@ fn build_cli(reg: &Registry) -> Command {
         root = root.subcommand(c);
     }
     root = root.subcommand(workcmd::timer_command());
+    for c in shortcmd::commands() {
+        root = root.subcommand(c);
+    }
     for c in reg.commands() {
+        // The short verbs `decisions` and `estimate` stand in for these generated groups.
+        if workcmd::REPLACED_GROUPS.contains(&c.get_name()) {
+            continue;
+        }
         let c = match c.get_name() {
             "event" => c.subcommand(events::command()),
             "task" => workcmd::extend_task(c),
@@ -271,6 +279,7 @@ async fn run() -> Result<()> {
         "event" if sub.subcommand_name() == Some("watch") => {
             events::watch(sub.subcommand_matches("watch").expect("checked"), &ctx).await
         }
+        short if shortcmd::NAMES.contains(&short) => shortcmd::run(short, sub, &ctx).await,
         group => run_tool(&reg, group, sub, &ctx).await,
     }
 }

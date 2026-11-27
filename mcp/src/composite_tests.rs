@@ -355,7 +355,10 @@ async fn composites_are_hidden_and_refused_without_their_permissions() {
     let a = [account("acme", &read_only)];
     let listed: Vec<String> = s.list_tools(&a).iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
     assert!(listed.contains(&"get_context".to_string()) && listed.contains(&"find_work".to_string()));
-    for hidden in ["create_task", "report_progress", "attach_artifact", "add_comment", "triage_tasks", "update_task"] {
+    for read in ["find_decisions", "suggest_estimate"] {
+        assert!(listed.contains(&read.to_string()), "{read} only reads, so a read-only key lists it");
+    }
+    for hidden in ["create_task", "report_progress", "attach_artifact", "add_comment", "triage_tasks", "update_task", "link_thread", "sync_thread"] {
         assert!(!listed.contains(&hidden.to_string()), "{hidden} must be hidden for a read-only key");
     }
     let (err, text) = call(&s, &a, "create_task", json!({ "kind": "bug", "title": "q" })).await;
@@ -386,7 +389,7 @@ async fn list_capabilities_reveals_the_long_tail_with_schemas() {
     let (_, text) = call(&s, &a, "list_capabilities", json!({ "group": "tasks" })).await;
     let names: Vec<String> = parsed(&text)["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
     assert!(names.contains(&"create_task".to_string()));
-    assert!(!names.iter().any(|n| n.contains("team") || n.contains("decision") || n.contains("customer")));
+    assert!(!names.iter().any(|n| n.contains("team") || n.contains("customer")));
 
     let (_, text) = call(&s, &a, "list_capabilities", json!({ "tool": "create_milestone" })).await;
     let v = parsed(&text);
@@ -657,4 +660,251 @@ async fn track_time_validates_before_calling_and_needs_a_user_key() {
     let read_only: Vec<String> = all_permissions().into_iter().filter(|p| p.ends_with(":read")).collect();
     let (err, text) = call(&s, &[account("acme", &read_only)], "track_time", json!({ "action": "stop" })).await;
     assert!(err && text.contains("tasks:write"), "{text}");
+}
+
+// ── thread records ──
+
+const THREAD: &str = "https://delta.example/t/th_1";
+
+#[tokio::test]
+async fn link_thread_links_a_task_that_has_no_thread_and_is_idempotent() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/TRM-1") => j(json!({ "id": "in_1", "key": "TRM-1", "title": "t", "status": "todo" })),
+        ("GET", "/tasks/TRM-2") => j(json!({ "id": "in_2", "key": "TRM-2", "title": "t", "status": "todo", "threadUrl": THREAD })),
+        ("PATCH", "/tasks/in_1") => j(json!({ "id": "in_1" })),
+        _ => not_found(),
+    });
+    let s = server(&mock);
+    let (err, text) = call(&s, &all(), "link_thread", json!({ "issue": "TRM-1", "threadUrl": THREAD })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert_eq!((v["linked"].clone(), v["threadUrl"].clone()), (json!(true), json!(THREAD)));
+    let w = mock.writes();
+    assert_eq!(w.len(), 1);
+    assert!(w[0].is("PATCH", "/tasks/in_1"));
+    assert_eq!(w[0].body, json!({ "threadUrl": THREAD }));
+
+    let (err, text) = call(&s, &all(), "link_thread", json!({ "issue": "TRM-2", "threadUrl": THREAD })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["alreadyLinked"], true);
+    assert_eq!(mock.writes().len(), 1, "the same thread is not written again");
+}
+
+#[tokio::test]
+async fn link_thread_refuses_a_task_with_another_thread_with_a_clear_payload() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/TRM-128") => j(json!({ "id": "in_128", "key": "TRM-128", "threadUrl": "https://delta.example/t/th_8f2a19" })),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "link_thread", json!({ "issue": "TRM-128", "threadUrl": THREAD })).await;
+    assert!(err, "an error result, so the agent stops and asks");
+    let v = parsed(&text);
+    assert_eq!(v["code"], "thread_already_linked");
+    assert_eq!(v["linked"], false);
+    assert_eq!(v["threadUrl"], "https://delta.example/t/th_8f2a19");
+    assert_eq!(v["message"], "TRM-128 already linked to https://delta.example/t/th_8f2a19");
+    assert!(v["hint"].as_str().unwrap().contains("create_task"), "{text}");
+    assert!(mock.writes().is_empty(), "nothing was changed");
+}
+
+#[tokio::test]
+async fn link_thread_reports_a_409_raced_by_another_thread() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let reads = AtomicUsize::new(0);
+    let mock = Mock::spawn(move |r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/TRM-1") => {
+            let first = reads.fetch_add(1, Ordering::SeqCst) == 0;
+            j(if first { json!({ "id": "in_1", "key": "TRM-1" }) } else { json!({ "id": "in_1", "key": "TRM-1", "threadUrl": "https://delta.example/t/other" }) })
+        }
+        ("GET", "/tasks/in_1") => j(json!({ "id": "in_1", "key": "TRM-1", "threadUrl": "https://delta.example/t/other" })),
+        ("PATCH", "/tasks/in_1") => (409, json!({ "statusCode": 409, "code": "thread_already_linked", "message": "TRM-1 already linked to https://delta.example/t/other", "threadUrl": "https://delta.example/t/other" }).to_string()),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "link_thread", json!({ "issue": "TRM-1", "threadUrl": THREAD })).await;
+    assert!(err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["code"], "thread_already_linked");
+    assert_eq!(v["threadUrl"], "https://delta.example/t/other");
+    assert_eq!(v["requestedThreadUrl"], THREAD);
+}
+
+#[tokio::test]
+async fn link_thread_validates_before_calling() {
+    let mock = Mock::spawn(|_| not_found());
+    let s = server(&mock);
+    for args in [json!({ "issue": "TRM-1", "threadUrl": "th_1" }), json!({ "issue": "TRM-1" }), json!({ "threadUrl": THREAD })] {
+        let (err, text) = call(&s, &all(), "link_thread", args.clone()).await;
+        assert!(err, "{args}: {text}");
+    }
+    assert!(mock.calls().is_empty());
+}
+
+fn sync_reply() -> Value {
+    json!({
+        "record": { "issueId": "in_1", "threadUrl": THREAD, "summary": "s", "files": ["a.ts", "b.ts"], "turns": 3, "syncCount": 2, "decisions": [] },
+        "decisionsAdded": 1,
+        "linked": true,
+        "artifact": { "id": "ar_1", "kind": "pull_request", "title": "Fix", "state": "open", "url": "https://github.com/acme/web/pull/1", "createdAt": "x" },
+        "timeSuggestion": { "id": "te_9", "userId": "usr_me", "minutes": 47 }
+    })
+}
+
+#[tokio::test]
+async fn sync_thread_sends_the_validated_parts_and_reports_the_facts() {
+    let mock = Mock::spawn(|r| if r.is("POST", "/tasks/BUG-1/thread/sync") { j(sync_reply()) } else { not_found() });
+    let args = json!({
+        "issue": "BUG-1",
+        "summary": "  Retry wired  ",
+        "decisions": [{ "text": "Alert after 3 failures", "paths": ["src/auth/"] }, { "text": "Keep it simple" }],
+        "files": ["./a.ts", "b.ts", "a.ts"],
+        "pullRequestUrl": "https://github.com/acme/web/pull/1",
+        "activeMinutes": 47,
+        "turns": 3,
+        "threadUrl": THREAD
+    });
+    let (err, text) = call(&server(&mock), &all(), "sync_thread", args).await;
+    assert!(!err, "{text}");
+    let w = mock.writes();
+    assert_eq!(w.len(), 1);
+    assert_eq!(
+        w[0].body,
+        json!({
+            "summary": "Retry wired",
+            "decisions": [{ "text": "Alert after 3 failures", "paths": ["src/auth/"] }, { "text": "Keep it simple" }],
+            "files": ["a.ts", "b.ts"],
+            "pullRequestUrl": "https://github.com/acme/web/pull/1",
+            "activeMinutes": 47,
+            "turns": 3,
+            "threadUrl": THREAD
+        })
+    );
+    let v = parsed(&text);
+    assert_eq!(v["synced"], true);
+    assert_eq!(v["linked"], true);
+    assert_eq!(v["decisionsAdded"], 1);
+    assert_eq!(v["files"], 2);
+    assert_eq!(v["syncCount"], 2);
+    assert_eq!(v["artifact"]["state"], "open");
+    assert!(v["artifact"].get("createdAt").is_none());
+    assert_eq!(v["timeSuggestion"]["minutes"], 47);
+    assert!(v["note"].as_str().unwrap().contains("status"), "{text}");
+}
+
+#[tokio::test]
+async fn sync_thread_may_send_nothing_but_the_task() {
+    let mock = Mock::spawn(|r| if r.is("POST", "/tasks/BUG-1/thread/sync") { j(sync_reply()) } else { not_found() });
+    let (err, text) = call(&server(&mock), &all(), "sync_thread", json!({ "issue": "BUG-1" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(mock.writes()[0].body, json!({}));
+}
+
+#[tokio::test]
+async fn sync_thread_validates_before_calling_and_names_a_thread_conflict() {
+    let mock = Mock::spawn(|r| {
+        if r.is("POST", "/tasks/BUG-1/thread/sync") {
+            (409, json!({ "statusCode": 409, "code": "thread_already_linked", "message": "BUG-1 already linked to https://delta.example/t/other" }).to_string())
+        } else {
+            not_found()
+        }
+    });
+    let s = server(&mock);
+    for args in [
+        json!({ "issue": "BUG-1", "files": ["../secret"] }),
+        json!({ "issue": "BUG-1", "files": ["/etc/passwd"] }),
+        json!({ "issue": "BUG-1", "decisions": [{ "text": "x", "paths": ["../y"] }] }),
+        json!({ "issue": "BUG-1", "activeMinutes": 721 }),
+        json!({ "issue": "BUG-1", "pullRequestUrl": "acme/web#1" }),
+        json!({ "issue": "BUG-1", "threadUrl": "th_1" }),
+        json!({ "issue": "BUG-1", "decisions": [{ "paths": ["a"] }] }),
+        json!({ "summary": "no task" }),
+    ] {
+        let (err, text) = call(&s, &all(), "sync_thread", args.clone()).await;
+        assert!(err, "{args}: {text}");
+    }
+    assert!(mock.calls().is_empty(), "nothing reached the API");
+
+    let (err, text) = call(&s, &all(), "sync_thread", json!({ "issue": "BUG-1", "threadUrl": THREAD })).await;
+    assert!(err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["code"], "thread_already_linked");
+    assert!(v["message"].as_str().unwrap().contains("already linked"), "{text}");
+    assert_eq!(v["requestedThreadUrl"], THREAD);
+}
+
+#[tokio::test]
+async fn find_decisions_asks_for_a_path_and_a_task() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/decisions") if r.query.contains("path=") && r.query.contains("login.ts") => j(json!([
+            { "id": "dc_1", "issueId": "in_1", "issueKey": "TRM-128", "text": "Rotate refresh tokens", "paths": ["src/auth/"], "threadUrl": null, "createdBy": { "type": "agent", "id": "ag_1" }, "createdAt": "2026-05-01T09:00:00.000Z" }
+        ])),
+        ("GET", "/decisions") => j(json!([])),
+        _ => not_found(),
+    });
+    let s = server(&mock);
+    let (err, text) = call(&s, &all(), "find_decisions", json!({ "path": "./src/auth/login.ts", "issue": "TRM-128", "limit": 5 })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["decisions"][0]["issueKey"], "TRM-128");
+    assert_eq!(v["decisions"][0]["text"], "Rotate refresh tokens");
+    assert!(v["decisions"][0].get("createdBy").is_none());
+    let q = &mock.calls()[0].query;
+    assert!(q.contains("issue=TRM-128") && q.contains("limit=5"), "{q}");
+    assert!(!q.contains("path=.%2F"), "the leading ./ is dropped: {q}");
+
+    let (err, text) = call(&s, &all(), "find_decisions", json!({ "path": "docs/readme.md" })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["count"], 0);
+    assert!(v["hint"].as_str().unwrap().contains("no recorded decision"), "{text}");
+}
+
+#[tokio::test]
+async fn suggest_estimate_returns_the_suggestion_with_a_hint_and_writes_nothing() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1/estimate-suggestion") => j(json!({ "issueId": "in_1", "suggestion": 3, "scale": [1, 2, 3, 5, 8], "basis": [{ "id": "in_7", "key": "BUG-7", "title": "Retry queue", "estimate": 3, "trackedMinutes": 130 }], "reason": "Median of 2 similar tasks." })),
+        ("GET", "/tasks/BUG-2/estimate-suggestion") => j(json!({ "issueId": "in_2", "suggestion": null, "scale": [1, 2, 3], "basis": [], "reason": "Only one similar task." })),
+        _ => not_found(),
+    });
+    let s = server(&mock);
+    let (err, text) = call(&s, &all(), "suggest_estimate", json!({ "issue": "BUG-1" })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["suggestion"], 3);
+    assert_eq!(v["basis"][0]["key"], "BUG-7");
+    assert!(v["hint"].as_str().unwrap().contains("update_task"), "{text}");
+    let (_, text) = call(&s, &all(), "suggest_estimate", json!({ "issue": "BUG-2" })).await;
+    assert!(parsed(&text)["hint"].as_str().unwrap().contains("Too little history"), "{text}");
+    assert!(mock.writes().is_empty());
+}
+
+#[tokio::test]
+async fn get_context_includes_the_decisions_of_the_task() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1/context") => j(json!({ "issue": { "id": "in_1", "key": "BUG-1" } })),
+        ("GET", "/tasks/BUG-1/artifacts") => j(json!([])),
+        ("GET", "/decisions") => j(json!([{ "id": "dc_1", "issueKey": "BUG-1", "text": "Use rotating tokens", "paths": ["src/auth/"], "createdAt": "2026-05-01T09:00:00.000Z", "createdBy": { "type": "user", "id": "usr_1" } }])),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-1" })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert_eq!(v["decisions"][0]["text"], "Use rotating tokens");
+    assert!(v["decisions"][0].get("createdBy").is_none());
+    assert!(v.get("warnings").is_none(), "{text}");
+    let list = mock.calls().into_iter().find(|r| r.is("GET", "/decisions")).unwrap();
+    assert_eq!(list.query, "issue=in_1");
+}
+
+#[tokio::test]
+async fn get_context_still_answers_when_the_api_has_no_decisions() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1/context") => j(json!({ "issue": { "id": "in_1", "key": "BUG-1" } })),
+        ("GET", "/tasks/BUG-1/artifacts") => j(json!([])),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-1" })).await;
+    assert!(!err, "{text}");
+    let v = parsed(&text);
+    assert!(v.get("decisions").is_none() && v.get("warnings").is_none(), "{text}");
 }

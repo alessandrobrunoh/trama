@@ -41,6 +41,7 @@ import {
 } from '../auth/member-access.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 import { allocateIssueNumbers, issueKeyPrefix, type IssueKeyChange } from './issue-keys.js';
+import { assertThreadLinkable } from './thread-link.js';
 
 export interface IssueInput {
   title?: string;
@@ -605,6 +606,14 @@ export class IssuesService {
         row.parentId = lockedRelation.parentId;
       }
       if (!relation) throw notFound('Issue', row.id);
+      if (typeof prepared.patch.threadUrl === 'string') {
+        // the row is locked now: a concurrent link that committed first wins
+        const [stored] = (await m.query(
+          `SELECT "threadUrl" FROM "issues" WHERE "id" = $1`,
+          [row.id],
+        )) as { threadUrl: string | null }[];
+        assertThreadLinkable(relation.key, stored?.threadUrl, prepared.patch.threadUrl);
+      }
       prepared.fromKey = relation.key;
       prepared.fromProjectId = relation.projectId;
       row.key = relation.key;
@@ -781,6 +790,7 @@ export class IssuesService {
     catalog?: readonly StatusEntry<IssueStatus>[],
   ): Promise<PreparedUpdate> {
     const statuses = catalog ?? (await this.issueCatalog(workspaceId));
+    assertThreadLinkable(row.key, row.threadUrl, patch.threadUrl);
     const previousAssigneeId = row.assigneeId;
     if (!refsChecked) {
       await this.refs.users(workspaceId, [patch.assigneeId]);

@@ -18,6 +18,7 @@ import {
   WorkspaceCounterEntity,
   WorkspaceEntity,
 } from '../entities/index.js';
+import { TaskDecisionEntity, ThreadRecordEntity } from '../../threads/thread.entity.js';
 import { DEMO_PASSWORD, createSeed } from './seed-data.js';
 
 @Injectable()
@@ -57,6 +58,8 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, MilestoneEntity, data.milestones);
       await insert(m, IssueEntity, data.issues);
       await insert(m, ArtifactEntity, data.artifacts);
+      await insert(m, ThreadRecordEntity, data.threadRecords);
+      await insert(m, TaskDecisionEntity, data.decisions);
       await insert(m, DependencyEntity, data.dependencies);
       await insert(m, CommentEntity, data.comments);
       await insert(m, DomainEventEntity, data.events);

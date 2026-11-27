@@ -13,6 +13,7 @@ import type {
   MemberAccess,
   MemberGrant,
   PermissionMap,
+  TimeEntrySource,
   TokenScope,
   ApiPermission,
   TokenLimits,
@@ -428,6 +429,8 @@ export interface TimeEntry {
   description: string;
   startedAt: ISODate;
   endedAt: ISODate | null;
+  /** `suggested` entries come from `trama sync` and count nowhere until a person accepts them. */
+  source?: TimeEntrySource;
   createdAt: ISODate;
   updatedAt: ISODate;
 }

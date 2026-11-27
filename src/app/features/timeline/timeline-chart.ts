@@ -463,8 +463,6 @@ export class TimelineChart {
   readonly projects = input<readonly Project[]>([]);
   readonly zoom = input<Zoom>('month');
   readonly group = input<TimelineGroup>('milestone');
-  /** Also draw closed tasks (done, canceled). */
-  readonly showClosed = input(false);
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
@@ -525,14 +523,13 @@ export class TimelineChart {
     const now = this.now();
     const types = this.store.settings().statuses.issue;
     const inScope = new Set(this.projects().map((p) => p.id));
-    const showClosed = this.showClosed();
     const items: Item[] = [];
     let undated = 0;
     for (const issue of this.store.issues()) {
       if (issue.projectId && !inScope.has(issue.projectId)) continue;
       const type = statusTypeOf(types, issue.status);
       const open = type !== 'done' && type !== 'canceled';
-      if (!open && !showClosed) continue;
+      if (!open) continue;
       const span = taskSpan(
         { startedAt: issue.startedAt, dueDate: issue.dueDate, completedAt: issue.completedAt, open },
         now,

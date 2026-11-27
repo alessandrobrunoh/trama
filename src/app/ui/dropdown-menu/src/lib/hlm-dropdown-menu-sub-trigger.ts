@@ -33,7 +33,8 @@ export class HlmDropdownMenuSubTrigger {
   private readonly _config = injectHlmDropdownMenuConfig();
 
   public readonly align = input<MenuAlign>(this._config.align);
-  public readonly side = input<MenuSide>(this._config.side);
+  // A submenu opens beside its trigger row (v3 · 14), not under it like a top-level menu.
+  public readonly side = input<MenuSide>('right');
 
   private readonly _menuPosition = computed(() => createMenuPosition(this.align(), this.side()));
 

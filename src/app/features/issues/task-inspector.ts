@@ -1,26 +1,18 @@
 // The property column of the task page (v3 "06 Task detail" / "07 Subtask detail"): the /trama command, the
 // properties as hairline rows (label in mono 10 faint, value beside it), the estimate and the time against it,
-// the thread, the one-thread-per-task rule. What the frames do not show (type, reporter, link, milestone, the
-// time entries…) sits in two collapsed groups at the bottom, so nothing the page could edit is lost.
+// the thread, the one-thread-per-task rule. Nothing the frames do not show.
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import {
-  LucideCircleUserRound,
   LucideCopy,
   LucideDynamicIcon,
-  LucideExternalLink,
-  LucideFolder,
   LucideListChecks,
   LucidePencil,
   LucidePlay,
-  LucideShapes,
   LucideSquare,
-  LucideTag,
-  LucideX,
 } from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Clipboard,
@@ -31,116 +23,90 @@ import {
   formatSpan,
 } from '../../core';
 import { AgoPipe } from '../../shared/ago';
-import { EntityChip } from '../../shared/entity-chip';
-import { InlineText } from '../../shared/inline-edit';
-import { IssueKindLabel } from '../../shared/issue';
 import { LabelPicker } from '../../shared/label-picker';
 import { Picker } from '../../shared/picker';
 import { projectOptions } from '../../shared/picker-options';
-import { PropertyRow } from '../../shared/property-row';
 import { sourceRef } from '../../shared/v3';
-import { IssueMilestoneProp } from '../milestones/milestone-chips';
 import { REF_MIN, trackedByIssue } from '../stats/flow-stats';
 import { IssueActions } from './issue-actions';
-import { IssueExternalRef } from './issue-external-ref';
-import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
+import { SOURCE_LABEL, issueEstimateOptions } from './issue-model';
 import { IssueProp } from './issue-prop';
-import { IssueSection } from './issue-section';
 import { IssueThreadLink } from './issue-thread-link';
 import { issueCost } from './issue-cost';
 import { TaskChildren } from './task-children';
-import { TaskStatusWizard } from './task-status-wizard';
-import { TaskTime } from './task-time';
 import { trackedOn } from './task-time-model';
 
-/** One hairline row of the column: a 84px mono label and the value beside it. */
+/**
+ * One hairline row of the column: a 84px mono label and the value beside it. The frame's rows are 34 to 42px
+ * high depending on what they hold (`height`), so a picker's tall hit area never makes a row taller.
+ */
 @Component({
   selector: 'app-task-prop',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'border-border flex min-w-0 items-center gap-2.5 border-b px-[18px] py-2.5' },
+  host: {
+    class: 'border-border flex min-w-0 items-center gap-2.5 border-b px-[18px] py-0.5',
+    '[style.min-height.px]': 'height()',
+  },
   template: `
-    <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[12px]">{{ label() }}</span>
+    <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[13px]">{{ label() }}</span>
     <div class="flex min-w-0 flex-1 items-center gap-1.5"><ng-content /></div>
   `,
 })
 export class TaskProp {
   readonly label = input('');
+  /** Minimum row height in px, border included. */
+  readonly height = input(36);
 }
 
 @Component({
   selector: 'app-task-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    HlmButtonImports,
     HlmTooltip,
     NgTemplateOutlet,
     RouterLink,
     LucideDynamicIcon,
     LabelPicker,
     Picker,
-    InlineText,
-    EntityChip,
-    IssueKindLabel,
-    PropertyRow,
     AgoPipe,
-    IssueMilestoneProp,
-    IssueExternalRef,
     IssueProp,
-    IssueSection,
     IssueThreadLink,
     TaskProp,
-    TaskStatusWizard,
-    TaskTime,
   ],
   host: { class: 'block min-w-0' },
   template: `
     @if (issue(); as i) {
-      <div class="flex flex-col">
+      <div class="-ml-px flex flex-col">
         <!-- How to start it in Delta (a subtask that already has its own thread does not need it). -->
         @if (!parent() || !i.threadUrl) {
           <div class="border-border flex flex-col gap-2 border-b px-[18px] py-3.5">
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">WORK ON IT IN DELTA</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">WORK ON IT IN DELTA</span>
             <button
               type="button"
-              class="bg-background border-border hover:border-border-strong focus-visible:ring-ring flex w-full items-center gap-2 border px-2.5 py-2 text-left outline-none focus-visible:ring-2"
+              class="bg-background border-border hover:border-border-strong focus-visible:ring-ring flex w-full items-center gap-2 border px-2.5 py-[7px] text-left outline-none focus-visible:ring-2"
               aria-label="Copy the /trama command"
               hlmTooltip="Copy command · ⇧C"
               (click)="copyCommand()"
             >
               <span class="text-foreground font-mono text-[12px] leading-[15px]">/trama {{ i.key }}</span>
               <span class="flex-1"></span>
-              <svg [lucideIcon]="copyIcon" [size]="14" class="text-muted-foreground shrink-0" aria-hidden="true"></svg>
+              <svg [lucideIcon]="copyIcon" [size]="13" class="text-muted-foreground shrink-0" aria-hidden="true"></svg>
             </button>
           </div>
         }
 
-        <app-task-prop label="STATUS">
+        <app-task-prop label="STATUS" [height]="40">
           <app-issue-prop [issue]="i" field="status" chip />
-          @if (canEdit()) {
-            <app-task-status-wizard class="ml-auto" variant="link" [issue]="i" />
-          }
         </app-task-prop>
 
         @if (!parent()) {
-          <app-task-prop label="PRIORITY">
+          <app-task-prop label="PRIORITY" [height]="34">
             <app-issue-prop [issue]="i" field="priority" chip />
           </app-task-prop>
         }
 
-        <app-task-prop label="ASSIGNEE">
+        <app-task-prop label="ASSIGNEE" [height]="42">
           <app-issue-prop [issue]="i" field="assignee" showLabel chip [avatarSize]="22" />
-          @if (canEdit() && store.me(); as me) {
-            @if (i.assigneeId !== me.id) {
-              <button
-                type="button"
-                class="text-faint hover:text-foreground ml-auto shrink-0 font-mono text-[10.5px]"
-                hlmTooltip="Assign to me · I"
-                (click)="actions.setAssignee([i.id], me.id)"
-              >
-                Me
-              </button>
-            }
-          }
         </app-task-prop>
 
         @if (!parent()) {
@@ -179,7 +145,7 @@ export class TaskProp {
         @if (!parent() && showEstimate()) {
           <div class="border-border flex flex-col gap-2.5 border-b px-[18px] py-3.5">
             <div class="flex items-center gap-2.5">
-              <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[12px]">ESTIMATE</span>
+              <span class="text-faint w-[84px] shrink-0 font-mono text-[10px] leading-[13px]">ESTIMATE</span>
               <app-picker
                 #estimatePicker
                 variant="bare"
@@ -192,12 +158,12 @@ export class TaskProp {
                 [disabled]="!canEdit()"
                 [options]="estimateOpts()"
                 [value]="i.estimate !== undefined && i.estimate !== null ? ['' + i.estimate] : []"
-                triggerClass="h-8 px-0"
+                triggerClass="h-[26px] px-0"
                 (valueChange)="setEstimate(i.id, $event[0])"
               >
-                <span class="font-title text-foreground text-[26px] leading-[30px]">{{ estimateText() }}</span>
+                <span class="font-title text-foreground text-[26px] leading-[26px] tracking-normal!">{{ estimateText() }}</span>
               </app-picker>
-              <span class="border-border text-muted-foreground border px-1.5 py-px font-mono text-[10px] leading-[13px]">{{ scale() }}</span>
+              <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[13px]">{{ scale() }}</span>
               <span class="flex-1"></span>
               @if (canEdit()) {
                 <button
@@ -216,10 +182,10 @@ export class TaskProp {
             }
             <div class="flex flex-col gap-[5px]">
               <div class="flex items-center gap-1.5">
-                <span class="text-faint font-mono text-[10px] leading-[12px]">TRACKED</span>
+                <span class="text-faint font-mono text-[10px] leading-[13px]">TRACKED</span>
                 <span class="text-foreground text-[12.5px] leading-4">{{ trackedText() }}</span>
                 @if (typical()) {
-                  <span class="text-faint font-mono text-[10.5px] leading-[13px]">of ~{{ span(typical()!) }}</span>
+                  <span class="text-faint font-mono text-[10.5px] leading-[14px]">of ~{{ span(typical()!) }}</span>
                 }
                 <span class="flex-1"></span>
                 <ng-container [ngTemplateOutlet]="timerButton" />
@@ -231,7 +197,7 @@ export class TaskProp {
             @if (rollup(); as r) {
               <button
                 type="button"
-                class="bg-yellow/[0.07] border-yellow/25 text-yellow flex w-full items-center gap-2 border px-[9px] py-[7px] text-left font-mono text-[10.5px] leading-[13px] disabled:cursor-default"
+                class="bg-yellow/[0.07] border-yellow/25 text-yellow flex w-full items-center gap-2 border px-[9px] py-1.5 text-left font-mono text-[10.5px] leading-[14px] disabled:cursor-default"
                 [disabled]="!canEdit() || r.next === null"
                 (click)="r.next !== null && setEstimate(i.id, '' + r.next)"
               >
@@ -259,11 +225,11 @@ export class TaskProp {
                 triggerClass="h-5 w-[84px] justify-start px-0"
                 (valueChange)="setEstimate(i.id, $event[0])"
               >
-                <span class="text-faint hover:text-muted-foreground font-mono text-[10px] leading-[12px]">EST {{ estimateText() }}</span>
+                <span class="text-faint hover:text-muted-foreground font-mono text-[10px] leading-[13px]">EST {{ estimateText() }}</span>
               </app-picker>
               <span class="text-foreground text-[12.5px] leading-4">{{ trackedText() }}</span>
               @if (typical()) {
-                <span class="text-faint font-mono text-[10.5px] leading-[13px]">of ~{{ span(typical()!) }}</span>
+                <span class="text-faint font-mono text-[10.5px] leading-[14px]">of ~{{ span(typical()!) }}</span>
               }
               <span class="flex-1"></span>
               <ng-container [ngTemplateOutlet]="timerButton" />
@@ -278,14 +244,15 @@ export class TaskProp {
           <app-task-prop label="LABELS">
             <app-label-picker
               scope="issue"
-              triggerClass="min-h-6 py-0"
+              chipLook="hairline"
+              triggerClass="min-h-6 px-0! py-0 font-sans text-[12.5px]"
               [disabled]="!canEdit()"
               [value]="i.labels"
               (valueChange)="store.updateIssue(i.id, { labels: $event })"
             />
           </app-task-prop>
         } @else if (parentIssue(); as p) {
-          <app-task-prop label="PARENT">
+          <app-task-prop label="PARENT" [height]="34">
             <a
               [routerLink]="['/', slug(), 'tasks', p.key]"
               class="text-foreground hover:underline font-mono text-[11px] leading-[14px]"
@@ -295,7 +262,7 @@ export class TaskProp {
           </app-task-prop>
         }
 
-        <app-task-prop label="SOURCE">
+        <app-task-prop label="SOURCE" [height]="34">
           @let src = source();
           @if (parent() && src.kind === 'trama') {
             <span class="text-muted-foreground font-mono text-[11px] leading-[14px]">Trama only · not synced</span>
@@ -320,19 +287,19 @@ export class TaskProp {
           }
         </app-task-prop>
 
-        <app-task-prop label="THREAD">
-          <app-issue-thread-link class="min-w-0 flex-1" variant="row" [issue]="i" [canEdit]="canEdit()" />
+        <app-task-prop label="THREAD" [height]="34">
+          <app-issue-thread-link class="min-w-0 flex-1" [issue]="i" />
         </app-task-prop>
 
         <div class="flex flex-col gap-1.5 px-[18px] py-3.5">
           @if (parent()) {
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">SUBTASKS = MORE THREADS</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">SUBTASKS = MORE THREADS</span>
             <p class="text-muted-foreground text-xs leading-[19px]">
               The parent keeps its own thread. This subtask was started with /trama {{ i.key }} and records a
               separate piece of work.
             </p>
           } @else {
-            <span class="text-foreground font-mono text-[10px] leading-[12px]">ONE THREAD PER TASK</span>
+            <span class="text-foreground font-mono text-[10px] leading-[13px]">ONE THREAD PER TASK</span>
             <p class="text-muted-foreground text-xs leading-[19px]">
               @if (i.threadUrl) {
                 To relink, run /trama {{ i.key }} in a new Delta thread — the agent will offer to create a subtask
@@ -345,140 +312,13 @@ export class TaskProp {
           }
         </div>
 
-        <div class="flex flex-col gap-1 px-[18px] pt-1.5 pb-3.5">
-          <span class="text-faint font-mono text-[10.5px] leading-[13px]">Created {{ createdText() }}</span>
-          <span class="text-faint font-mono text-[10.5px] leading-[13px]">Updated {{ i.updatedAt | ago }} ago</span>
-        </div>
-
-        <!-- Everything the frames leave out, out of the way. -->
-        <app-issue-section class="border-border border-t" label="MORE">
-          <div class="flex flex-col px-1.5">
-            <app-property-row label="Type" [icon]="typeIcon" compact>
-              <app-picker
-                variant="bare"
-                label="Type"
-                [searchable]="false"
-                [disabled]="!canEdit()"
-                [options]="kindOpts"
-                [value]="[i.kind]"
-                triggerClass="h-7 px-1.5 text-[13px]"
-                (valueChange)="actions.changeKind(i, $any($event[0]))"
-              >
-                <app-issue-kind [kind]="i.kind" showLabel />
-              </app-picker>
-            </app-property-row>
-            @if (parent()) {
-              <app-property-row label="Priority" compact>
-                <app-issue-prop [issue]="i" field="priority" showLabel />
-              </app-property-row>
-              <app-property-row label="Project" [icon]="projectIcon" compact>
-                <app-picker
-                  variant="field"
-                  triggerClass="min-h-7 py-0.5"
-                  label="Project"
-                  placeholder="No project"
-                  [clearable]="true"
-                  clearLabel="Remove from project"
-                  [disabled]="!canEdit()"
-                  [options]="projects()"
-                  [value]="i.projectId ? [i.projectId] : []"
-                  (valueChange)="store.updateIssue(i.id, { projectId: $event[0] ?? null })"
-                />
-              </app-property-row>
-              <app-property-row label="Labels" [icon]="labelIcon" compact>
-                <app-label-picker
-                  scope="issue"
-                  triggerClass="min-h-7 py-0.5"
-                  [disabled]="!canEdit()"
-                  [value]="i.labels"
-                  (valueChange)="store.updateIssue(i.id, { labels: $event })"
-                />
-              </app-property-row>
-            }
-            <app-issue-milestone-prop [issue]="i" />
-            <app-property-row label="Source" compact>
-              <span class="px-1.5 text-[13px]">{{ sourceLabel() }}</span>
-            </app-property-row>
-            <app-property-row label="Reporter" [icon]="reporterIcon" compact>
-              <app-inline-text
-                class="min-w-0 flex-1"
-                label="reporter"
-                placeholder="Who reported it?"
-                textClass="text-[13px]"
-                [allowEmpty]="true"
-                [value]="reporter()"
-                [canEdit]="canEdit() && !i.reporterId"
-                (save)="store.updateIssue(i.id, { reporterName: $event || null })"
-              />
-            </app-property-row>
-            <app-property-row label="Link" compact>
-              <app-inline-text
-                class="min-w-0 flex-1"
-                label="external link"
-                placeholder="Paste a URL"
-                textClass="text-[13px]"
-                [allowEmpty]="true"
-                [value]="i.externalUrl ?? ''"
-                [canEdit]="canEdit()"
-                (save)="saveUrl(i.id, $event)"
-              />
-              @if (i.externalUrl) {
-                <a
-                  [href]="i.externalUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-muted-foreground hover:text-foreground shrink-0"
-                  aria-label="Open external link"
-                  hlmTooltip="Open link"
-                >
-                  <svg [lucideIcon]="openIcon" [size]="13"></svg>
-                </a>
-              }
-            </app-property-row>
-            <app-issue-external-ref [issue]="i" [canEdit]="canEdit()" />
-            <app-property-row label="Duplicate" compact>
-              @if (duplicate(); as dup) {
-                <app-entity-chip type="issue" [ref]="dup.id" compact />
-                @if (canEdit()) {
-                  <button
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground ml-auto"
-                    aria-label="Clear duplicate"
-                    hlmTooltip="Not a duplicate"
-                    (click)="actions.clearDuplicate(i.id)"
-                  >
-                    <svg [lucideIcon]="xIcon" [size]="13"></svg>
-                  </button>
-                }
-              } @else if (canEdit()) {
-                <button
-                  type="button"
-                  class="text-muted-foreground hover:bg-hover hover:text-foreground h-7 min-w-0 truncate px-1.5 text-left text-[13px] whitespace-nowrap"
-                  (click)="actions.openPrompt('duplicate', [i.id])"
-                >
-                  Mark as duplicate…
-                </button>
-              } @else {
-                <span class="text-muted-foreground px-1.5 text-[13px]">—</span>
-              }
-            </app-property-row>
-            @if (duplicates().length) {
-              <app-property-row label="Duplicates" compact>
-                <span class="flex flex-wrap gap-1">
-                  @for (d of duplicates(); track d.id) {
-                    <app-entity-chip type="issue" [ref]="d.id" compact />
-                  }
-                </span>
-              </app-property-row>
-            }
+        <!-- The subtask frame ends on its note. -->
+        @if (!parent()) {
+          <div class="flex flex-col gap-1 px-[18px] py-1.5">
+            <span class="text-faint font-mono text-[10.5px] leading-[14px]">Created {{ createdText() }}</span>
+            <span class="text-faint font-mono text-[10.5px] leading-[14px]">Updated {{ i.updatedAt | ago }} ago</span>
           </div>
-        </app-issue-section>
-
-        <app-issue-section class="border-border border-t" label="TIME ENTRIES" [summary]="trackedText()">
-          <div class="px-3 pt-2">
-            <app-task-time [issue]="i" />
-          </div>
-        </app-issue-section>
+        }
       </div>
 
       <ng-template #timerButton>
@@ -508,18 +348,11 @@ export class TaskInspector {
   /** A task id or its key (`CORA-142`). */
   readonly idOrKey = input.required<string>();
 
-  protected readonly openIcon = LucideExternalLink;
-  protected readonly xIcon = LucideX;
   protected readonly copyIcon = LucideCopy;
   protected readonly pencilIcon = LucidePencil;
   protected readonly playIcon = LucidePlay;
   protected readonly stopIcon = LucideSquare;
   protected readonly subtasksIcon = LucideListChecks;
-  protected readonly projectIcon = LucideFolder;
-  protected readonly labelIcon = LucideTag;
-  protected readonly typeIcon = LucideShapes;
-  protected readonly reporterIcon = LucideCircleUserRound;
-  protected readonly kindOpts = issueKindOptions();
 
   private readonly now = signal(Date.now());
 
@@ -559,8 +392,9 @@ export class TaskInspector {
   protected readonly trackedPct = computed(() => {
     const typical = this.typical();
     const t = this.tracked().totalMs;
-    if (!t) return 0;
-    return typical ? Math.min(100, (t / typical) * 100) : 100;
+    // Without a typical duration there is nothing to measure against: a full bar would read as done.
+    if (!t || !typical) return 0;
+    return Math.min(100, (t / typical) * 100);
   });
   protected readonly trackedLabel = computed(() => {
     const typical = this.typical();
@@ -613,16 +447,6 @@ export class TaskInspector {
     return e === undefined || e === null ? '—' : formatEstimate(e, this.store.estimateScale());
   });
 
-  protected readonly duplicate = computed(() => {
-    const id = this.issue()?.duplicateOfId;
-    return id ? this.store.issueById().get(id) : undefined;
-  });
-  /** Issues marked as duplicates of this one. */
-  protected readonly duplicates = computed(() => {
-    const id = this.issue()?.id;
-    return id ? this.store.issues().filter((i) => i.duplicateOfId === id) : [];
-  });
-  protected readonly sourceLabel = computed(() => SOURCE_LABEL[this.issue()?.source ?? ''] ?? '');
   protected readonly reporter = computed(() => {
     const i = this.issue();
     if (!i) return '';
@@ -666,14 +490,5 @@ export class TaskInspector {
 
   protected setEstimate(id: string, value: string | undefined): void {
     this.actions.setEstimate([id], value === undefined ? null : Number(value));
-  }
-
-  protected saveUrl(id: string, value: string): void {
-    const v = value.trim();
-    if (v && !/^https?:\/\//i.test(v)) {
-      void this.store.updateIssue(id, { externalUrl: `https://${v}` });
-      return;
-    }
-    void this.store.updateIssue(id, { externalUrl: v || null });
   }
 }

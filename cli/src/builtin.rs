@@ -218,6 +218,8 @@ pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
         .entries
         .iter()
         .filter(|e| group.is_none_or(|g| &e.group == g))
+        // Their short verbs (`trama decisions`, `trama estimate`) replace the generated commands.
+        .filter(|e| !workcmd::REPLACED_GROUPS.contains(&e.group.as_str()))
         .collect();
     entries.sort_by_key(|e| e.command_name());
     let mut rows: Vec<Value> = entries

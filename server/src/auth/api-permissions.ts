@@ -14,6 +14,8 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   statuses: 'workspace',
   // importing from GitHub / Linear is an integration (admin); linking one task is a task edit
   imports: 'integrations',
+  // decisions an agent recorded on tasks (`trama decisions`): read with the tasks they belong to
+  decisions: 'tasks',
 };
 
 /**

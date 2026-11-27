@@ -14,7 +14,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideArrowUp, LucideDynamicIcon, LucidePencil, LucideQuote, LucideTrash2 } from '@lucide/angular';
+import { LucideDynamicIcon, LucidePencil, LucideQuote, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
@@ -23,6 +23,7 @@ import {
   Preferences,
   UiStore,
   fullDate,
+  shortDate,
   type Comment,
   type SubjectRef,
 } from '../core';
@@ -30,58 +31,45 @@ import { ActorAvatar } from './actor-avatar';
 import { EntityRefs } from './entity-ref';
 import { Kbd } from './kbd';
 import { Markdown } from './markdown';
-import { RelativeTimePipe } from './pipes';
 import { UploadFile } from './upload-file';
 import { CommentInput } from './comment-input';
 import { splitQuote, toQuote } from './comment-quote';
 
 /**
  * Comment box. The default is a card (input on top, hint and send row under it). `dock` is the bottom bar of
- * the task page: one expanding line with the projected context (status chip, assignee…) on the left and
- * attach + send on the right.
+ * the task page: one expanding line with the send key on the right.
  */
 @Component({
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, Kbd, CommentInput, UploadFile, LucideDynamicIcon, HlmTooltip],
+  imports: [HlmButtonImports, Kbd, CommentInput, UploadFile, HlmTooltip],
   host: {
     class: 'block min-w-0',
     '[class]': 'dock() ? \'\' : mobileSticky',
   },
   template: `
     @if (dock()) {
+      <!-- v3 "Composer": a 40px hairline box, the placeholder on the left, the send key on the right. -->
       <div
-        class="bg-card focus-within:ring-ring/40 flex items-end gap-1.5 rounded-xl py-1 pr-1.5 pl-2 focus-within:ring-2"
+        class="border-border focus-within:border-border-strong flex min-h-10 items-end gap-2 border py-px pr-2 pl-3"
       >
-        <div class="flex shrink-0 items-center gap-0.5 self-center max-sm:hidden">
-          <ng-content />
-        </div>
         <app-comment-input
           #composer
-          class="min-w-0 flex-1 [&_textarea]:max-h-40 [&_textarea]:min-h-8 [&_textarea]:resize-none [&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-1 [&_textarea]:py-1.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0 dark:[&_textarea]:bg-transparent"
+          class="min-w-0 flex-1 [&_textarea]:max-h-40 [&_textarea]:min-h-9 [&_textarea]:resize-none [&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-0! [&_textarea]:py-2 [&_textarea]:text-[13px] [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0 dark:[&_textarea]:bg-transparent"
           compact
           [placeholder]="placeholder()"
           [(value)]="draft"
           (keyed)="onKeydown($event)"
         />
-        <app-upload-file
-          class="self-center"
-          label="Attach"
-          variant="ghost"
-          [busy]="uploading()"
-          (file)="attach($event)"
-        />
         <button
-          hlmBtn
-          size="icon-sm"
           type="button"
-          class="self-center"
+          class="bg-secondary border-border text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 items-center self-center border px-[5px] font-mono text-[10.5px] leading-[14px] outline-none focus-visible:ring-2 disabled:pointer-events-none"
           aria-label="Send comment"
           [hlmTooltip]="'Send · ' + (prefs.sendsOnEnter() ? '↵' : '⌘↵')"
           [disabled]="!draft().trim() || busy()"
           (click)="send()"
         >
-          <svg [lucideIcon]="sendIcon" [size]="15" aria-hidden="true"></svg>
+          {{ prefs.sendsOnEnter() ? '↵' : '⌘↵' }}
         </button>
       </div>
     } @else {
@@ -130,7 +118,6 @@ export class CommentComposer {
   private readonly drafts = inject(DraftStore);
   private readonly store = inject(TramaStore);
   private readonly composer = viewChild<CommentInput>('composer');
-  protected readonly sendIcon = LucideArrowUp;
   protected readonly mobileSticky =
     'max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:px-4 max-md:py-2';
   readonly placeholder = input('Leave a comment…');
@@ -214,7 +201,6 @@ export class CommentComposer {
   imports: [
     ActorAvatar,
     Markdown,
-    RelativeTimePipe,
     HlmButtonImports,
     LucideDynamicIcon,
     HlmTooltip,
@@ -227,26 +213,26 @@ export class CommentComposer {
   },
   template: `
     <div class="flex min-w-0 gap-3">
-      <app-actor-avatar [actor]="comment().author" [size]="24" class="mt-0.5" />
-      <div class="min-w-0 flex-1">
+      <app-actor-avatar [actor]="comment().author" [size]="22" />
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
         <div class="flex min-w-0 items-baseline gap-x-2 gap-y-0.5">
-          <span class="text-foreground truncate text-sm">{{
+          <span class="text-foreground truncate text-[13px] leading-[17px] font-semibold">{{
             store.actorName(comment().author)
           }}</span>
           @if (comment().author.type === 'agent') {
             <span
-              class="text-primary bg-primary/10 shrink-0 rounded px-1 text-[10px] font-medium uppercase"
+              class="text-primary bg-primary/10 shrink-0 px-1 font-mono text-[10px] leading-[14px] uppercase"
               >agent</span
             >
           }
           <time
-            class="text-muted-foreground shrink-0 text-xs"
+            class="text-faint shrink-0 font-mono text-[10.5px] leading-[14px]"
             [attr.datetime]="comment().createdAt"
-            >{{ comment().createdAt | relativeTime }}</time
+            >{{ shortAgo() }} · via {{ origin() }}</time
           >
           @if (modified()) {
             <span
-              class="text-muted-foreground shrink-0 text-xs"
+              class="text-faint shrink-0 font-mono text-[10.5px] leading-[14px]"
               [hlmTooltip]="full(comment().updatedAt)"
               >edited</span
             >
@@ -326,7 +312,7 @@ export class CommentComposer {
             }
           </div>
         } @else {
-          <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-1 block [&_a]:underline [&_a]:underline-offset-2" />
+          <app-markdown [source]="comment().body" [link]="refs.linker()" class="block text-[13.5px]! leading-[21px]! text-text-2 [&_a]:underline [&_a]:underline-offset-2" />
         }
       </div>
     </div>
@@ -345,6 +331,18 @@ export class CommentItem {
   readonly quote = output<string>();
   protected readonly quoteIcon = LucideQuote;
   protected readonly parts = computed(() => splitQuote(this.comment().body));
+  /** "just now", "5m", "2h", "3d", then the date: how the activity frames write a comment's age. */
+  protected readonly shortAgo = computed(() => {
+    const ms = Date.now() - Date.parse(this.comment().createdAt);
+    const min = Math.floor(ms / 60_000);
+    if (ms < 45_000) return 'just now';
+    if (min < 60) return `${Math.max(min, 1)}m`;
+    if (min < 60 * 24) return `${Math.floor(min / 60)}h`;
+    if (min < 60 * 24 * 14) return `${Math.floor(min / (60 * 24))}d`;
+    return shortDate(this.comment().createdAt);
+  });
+  /** Where the comment was written: agents write from their Delta thread, people in Trama. */
+  protected readonly origin = computed(() => (this.comment().author.type === 'agent' ? 'Delta' : 'Trama'));
 
   protected quoteReply(): void {
     const selection = this.document.getSelection();
@@ -421,7 +419,7 @@ export class CommentItem {
   selector: 'app-comments-loader',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports],
-  host: { class: 'block' },
+  host: { class: 'block not-has-[*]:hidden' },
   template: `
     @if (thread().state === 'error') {
       <p class="text-muted-foreground text-xs">

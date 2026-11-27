@@ -34,7 +34,7 @@ import { settingsGroupsFor, settingsSectionOfUrl } from './settings-nav';
     </div>
 
     <div class="flex flex-col gap-0.5 px-[18px] pt-3.5 pb-2">
-      <span class="font-title text-foreground text-[24px] leading-normal">Settings</span>
+      <span class="font-title text-foreground text-[24px] leading-[normal]">Settings</span>
       <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ workspaceName() }} workspace</span>
     </div>
 

@@ -1,33 +1,46 @@
 ---
 name: trama-report-progress
-description: Record factual progress on Trama tasks, including implementation artifacts and concise updates. Use after meaningful implementation, a PR or build change, or when asked to update Trama.
+description: Keep a Trama task's thread record in sync. Use after every turn that edits files, when you open a PR or make a decision, and when asked to update Trama.
 ---
 
 # Report progress
 
-Record what happened, where it happened, and what remains. Use task-level updates and artifacts; do not create duplicate progress on a separate execution object.
+The thread's record on the task (summary, files, decisions, PR, suggested time) is written with one call: `trama sync` / `sync_thread`. Comments are for questions to people, not for progress.
 
-## Read, then report
+## Sync after each turn that edits files
 
-Read the relevant task context first. For work spanning multiple tasks, update each affected task with the facts relevant to it. Do not claim a change, test, review, or deployment you have not observed.
+CLI:
 
-Use `report_progress` to record, in one call, any of: an `artifact` (PR, build, test report, deployment...), a new task status (`issueStatus`), and one factual `comment`. Pass the task key as `issue` (the argument name is historical). Use `attach_artifact` when you only need to attach or refresh an artifact, and `add_comment` for a note. For anything else, use `list_capabilities` and `run_tool`, and the exact schema they return. Keep update text short and useful; the full transcript and detailed execution log belong in execution tools, not Trama.
+`trama sync <ID> --summary "<state and what remains>" --files-from-git --turns <N> --minutes <N>`, with `--decision "<text>@path,path"` once per decision and `--file <path>` for files git does not show. `--summary-file <F>` or `--summary -` read the text from a file or stdin.
 
-## What to record
+MCP: `sync_thread {issue, summary, files, decisions, turns, pullRequestUrl, activeMinutes, threadUrl}`; every field is optional, send what changed. Pass `issue` as the task key (the argument name is historical).
 
-- A concise comment on what changed and what remains.
-- The actual task status when it changes: `in_progress` when you start, `in_review` while the PR is open, `done` only once the fix is merged.
-- Relevant PR, build, test, design, or deployment artifacts, with accurate observed state (`state`, `ci` as pending, passing or failing, `review`, `hasConflicts`).
-- A short verification note: what was tested, where, and the result.
-- The `estimate` (points) when the real size became clear, and the `threadUrl` of the thread the work happened in, through `update_task`.
-- Anything that needs a person's decision, stated plainly in the comment.
+Rules:
 
-Attach an artifact to the task or tasks it concerns. Repeating the same `externalId` or URL updates the artifact in place, so do not worry about duplicates, but do not attach the same artifact to unrelated tasks. Verify the result after writing.
+- The summary **replaces** the previous one: write the whole current state in a few sentences (what changed, what remains, what was verified), not a diff of the turn.
+- Files are merged in; decisions are appended. Do not resend old decisions.
+- A decision is a durable choice a later agent should respect, with paths: a file, a directory prefix (`src/auth/`) or a glob (`src/auth/*`). No routine edits.
+- `--minutes` / `activeMinutes` is your active time since the last sync. It becomes a suggested time entry that a person accepts or dismisses; it is not logged time.
+- Sync only what you did and observed. Do not claim a test, review or deployment you have not seen, and state what was not checked.
+- Skip the sync on turns that edit no files. `trama sync --all` syncs every task linked to the current thread.
+- Output such as `✓ summary · 2 decisions · 3 files · 47m suggested` is the confirmation; no extra read is needed.
+
+## Attach the PR
+
+When you open a PR: `trama sync <ID> --pr <url>` (or `owner/repo#123`), MCP `sync_thread {issue, pullRequestUrl}`. It creates or refreshes the `pull_request` artifact on the task; repeating the same URL updates it in place. Attach it only to the task it concerns. Use `attach_artifact` (or `report_progress {artifact}`) for other artifacts: build, test report, design, deployment, with their observed state (`state`, `ci` as pending, passing or failing, `review`, `hasConflicts`).
+
+## Status belongs to people
+
+You set `in_progress` when you start, and nothing else. Never set `in_review` or `done`: the person moves the task after reviewing the PR. If the task is blocked, say so in your reply and in a comment.
+
+## Comments
+
+Use `add_comment` (or `report_progress {comment}`) only for a question or a note a person must see: an open decision, a blocker, something you could not verify. Say it plainly. Do not repeat the sync summary as a comment. Full transcripts and execution logs belong in execution tools.
 
 ## Before saying "done"
 
-- Every affected task has an accurate, useful comment and status.
-- Artifacts reflect their current observed state.
-- Verification claims are backed by evidence; state what was not checked.
+- The record has the latest summary, files and decisions of every affected task.
+- The PR is attached with `sync --pr`, and its state is what you observed.
 - Open questions for a person are written down on the task.
-- No full transcript or speculative progress was copied into Trama.
+- Verification claims are backed by evidence.
+- You left the status alone, apart from `in_progress`.

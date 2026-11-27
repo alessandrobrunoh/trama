@@ -11,7 +11,6 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideDynamicIcon, LucidePencil } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { TramaStore } from '../../core';
@@ -31,7 +30,7 @@ import { UploadFile } from '../../shared/upload-file';
       <textarea
         #ta
         rows="1"
-        class="font-title w-full resize-none overflow-hidden bg-transparent text-[30px] leading-[1.2] tracking-[-0.5px] outline-none md:text-[36px]"
+        class="font-title w-full resize-none overflow-hidden bg-transparent text-[30px] leading-[1.2] tracking-[-0.5px]! outline-none md:text-[36px] md:leading-[36.5px]"
         aria-label="Task title"
         [value]="draft()"
         (input)="onInput($event)"
@@ -41,7 +40,7 @@ import { UploadFile } from '../../shared/upload-file';
       ></textarea>
     } @else {
       <h1
-        class="font-title text-foreground -mx-1 px-1 text-[30px] leading-[1.2] tracking-[-0.5px] break-words md:text-[36px]"
+        class="font-title text-foreground -mx-1 px-1 text-[30px] leading-[1.2] tracking-[-0.5px]! break-words md:text-[36px] md:leading-[36.5px]"
         [class]="canEdit() ? 'hover:bg-hover cursor-text' : ''"
         [attr.role]="canEdit() ? 'button' : null"
         [attr.tabindex]="canEdit() ? 0 : null"
@@ -113,7 +112,7 @@ export class IssueTitle {
 @Component({
   selector: 'app-issue-description',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon, UploadFile],
+  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, UploadFile],
   host: { class: 'block' },
   template: `
     @if (editing()) {
@@ -183,7 +182,7 @@ export class IssueTitle {
       </div>
     } @else {
       <div
-        class="group/md relative -mx-1 px-1"
+        class="-mx-1 px-1"
         [class]="canEdit() ? 'hover:bg-hover cursor-text' : ''"
         [attr.role]="canEdit() ? 'button' : null"
         [attr.tabindex]="canEdit() ? 0 : null"
@@ -194,7 +193,7 @@ export class IssueTitle {
         @if (value().trim()) {
           <app-markdown
             [source]="value()"
-            class="text-text-2 block text-[14.5px]! leading-[22px]! [&_a]:underline [&_a]:underline-offset-2"
+            class="block text-[14.5px]! leading-[22px]! text-text-2 [&_a]:underline [&_a]:underline-offset-2"
           />
         } @else {
           <p class="text-faint text-[14.5px] leading-[22px]">
@@ -204,13 +203,6 @@ export class IssueTitle {
                 : 'No description.'
             }}
           </p>
-        }
-        @if (canEdit()) {
-          <svg
-            [lucideIcon]="pencil"
-            [size]="13"
-            class="text-muted-foreground absolute top-1 right-1 opacity-0 group-hover/md:opacity-100"
-          ></svg>
         }
       </div>
     }
@@ -225,7 +217,6 @@ export class IssueDescription {
   protected readonly tab = signal<'write' | 'preview'>('write');
   protected readonly draft = signal('');
   protected readonly uploading = signal(false);
-  protected readonly pencil = LucidePencil;
   private readonly ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
 
   constructor() {

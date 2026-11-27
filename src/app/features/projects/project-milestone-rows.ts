@@ -81,7 +81,7 @@ const DOT: Record<BurnTone, string> = {
     }
     @if (!rows().length) {
       <p class="text-faint border-border border-t py-3 font-mono text-[11px]">
-        No milestones yet. Add some on the Overview tab.
+        No milestones yet.
       </p>
     }
   `,

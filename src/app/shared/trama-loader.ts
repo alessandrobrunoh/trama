@@ -20,7 +20,7 @@ import { STRAND_A_PATH, STRAND_B_PATH } from './trama-logo';
       [attr.height]="size()"
       aria-hidden="true"
     >
-      <path class="strand strand-a" [attr.d]="strandA" fill="var(--primary)" />
+      <path class="strand strand-a" [attr.d]="strandA" fill="var(--brand)" />
       <path class="strand strand-b" [attr.d]="strandB" fill="var(--foreground)" />
     </svg>
     @if (caption(); as text) {
